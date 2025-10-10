@@ -1,0 +1,55 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node / Vite
+node_modules/
+webapp/dist/
+webapp/.vite/
+
+# WordPress plugin build output
+plugin/dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# RAG storage / indexes
+rag-backend/chroma_store/
+rag-backend/docs/**/*.pdf
+rag-backend/docs/**/*.html
+rag-backend/docs/**/*.txt
+rag-backend/docs/**/*.md
+
+# Editors / IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Misc
+coverage/
+.dist/
+.tmp/
+.sass-cache/
+
+# Lock files (optional keep uv.lock if desired)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock

@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>RAG Chatbot (Standalone)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <!-- mirror the same root id as the shortcode renders in WP -->
+    <div id="rag-chatbot-root" data-title="Ask our AI" data-source="dev"></div>
+
+    <script>
+      // When running standalone, WP’s wp_localize_script doesn’t exist.
+      // So we provide a compatible global config object here.
+      window.RAG_CHATBOT_CONFIG = {
+        apiBase: 'http://localhost:8000',  // your RAG backend locally
+        dev: true
+      }
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
