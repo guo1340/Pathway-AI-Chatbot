@@ -67,3 +67,16 @@
 .rcb-cite-item a:hover {
   text-decoration: underline;
 }
+
+/* Prevent color change after clicking citation links */
+.rcb-cite-item a:link,
+.rcb-cite-item a:visited {
+  color: #0066cc;          /* or whatever color you want */
+  text-decoration: none;
+}
+
+.rcb-cite-item a:hover,
+.rcb-cite-item a:focus {
+  color: #004999;          /* slightly darker on hover */
+  text-decoration: underline;
+}

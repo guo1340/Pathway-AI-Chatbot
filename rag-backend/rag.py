@@ -1,6 +1,7 @@
 import os, uuid, glob, html
 from typing import List, Tuple, Optional, Dict
 from dataclasses import dataclass
+import re
 
 from dotenv import load_dotenv
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -11,6 +12,7 @@ from langchain_community.document_loaders import TextLoader, BSHTMLLoader, PyPDF
 # LLM + embeddings (OpenAI or Ollama)
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_ollama import ChatOllama, OllamaEmbeddings
+from urllib.parse import quote
 
 load_dotenv()
 
@@ -123,39 +125,89 @@ class RagPipeline:
         retriever = self.vectordb.as_retriever(search_kwargs={"k": k})
         return retriever.invoke(query)
 
+    # rag.py (drop-in replacement for answer() only; rest unchanged)
+
     def answer(self, query: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, str]]]:
         ctx_docs = self.retrieve(query, k=k)
+
+        # Build the numbered context block that the LLM will cite as [n]
         context = "\n\n".join(
             f"[{i+1}] {d.page_content.strip()}" for i, d in enumerate(ctx_docs)
         )
+
+        # Build richer citations: include page numbers and add #page=N to URLs
         citations = []
         for d in ctx_docs:
-            src = d.metadata.get("source", "")
-            citations.append({"title": os.path.basename(src) or "source", "url": _file_to_url(src)})
+            src = d.metadata.get("source", "") or ""
+            base = os.path.basename(src) or "source"
 
-        prompt = f"""
-You are a helpful assistant. Use ONLY the provided context to answer.
-Cite sources by number where relevant, and keep the answer concise.
-If you don't have enough infomration to answer the question, It is alright.
+            # Try to extract page number from metadata
+            page = d.metadata.get("page", d.metadata.get("page_number"))
+            title = f"{base} p.{page}" if page is not None else base
 
+            # Build URL with page reference if applicable
+            file_url = _file_to_url(src)
+            if page is not None:
+                file_url += f"#page={page}"
 
-Question: {query}
+            citations.append({
+                "title": title,
+                "url": file_url
+            })
 
-Context:
-{context}
+        # Clean, explicit prompt to avoid hallucination
+        prompt = f"""You are a concise assistant that must answer using ONLY the provided context.
+    - Cite sources with the exact bracket numbers like [1], [2] corresponding to the context.
+    - If the context is insufficient, say so briefly including the phrase "we do not have enough information" and do not invent details.
 
-Answer:
-"""
-        # run the LLM
+    Question:
+    {query}
+
+    Context:
+    {context}
+
+    Answer (use [n]-style citations inline where relevant):
+    """
+
+        # Invoke the LLM
         resp = self.llm.invoke(prompt)
         text = resp.content if hasattr(resp, "content") else str(resp)
-        # return raw text; React will escape as needed in the UI
+        
+        # Extract which sources were actually cited in the text
+        used_indices = {int(n) for n in re.findall(r"\[(\d+)\]", text)}
+        if used_indices:
+            citations = [c for i, c in enumerate(citations, start=1) if i in used_indices]
+        
+        # Debug: print the response text to inspect it
+        # print("AI Response:", text)
+        
+        # 🧠 NEW: hide citations if AI says it cannot answer
+        normalized = text.lower().strip()
+        if any(
+            phrase in normalized
+            for phrase in [
+                "cannot answer",
+                "cannot answer from the given context",
+                "insufficient context",
+                "not enough information",
+                "no relevant information",
+                "based on the provided context i cannot",
+                "we do not have enough information",
+            ]
+        ):
+            # print("Refusal detected! Clearing citations.")
+            citations = []
+
         return text, citations
 
-def _file_to_url(path: str) -> str:
-    # if you are indexing live website pages, put the page URL in metadata['source'] already
-    if not path:
-        return ""
-    # default to a file:// url (standalone dev); you can map this to site URLs later
-    abspath = os.path.abspath(path)
-    return f"file://{abspath}"
+
+
+def _file_to_url(src: str) -> str:
+    """
+    Converts a local file path to a fully qualified /api/files URL.
+    Keeps #page fragments intact so browsers open directly to that page.
+    """
+    base = os.path.basename(src)
+    safe_base = quote(base, safe="#?()[]!$&',;=:@")  # allow useful URL chars
+    api_base = os.getenv("API_BASE", "http://localhost:8000").rstrip("/")
+    return f"{api_base}/api/files/{safe_base}"

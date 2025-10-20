@@ -36,7 +36,13 @@ export default function App({
     // Fallback: convert file:// to /api/files
     if (c.url.startsWith('file://')) {
       const name = basenameFromUrl(c.url)
-      if (name) return `${apiBase.replace(/\/$/, '')}/api/files/${encodeURIComponent(name)}`
+      if (name) {
+        // Split filename and fragment (e.g. "policy.pdf#page=7")
+        const [file, fragment] = name.split('#')
+        const safeFile = encodeURIComponent(file)
+        const fragPart = fragment ? `#${fragment}` : ''
+        return `${apiBase.replace(/\/$/, '')}/api/files/${safeFile}${fragPart}`
+      }
     }
     return c.url
   }
@@ -117,7 +123,9 @@ export default function App({
                   <div className="rcb-cite-label">Sources:</div>
                   <ol className="rcb-cite-list">
                     {deduped.map((c, j) => {
-                      const fileName = basenameFromUrl(c.url) || c.title || 'source'
+                      // const fileName = basenameFromUrl(c.url) || c.title || 'source'
+                      const displayTitle = c.title || basenameFromUrl(c.url) || 'source';
+                      const [name, page] = (displayTitle || '').split(' p.');
                       const href = toHttpUrl(c, apiBase)
                       const num = j + 1
                       return (
@@ -127,12 +135,12 @@ export default function App({
                               href={href}
                               target="_blank"
                               rel="noopener noreferrer"
-                              title={fileName}               // tooltip on hover
+                              title={displayTitle} 
                             >
-                              [{num}] {fileName}
+                              [{num}] {name}{page && <span style={{ color: '#777' }}> p.{page}</span>}
                             </a>
                           ) : (
-                            <span>[{num}] {fileName}</span>
+                            <span>[{num}] {displayTitle}</span>
                           )}
                         </li>
                       )
@@ -149,8 +157,11 @@ export default function App({
           placeholder="Ask about our docs, posts, or PDFs…"
           value={q}
           onChange={e => setQ(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              send(); 
+            }
           }}
         />
         <button onClick={send} disabled={busy}>{busy ? 'Thinking…' : 'Send'}</button>

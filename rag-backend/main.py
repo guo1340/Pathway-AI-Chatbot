@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+import mimetypes
 from typing import Optional, List, Dict, Any, Tuple
 from urllib.parse import quote
 
@@ -156,31 +157,75 @@ def chat(body: ChatIn, request: Request):
 def get_file(name: str):
     """
     Streams a file from DOCS_DIR.
-    - Path traversal protected by basename().
-    - 'inline' Content-Disposition so browsers open PDFs in a new tab.
+    - Protects against path traversal.
+    - Serves PDFs inline so #page=N anchors work in browsers.
+    - Guesses MIME type for other files for correct preview/download behavior.
     """
     safe = os.path.basename(name)  # prevent ../../ tricks
     path = os.path.join(DOCS_DIR, safe)
+
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="File not found")
 
-    media_type = "application/pdf" if safe.lower().endswith(".pdf") else "application/octet-stream"
-    return FileResponse(
-        path,
-        media_type=media_type,
-        headers={"Content-Disposition": f'inline; filename="{safe}"'}
-    )
+    # Guess MIME type
+    mime_type, _ = mimetypes.guess_type(path)
+    if mime_type is None:
+        mime_type = "application/octet-stream"
 
+    # Use inline disposition for PDFs so browser viewers honor #page=N anchors
+    headers = {}
+    if mime_type == "application/pdf":
+        headers["Content-Disposition"] = f'inline; filename="{safe}"'
+    else:
+        # for non-PDFs, allow download
+        headers["Content-Disposition"] = f'attachment; filename="{safe}"'
+
+    return FileResponse(path, media_type=mime_type, headers=headers)
+
+# main.py (replace only the /api/upload route and add a small env at top)
+
+MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))  # optional soft guard
 
 @app.post("/api/upload")
-def upload(file: UploadFile = File(...)):
-    # Save into docs dir and reload index
+async def upload(file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Missing filename")
+
     os.makedirs(DOCS_DIR, exist_ok=True)
-    dest = os.path.join(DOCS_DIR, file.filename)
-    with open(dest, "wb") as f:
-        f.write(file.file.read())
-    PIPE.reload()
-    return {"status": "ok", "filename": file.filename}
+    dest = os.path.join(DOCS_DIR, os.path.basename(file.filename))
+
+    size = 0
+    chunk_size = 1024 * 1024  # 1MB
+    try:
+        with open(dest, "wb") as f:
+            while True:
+                chunk = await file.read(chunk_size)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if MAX_UPLOAD_MB and size > MAX_UPLOAD_MB * 1024 * 1024:
+                    # Clean up partial file and abort
+                    f.close()
+                    try:
+                        os.remove(dest)
+                    except Exception:
+                        pass
+                    raise HTTPException(status_code=413, detail="File too large")
+                f.write(chunk)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save: {e!s}")
+
+    # Reload the vector index after successful upload
+    try:
+        PIPE.reload()
+    except Exception as e:
+        # File saved, but indexing failed; surface a useful message
+        raise HTTPException(status_code=500, detail=f"Saved but failed to index: {e!s}")
+
+    return {"status": "ok", "filename": file.filename, "bytes": size}
+
 
 
 if __name__ == "__main__":
