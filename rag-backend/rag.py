@@ -158,8 +158,11 @@ class RagPipeline:
         # Clean, explicit prompt to avoid hallucination
         prompt = f"""You are a concise assistant that must answer using ONLY the provided context.
     - Cite sources with the exact bracket numbers like [1], [2] corresponding to the context.
-    - If the context is insufficient, say so briefly including the phrase "we do not have enough information" and do not invent details.
-
+    - If the context is insufficient, say so briefly including the phrase "sorry, we do not have enough information" and do not invent details.
+    - If the question is not really a question, and it is a simple conversational input, feel free to respond with a conversational response and inform that your main purpose here is to answer information questions from the file base. When you do inform the users this, include these exact words "My main purpose here is to answer information questions from the file base". 
+    - If the question or statement includes any form of curse words, gently tell the user to stop 
+    - refraim from using any form of contraction for example, use "do not" insted of "don't", use "cannot" instead of "can't"
+      
     Question:
     {query}
 
@@ -192,7 +195,8 @@ class RagPipeline:
                 "not enough information",
                 "no relevant information",
                 "based on the provided context i cannot",
-                "we do not have enough information",
+                "sorry, we do not have enough information",
+                "my main purpose here is to answer information questions from the file base",
             ]
         ):
             # print("Refusal detected! Clearing citations.")
