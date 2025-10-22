@@ -2,7 +2,7 @@ import React from 'react'
 import { askRag } from './api'
 
 type Citation = { title?: string; url?: string }
-type Msg = { who: 'you' | 'ai', text: string, citations?: Citation[] }
+type Msg = { who: 'you' | 'ai', text: string, citations?: Citation[], time?: string }
 
 export default function App({
   apiBase,
@@ -65,7 +65,7 @@ export default function App({
     const query = q.trim()
     if (!query || busy) return
     setQ('')
-    setMsgs(m => [...m, { who: 'you', text: query }])
+    setMsgs(m => [...m, { who: 'you', text: query, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }])
     setBusy(true)
     try {
       const data = await askRag(apiBase, { query, source, conversation_id: convId })
@@ -74,7 +74,12 @@ export default function App({
       const citations: Citation[] | undefined = data.citations
 
       // push placeholder AI message, then progressively type it out
-      setMsgs(m => [...m, { who: 'ai', text: '', citations }])
+      setMsgs(m => [...m, {
+        who: 'ai',
+        text: '',
+        citations,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }])
 
       await new Promise<void>(resolve => {
         let i = 0
@@ -98,7 +103,11 @@ export default function App({
         setTimeout(step, 16)
       })
     } catch (e: any) {
-      setMsgs(m => [...m, { who: 'ai', text: `Error: ${e.message}` }])
+      setMsgs(m => [...m, {
+        who: 'ai',
+        text: `Error: ${e.message}`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }])
     }
     setBusy(false)
   }
@@ -111,13 +120,34 @@ export default function App({
 
   return (
     <div className="rcb-card" role="complementary" aria-label="RAG Chatbot">
-      <div className="rcb-head">{title || 'Ask our AI'}</div>
+      <div className="rcb-head">{title || 'Pathway Chatbot'}</div>
       <div className="rcb-log" id="rcb-log" ref={logRef}>
-        {msgs.map((m, i) => {
+        {msgs.length === 0 ? (
+          <div className="rcb-msg ai">
+            <span className='ai-title'>
+              Pathway's bot:
+            </span>
+            <p className="ai-text">
+              👋 Hi there! Got a question? I’m here to help.
+            </p>
+          </div>
+        ) : (msgs.map((m, i) => {
           const deduped = dedupeCitations(m.citations)
           return (
             <div key={i} className={`rcb-msg ${m.who}`}>
-              <div><strong>{m.who === 'you' ? 'You' : 'AI'}</strong>: {m.text}</div>
+              <div className='message-container'>
+                <span className='ai-title'>
+                  {m.who === 'you' ? 'You:' : "Pathway's bot: "}
+                </span>
+                <div className={m.who === 'you' ? 'user-text' : 'ai-text'}>
+                  {m.text}
+                </div>
+                {m.who === 'ai' && (
+                  <div className="timestamp">
+                    {m.time}
+                  </div>
+                )}
+              </div>
               {!!deduped.length && (
                 <div className="rcb-cite" aria-label="Sources">
                   <div className="rcb-cite-label">Sources:</div>
@@ -135,7 +165,7 @@ export default function App({
                               href={href}
                               target="_blank"
                               rel="noopener noreferrer"
-                              title={displayTitle} 
+                              title={displayTitle}
                             >
                               [{num}] {name}{page && <span style={{ color: '#777' }}> p.{page}</span>}
                             </a>
@@ -150,11 +180,11 @@ export default function App({
               )}
             </div>
           )
-        })}
+        }))}
       </div>
       <div className="rcb-row">
-        <textarea
-          placeholder="Ask about our docs, posts, or PDFs…"
+        {/* <textarea
+          placeholder="Type a message"
           value={q}
           onChange={e => setQ(e.target.value)}
           onKeyDown={(e) => {
@@ -163,8 +193,27 @@ export default function App({
               send(); 
             }
           }}
+        /> */}
+        <textarea
+          id="message"
+          placeholder="Type a message..."
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            e.target.style.height = "auto"; // reset
+            e.target.style.height = `${e.target.scrollHeight}px`; // expand
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
+          rows={1}
+          className="chat-input"
         />
-        <button onClick={send} disabled={busy}>{busy ? 'Thinking…' : 'Send'}</button>
+
+        <button className={busy ? '' : 'send-button'} onClick={send} disabled={busy}>{busy ? 'Thinking…' : 'Send'}</button>
       </div>
     </div>
   )

@@ -135,6 +135,19 @@ class RagPipeline:
             f"[{i+1}] {d.page_content.strip()}" for i, d in enumerate(ctx_docs)
         )
 
+        # --- Save context to local file ---
+        try:
+            with open("context.txt", "a", encoding="utf-8") as f:
+                f.write("=" * 80 + "\n")
+                f.write(f"🧠 Query: {query}\n")
+                f.write("-" * 80 + "\n")
+                f.write("📄 Context Sent to Model:\n")
+                f.write(context)
+                f.write("\n" + "=" * 80 + "\n\n")
+        except Exception as e:
+            print(f"⚠️ Failed to write context.txt: {e}")
+
+
         # Build richer citations: include page numbers and add #page=N to URLs
         citations = []
         for d in ctx_docs:
@@ -157,12 +170,24 @@ class RagPipeline:
 
         # Clean, explicit prompt to avoid hallucination
         prompt = f"""You are a concise assistant that must answer using ONLY the provided context.
-    - Cite sources with the exact bracket numbers like [1], [2] corresponding to the context.
-    - If the context is insufficient, say so briefly including the phrase "sorry, we do not have enough information" and do not invent details.
-    - If the question is not really a question, and it is a simple conversational input, feel free to respond with a conversational response and inform that your main purpose here is to answer information questions from the file base. When you do inform the users this, include these exact words "My main purpose here is to answer information questions from the file base". 
-    - If the question or statement includes any form of curse words, gently tell the user to stop 
-    - refraim from using any form of contraction for example, use "do not" insted of "don't", use "cannot" instead of "can't"
-      
+
+You may reason from context clues to interpret abbreviations, acronyms, or partial terms if their likely meaning can be clearly inferred from the text provided. 
+For example, if a repeated acronym appears near specific phrases, titles, or descriptions that indicate what it likely refers to, you may use that inferred meaning. 
+However, never use outside knowledge or external assumptions that are not supported by the context itself.
+
+Rules:
+- Cite sources with the exact bracket numbers like [1], [2] corresponding to the context.
+- If the context is insufficient, say so briefly including the phrase "sorry, we do not have enough information" and do not invent details.
+- If a meaning cannot be reasonably inferred, explicitly state that it is unclear.
+- If the question is not really a question, and it is a simple conversational input, feel free to respond with a conversational response and inform that your main purpose here is to answer information questions from the file base. 
+- When you do inform the users your main purpose and you are not responding with any of the information you got from the context. 
+- Encourage the user to ask you questions that is within the realm of your purpose and direct or redirect the conversation toward that, especially when you can't answer
+- When you do not have the answers to a question, respond with "sorry, we do not have enough information" and then invite the user to ask questions related to the topics found in the file base or the materials you have access to. Do not invent new topics or domains that are not supported by the context. Make sure you give examples of what topics are in the file base. Do not just tell the user to ask questions related to the topics found in the file base
+- If you are responding with infromation fom the context, you do not need to explain your purpose to the user
+- You may mention general topic categories only if they clearly appear in the retrieved context. For example, if many documents reference education or ministry, you may encourage questions in those areas. Otherwise, simply invite the user to ask another question without naming new topics.
+- If the question or statement includes any form of curse words, gently tell the user to stop.
+- Refrain from using any form of contraction (for example, use "do not" instead of "don't", use "cannot" instead of "can't").
+
     Question:
     {query}
 
