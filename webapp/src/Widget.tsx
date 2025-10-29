@@ -13,7 +13,7 @@ export default function Widget({ apiBase, source, title }: { apiBase: string; so
         onClick={toggle}
       >
         <span className="icon chat">
-          <div className='chat-icon'/>
+          <div className='chat-icon' />
         </span>
         <span className="icon close">✕</span>
       </button>
