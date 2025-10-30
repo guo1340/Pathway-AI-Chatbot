@@ -15,6 +15,7 @@ export default function App({
   const [busy, setBusy] = React.useState(false)
   const [convId, setConvId] = React.useState<string | undefined>(undefined)
   const logRef = React.useRef<HTMLDivElement | null>(null)
+  const inputRef = React.useRef<HTMLTextAreaElement | null>(null)
 
   // ---- helpers (frontend-only) ----
   function basenameFromUrl(u?: string) {
@@ -65,6 +66,7 @@ export default function App({
     const query = q.trim()
     if (!query || busy) return
     setQ('')
+    if (inputRef.current) inputRef.current.style.height = "auto"; // reset height
     setMsgs(m => [...m, { who: 'you', text: query, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }])
     setBusy(true)
     try {
@@ -73,7 +75,6 @@ export default function App({
       const answer = data.answer || ''
       const citations: Citation[] | undefined = data.citations
 
-      // push placeholder AI message, then progressively type it out
       setMsgs(m => [...m, {
         who: 'ai',
         text: '',
@@ -84,7 +85,7 @@ export default function App({
       await new Promise<void>(resolve => {
         let i = 0
         const step = () => {
-          i = Math.min(i + 2, answer.length) // typing speed
+          i = Math.min(i + 2, answer.length)
           setMsgs(m => {
             if (!m.length) return m
             const lastIdx = m.length - 1
@@ -112,6 +113,7 @@ export default function App({
     setBusy(false)
   }
 
+
   // auto-scroll to bottom on new messages
   React.useEffect(() => {
     const el = logRef.current
@@ -133,22 +135,54 @@ export default function App({
           </div>
         ) : (msgs.map((m, i) => {
           const deduped = dedupeCitations(m.citations)
+          function renderWithInlineCitations(text: string, citations?: Citation[]) {
+            if (!citations?.length) return text;
+
+            return text.split(/(\[\d+\])/g).map((part, i) => {
+              const match = part.match(/\[(\d+)\]/);
+              if (!match) return part;
+
+              const idx = parseInt(match[1], 10) - 1;
+              const citation = citations[idx];
+              if (!citation) return part;
+
+              const href = toHttpUrl(citation, apiBase);
+              const title = citation.title || basenameFromUrl(citation.url) || 'source';
+              return (
+                <a
+                  key={i}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={title}
+                  className="inline-citation"
+                >
+                  [{match[1]}]
+                </a>
+              );
+            });
+          }
+
           return (
             <div key={i} className={`rcb-msg ${m.who}`}>
               <div className='message-container'>
                 <span className='ai-title'>
                   {m.who === 'you' ? 'You:' : "Pathway's bot: "}
                 </span>
-                <div className={m.who === 'you' ? 'user-text' : 'ai-text'}>
+                {/* <div className={m.who === 'you' ? 'user-text' : 'ai-text'}>
                   {m.text}
+                </div> */}
+                <div className={m.who === 'you' ? 'user-text' : 'ai-text'}>
+                  {renderWithInlineCitations(m.text, m.citations)}
                 </div>
+
                 {m.who === 'ai' && (
                   <div className="timestamp">
                     {m.time}
                   </div>
                 )}
               </div>
-              {!!deduped.length && (
+              {/* {!!deduped.length && (
                 <div className="rcb-cite" aria-label="Sources">
                   <div className="rcb-cite-label">Sources:</div>
                   <ol className="rcb-cite-list">
@@ -177,7 +211,7 @@ export default function App({
                     })}
                   </ol>
                 </div>
-              )}
+              )} */}
             </div>
           )
         }))}
@@ -195,6 +229,7 @@ export default function App({
           }}
         /> */}
         <textarea
+          ref={inputRef}
           id="message"
           placeholder="Type a message..."
           value={q}

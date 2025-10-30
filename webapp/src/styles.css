@@ -1,20 +1,41 @@
-:root { --radius: 14px; }
-#rag-chatbot-root { font-family: ui-sans-serif, system-ui, -apple-system; }
-.rcb-widget-root { position: fixed; right: 20px; bottom: 20px; z-index: 2147483000; }
+:root {
+  --radius: 14px;
+}
+
+#rag-chatbot-root {
+  font-family: ui-sans-serif, system-ui, -apple-system;
+}
+
+/* --- Root and Launcher Position --- */
+.rcb-widget-root {
+  position: fixed;
+  left: 10px;
+  top: 10px;
+  /* default top 10px */
+  z-index: 2147483000;
+}
+
+.rcb-launcher-wrapper {
+  position: fixed;
+  left: 10px;
+  bottom: calc(100% - 66px - 10px);
+  /* initial bottom auto-adjust */
+  cursor: move;
+}
+
 .rcb-launcher {
-  position: relative;
   width: 56px;
   height: 56px;
   border-radius: 50%;
   background-color: #609693;
   color: white;
-  font-size: 24px;
+  font-size: 30px;
   border: none;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background-color 0.2s ease, transform 0.2s ease;
-
-  position: relative;
-  overflow: hidden;
 }
 
 .rcb-launcher:hover {
@@ -24,34 +45,13 @@
 
 .icon {
   position: absolute;
+  height: 30px;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
   transition: transform 0.4s ease, opacity 0.3s ease;
+  color: #000;
 }
-
-.chat-icon {
-  position: relative;
-  width: 30px;
-  height: 15px;
-  background-color: black;
-  border-radius: 5px;
-  display: inline-block;
-}
-
-/* Tail triangle */
-.chat-icon::after {
-  content: "";
-  position: absolute;
-  right: 1px;         /* move tail inward from edge */
-  bottom: -4px;       /* below the main bubble */
-  width: 0;
-  height: 0;
-  border-left: 7px solid transparent;
-  border-right: 7px solid transparent;
-  border-top: 7px solid black; /* color matches the bubble */
-}
-
 
 /* Default states */
 .icon.chat {
@@ -59,20 +59,20 @@
   opacity: 1;
 }
 
-.icon.chat .chat-icon {
+/* .icon.chat .chat-icon {
   transform: translateY(-1px);
-}
+} */
 
-
+/* 
 .icon.close {
   transform: translate(-50%, 60px);
   opacity: 0;
   color: black;
   font-weight: bolder;
-}
+} */
 
 /* When open */
-.rcb-launcher.open .icon.chat {
+/* .rcb-launcher.open .icon.chat {
   transform: translate(-50%, -120%);
   opacity: 0;
 }
@@ -80,90 +80,141 @@
 .rcb-launcher.open .icon.close {
   transform: translate(-50%, -50%);
   opacity: 1;
+} */
+
+/* Root now attaches to the left/top */
+.rcb-widget-root {
+  position: fixed;
+  left: 10px;
+  top: 10px;
+  /* default top position */
+  z-index: 2147483000;
+  cursor: move;
 }
 
-/* Chat popup wrapper */
+/* --- Popup alignment: slides horizontally from left --- */
 .rcb-popup {
   position: fixed;
-  bottom: 90px;        /* space above the launcher button */
-  right: 20px;
+  left: 80px;
+  /* appears to the right of the button */
   width: 380px;
-  max-height: 600px;
   background: white;
   border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   overflow: hidden;
-  transform: translateY(120%);
+  transform: translateX(-120%);
   opacity: 0;
   transition: transform 0.4s ease, opacity 0.3s ease;
-  pointer-events: none; /* disables click while closed */
+  pointer-events: none;
 }
 
-/* When open: slide up and fade in */
+/* --- Open and closed states --- */
 .rcb-popup.open {
-  transform: translateY(0);
+  transform: translateX(0);
   opacity: 1;
   pointer-events: auto;
+  animation: popup-slide-left 0.45s ease;
 }
 
-/* When closed: slide down and fade out */
 .rcb-popup.closed {
-  transform: translateY(120%);
+  transform: translateX(-120%);
   opacity: 0;
   pointer-events: none;
 }
 
-/* Optional subtle bounce animation on open */
-.rcb-popup.open {
-  animation: popup-bounce 0.45s ease;
+@keyframes popup-slide-left {
+  0% {
+    transform: translateX(-120%);
+    opacity: 0;
+  }
+
+  70% {
+    transform: translateX(10px);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
-@keyframes popup-bounce {
-  0% { transform: translateY(120%); opacity: 0; }
-  70% { transform: translateY(-10px); opacity: 1; }
-  100% { transform: translateY(0); opacity: 1; }
+/* --- Constrain top/bottom of popup within screen --- */
+@media (max-height: 600px) {
+  .rcb-popup {
+    max-height: calc(100vh - 20px);
+    bottom: 10px;
+  }
 }
 
 .rcb-popup-inner {
-  background: #fff; border-radius: var(--radius); overflow: hidden;
-  border: 1px solid #e5e7eb; box-shadow: 0 16px 48px rgba(0,0,0,.22);
+  background: #fff;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .22);
 }
+
 .rcb-card {
-  max-width: 720px; margin: 0; 
-  border: 1px solid #e5e7eb; border-radius: var(--radius);
-  box-shadow: 0 4px 12px rgba(0,0,0,.04);
+  max-width: 720px;
+  margin: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .04);
 }
-.rcb-head { 
-  font-size: 1.1rem; 
-  font-weight: 600; 
+
+.rcb-head {
+  font-size: 1.1rem;
+  font-weight: 600;
   padding: 1rem;
   background-color: rgb(78, 152, 147);
 }
-.rcb-log { 
-  height: 380px; 
-  overflow: auto; 
-  padding: 0.5rem 1.75rem 0.5rem 1.75rem; 
+
+.rcb-log {
+  height: 380px;
+  overflow: auto;
+  padding: 0.5rem 1.75rem 0.5rem 1.75rem;
   /* background: #fafafa;
   border-radius: 8px; 
   border: 1px solid #eee;  */
 }
-.rcb-msg { margin: .5rem 0; }
-.rcb-msg.you .message-container { align-items: flex-end; }
-.rcb-cite { font-size: .85rem; color: #555; margin-top: .25rem; }
-.rcb-row { display: flex; gap: .5rem; padding: .75rem; }
+
+.rcb-msg {
+  margin: .5rem 0;
+}
+
+.rcb-msg.you .message-container {
+  align-items: flex-end;
+}
+
+.rcb-cite {
+  font-size: .85rem;
+  color: #555;
+  margin-top: .25rem;
+}
+
+.rcb-row {
+  display: flex;
+  gap: .5rem;
+  padding: .75rem;
+}
 
 .chat-input {
   width: 100%;
-  min-height: 40px;               /* matches typical input height */
-  max-height: 150px;              /* limit how tall it can grow */
+  min-height: 40px;
+  /* matches typical input height */
+  max-height: 150px;
+  /* limit how tall it can grow */
   border: 1.5px solid #000;
   border-radius: 12px;
   padding: 8px 12px;
   font-size: 1rem;
   font-family: inherit;
   line-height: 1.5rem;
-  overflow: hidden;               /* hide scrollbars */
-  resize: none;                   /* prevent manual resize */
+  overflow: hidden;
+  /* hide scrollbars */
+  resize: none;
+  /* prevent manual resize */
   background-color: #fff;
   box-sizing: border-box;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -172,8 +223,9 @@
 
 .chat-input:focus {
   outline: none;
-  border-color: #609693;          /* highlight like input focus */
-  box-shadow: 0 0 0 2px rgba(96,150,147,0.2);
+  border-color: #609693;
+  /* highlight like input focus */
+  box-shadow: 0 0 0 2px rgba(96, 150, 147, 0.2);
 }
 
 /* Vertically centers placeholder text */
@@ -182,7 +234,14 @@
   vertical-align: middle;
 }
 
-.rcb-row button { padding: 0 .9rem; border-radius: 10px; border: 1px solid #609693; background: #609693; color: #000000; }
+.rcb-row button {
+  padding: 0 .9rem;
+  border-radius: 10px;
+  border: 1px solid #609693;
+  background: #609693;
+  color: #000000;
+}
+
 /* Container for the sources block */
 .rcb-cite {
   margin-top: 8px;
@@ -197,7 +256,8 @@
 
 /* Make each source its own line */
 .rcb-cite-list {
-  list-style: none;         /* remove default numbers (we render [n] ourselves) */
+  list-style: none;
+  /* remove default numbers (we render [n] ourselves) */
   padding: 0;
   margin: 0;
 }
@@ -212,9 +272,12 @@
 /* The magic trio for long, no-space filenames/URLs */
 .rcb-cite-item a,
 .rcb-cite-item span {
-  white-space: normal;      /* allow wrapping onto next line */
-  word-break: break-word;   /* break long words/filenames if needed */
-  overflow-wrap: anywhere;  /* modern property: break anywhere if necessary */
+  white-space: normal;
+  /* allow wrapping onto next line */
+  word-break: break-word;
+  /* break long words/filenames if needed */
+  overflow-wrap: anywhere;
+  /* modern property: break anywhere if necessary */
 }
 
 /* Optional: make long URLs look nicer when focused/hovered */
@@ -226,13 +289,15 @@
 /* Prevent color change after clicking citation links */
 .rcb-cite-item a:link,
 .rcb-cite-item a:visited {
-  color: #0066cc;          /* or whatever color you want */
+  color: #0066cc;
+  /* or whatever color you want */
   text-decoration: none;
 }
 
 .rcb-cite-item a:hover,
 .rcb-cite-item a:focus {
-  color: #004999;          /* slightly darker on hover */
+  color: #004999;
+  /* slightly darker on hover */
   text-decoration: underline;
 }
 
@@ -248,32 +313,52 @@
 }
 
 .ai-title {
-  color: #777;           /* light grey */
-  font-weight: 400;      /* normal / light */
-  font-size: 0.9em;      /* optional, slightly smaller */
-  font-family: inherit;  /* keeps same font as chat */
+  color: #777;
+  /* light grey */
+  font-weight: 400;
+  /* normal / light */
+  font-size: 0.9em;
+  /* optional, slightly smaller */
+  font-family: inherit;
+  /* keeps same font as chat */
 }
 
 .user-text {
-  display: inline-block;           /* so it only wraps the text width */
-  background-color: #BCE4E1;       /* your chosen background color */
-  color: #2B4140;                    /* readable text color */
-  padding: 8px 13px;               /* inner spacing */
-  border-radius: 20px;              /* rounded corners for “bubble” look */
-  max-width: 100%;                  /* prevent it from stretching too far */
-  word-wrap: break-word;           /* wrap long words */
-  margin: 4px 0;                   /* small spacing around */
+  display: inline-block;
+  /* so it only wraps the text width */
+  background-color: #BCE4E1;
+  /* your chosen background color */
+  color: #2B4140;
+  /* readable text color */
+  padding: 8px 13px;
+  /* inner spacing */
+  border-radius: 20px;
+  /* rounded corners for “bubble” look */
+  max-width: 100%;
+  /* prevent it from stretching too far */
+  word-wrap: break-word;
+  /* wrap long words */
+  margin: 4px 0;
+  /* small spacing around */
 }
 
 .ai-text {
-  display: inline-block;           /* so it only wraps the text width */
-  background-color: #e3e5e7;       /* your chosen background color */
-  color: #000000;                    /* readable text color */
-  padding: 8px 13px;               /* inner spacing */
-  border-radius: 20px;              /* rounded corners for “bubble” look */
-  max-width: 100%;                  /* prevent it from stretching too far */
-  word-wrap: break-word;           /* wrap long words */
-  margin: 4px 0;                   /* small spacing around */
+  display: inline-block;
+  /* so it only wraps the text width */
+  background-color: #e3e5e7;
+  /* your chosen background color */
+  color: #000000;
+  /* readable text color */
+  padding: 8px 13px;
+  /* inner spacing */
+  border-radius: 20px;
+  /* rounded corners for “bubble” look */
+  max-width: 100%;
+  /* prevent it from stretching too far */
+  word-wrap: break-word;
+  /* wrap long words */
+  margin: 4px 0;
+  /* small spacing around */
 }
 
 .timestamp {
@@ -282,4 +367,15 @@
   margin-top: 4px;
   text-align: right;
   padding-right: 4px;
+}
+
+.inline-citation {
+  color: #0066cc;
+  text-decoration: none;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.inline-citation:hover {
+  text-decoration: underline;
 }
