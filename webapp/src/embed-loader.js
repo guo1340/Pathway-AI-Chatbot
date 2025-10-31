@@ -4,7 +4,7 @@
   window.__RAG_WIDGET_LOADED__ = true;
 
   const iframe = document.createElement("iframe");
-  iframe.src = "https://main.xxxxx.amplifyapp.com/"; // your Amplify URL
+  iframe.src = "https://main.d2wlgxponag5j6.amplifyapp.com/"; // your Amplify URL
   iframe.id = "rag-widget-iframe";
   Object.assign(iframe.style, {
     position: "fixed",
