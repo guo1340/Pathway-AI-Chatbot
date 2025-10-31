@@ -77,7 +77,7 @@ export default function Widget({ apiBase, source, title }: { apiBase: string; so
   }, [buttonBottom, open])
 
   return (
-    <div className="rcb-widget-root">
+    <div className="rcb-widget-root" style={{ position: "fixed", top: 10, left: 10 }}>
       <div ref={buttonRef} className="rcb-launcher-wrapper">
         <button
           className={`rcb-launcher ${open ? 'open' : ''}`}

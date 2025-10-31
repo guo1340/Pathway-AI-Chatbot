@@ -1,3 +1,14 @@
+html,
+body,
+#root,
+.rcb-widget-root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
 :root {
   --radius: 14px;
 }
