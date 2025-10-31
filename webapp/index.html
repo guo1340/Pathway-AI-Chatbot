@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
@@ -13,9 +13,9 @@
       // When running standalone, WP’s wp_localize_script doesn’t exist.
       // So we provide a compatible global config object here.
       window.RAG_CHATBOT_CONFIG = {
-        apiBase: 'http://localhost:8000',  // your RAG backend locally
-        dev: true
-      }
+        apiBase: "http://3.14.127.116:8000", // your RAG backend locally
+        dev: true,
+      };
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -9,11 +9,11 @@ function mount() {
 
   // From WP shortcode attributes:
   const source = rootEl.getAttribute('data-source') || undefined
-  const title  = rootEl.getAttribute('data-title')  || undefined
+  const title = rootEl.getAttribute('data-title') || undefined
 
   // From WP (wp_localize_script) or standalone index.html shim
   const cfg = (window as any).RAG_CHATBOT_CONFIG || {}
-  const apiBase: string = cfg.apiBase || 'http://localhost:8000'
+  const apiBase: string = cfg.apiBase || 'http://3.14.127.116:8000'
 
   createRoot(rootEl).render(<Widget apiBase={apiBase} source={source} title={"Pathway Chatbot"} />)
 }
