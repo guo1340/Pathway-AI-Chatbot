@@ -1,4 +1,4 @@
-html,
+/* html,
 body,
 #root,
 .rcb-widget-root {
@@ -7,7 +7,7 @@ body,
   margin: 0;
   padding: 0;
   background: transparent;
-}
+} */
 
 :root {
   --radius: 14px;

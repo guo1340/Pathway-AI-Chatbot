@@ -3,6 +3,9 @@ import App from './App'
 import { RiRobot2Line } from "react-icons/ri";
 
 export default function Widget({ apiBase, source, title }: { apiBase: string; source?: string; title?: string }) {
+  const CLOSED_SIZE = { width: 56, height: 56 };
+  const OPEN_SIZE = { width: 420, height: 560 };
+
   const [open, setOpen] = React.useState(false)
   const [buttonBottom, setButtonBottom] = React.useState<number | null>(null)
   const buttonRef = React.useRef<HTMLDivElement | null>(null)
@@ -11,6 +14,27 @@ export default function Widget({ apiBase, source, title }: { apiBase: string; so
   function toggle() {
     setOpen(v => !v)
   }
+
+  React.useEffect(() => {
+    try {
+      const size = open ? OPEN_SIZE : CLOSED_SIZE;
+      window.parent?.postMessage(
+        { type: 'RAG_WIDGET_RESIZE', ...size, open },
+        '*'
+      );
+    } catch { }
+  }, [open]);
+
+
+  // send an initial size on first mount (ensure tiny on load)
+  React.useEffect(() => {
+    try {
+      window.parent?.postMessage(
+        { type: 'RAG_WIDGET_RESIZE', ...CLOSED_SIZE, open: false },
+        '*'
+      );
+    } catch { }
+  }, []);
 
   // Handle dragging vertically
   React.useEffect(() => {
