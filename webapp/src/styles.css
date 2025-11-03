@@ -108,7 +108,7 @@ body,
   width: 380px;
   background: white;
   border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  /* box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); */
   overflow: hidden;
   transform: translateX(-120%);
   opacity: 0;
@@ -160,7 +160,7 @@ body,
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid #e5e7eb;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, .22);
+  /* box-shadow: 0 16px 48px rgba(0, 0, 0, .22); */
 }
 
 .rcb-card {
@@ -168,7 +168,7 @@ body,
   margin: 0;
   border: 1px solid #e5e7eb;
   border-radius: var(--radius);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, .04);
+  /* box-shadow: 0 4px 12px rgba(0, 0, 0, .04); */
 }
 
 .rcb-head {

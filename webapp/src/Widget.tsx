@@ -4,7 +4,7 @@ import { RiRobot2Line } from "react-icons/ri";
 
 export default function Widget({ apiBase, source, title }: { apiBase: string; source?: string; title?: string }) {
   const CLOSED_SIZE = { width: 66, height: window.innerHeight };
-  const OPEN_SIZE = { width: 450, height: window.innerHeight };
+  const OPEN_SIZE = { width: 480, height: window.innerHeight };
 
   const [open, setOpen] = React.useState(false)
   const [buttonBottom, setButtonBottom] = React.useState<number | null>(null)
