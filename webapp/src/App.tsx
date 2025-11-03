@@ -122,7 +122,7 @@ export default function App({
 
   return (
     <div className="rcb-card" role="complementary" aria-label="RAG Chatbot">
-      <div className="rcb-head">{title || 'Pathway Chatbot'}</div>
+      <div className="rcb-head">{title || 'Pathway Chatbot (Beta)'}</div>
       <div className="rcb-log" id="rcb-log" ref={logRef}>
         {msgs.length === 0 ? (
           <div className="rcb-msg ai">
