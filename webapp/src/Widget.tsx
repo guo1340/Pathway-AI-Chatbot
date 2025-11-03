@@ -120,7 +120,7 @@ export default function Widget({ apiBase, source, title }: { apiBase: string; so
         className={`rcb-popup ${open ? 'open' : 'closed'}`}
         role="dialog"
         aria-modal="true"
-        aria-label={title || 'Pathway Chatbot'}
+        aria-label={title || 'Pathway Chatbot (Beta)'}
       >
         <div className="rcb-popup-inner">
           <App apiBase={apiBase} source={source} title={title} />
