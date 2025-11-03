@@ -159,14 +159,12 @@ body,
   background: #fff;
   border-radius: var(--radius);
   overflow: hidden;
-  border: 1px solid #e5e7eb;
   /* box-shadow: 0 16px 48px rgba(0, 0, 0, .22); */
 }
 
 .rcb-card {
   max-width: 720px;
   margin: 0;
-  border: 1px solid #e5e7eb;
   border-radius: var(--radius);
   /* box-shadow: 0 4px 12px rgba(0, 0, 0, .04); */
 }
