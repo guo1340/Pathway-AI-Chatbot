@@ -19,18 +19,17 @@ body,
 
 /* --- Root and Launcher Position --- */
 .rcb-widget-root {
-  position: fixed;
   left: 10px;
   top: 10px;
   z-index: 2147483000;
 }
 
 .rcb-launcher-wrapper {
-  position: fixed;
-  left: 10px;
-  bottom: calc(100% - 66px - 10px);
-  /* initial bottom auto-adjust */
-  cursor: move;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 56px;
+  height: 56px;
 }
 
 .rcb-launcher {
@@ -94,7 +93,6 @@ body,
 
 /* Root now attaches to the left/top */
 .rcb-widget-root {
-  position: fixed;
   left: 10px;
   top: 10px;
   /* default top position */
@@ -102,35 +100,32 @@ body,
   cursor: move;
 }
 
-/* --- Popup alignment: slides horizontally from left --- */
 .rcb-popup {
-  position: fixed;
-  left: 80px;
-  /* appears to the right of the button */
-  width: 380px;
-  background: white;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   border-radius: 16px;
+  background: white;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   overflow: hidden;
-  transform: translateX(-120%);
-  opacity: 0;
-  transition: transform 0.4s ease, opacity 0.3s ease;
-  pointer-events: none;
-}
-
-/* --- Open and closed states --- */
-.rcb-popup.open {
   transform: translateX(0);
   opacity: 1;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.rcb-popup.open {
   pointer-events: auto;
-  animation: popup-slide-left 0.45s ease;
+  opacity: 1;
 }
 
 .rcb-popup.closed {
-  transform: translateX(-120%);
   opacity: 0;
   pointer-events: none;
 }
+
 
 @keyframes popup-slide-left {
   0% {

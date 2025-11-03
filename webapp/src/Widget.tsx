@@ -77,7 +77,20 @@ export default function Widget({ apiBase, source, title }: { apiBase: string; so
   }, [buttonBottom, open])
 
   return (
-    <div className="rcb-widget-root" style={{ position: "fixed", top: 10, left: 10 }}>
+    <div
+      className="rcb-widget-root"
+      style={{
+        position: "fixed",
+        top: 10,
+        left: 10,
+        width: open ? 420 : 56,
+        height: open ? 560 : 56,
+        borderRadius: open ? 16 : "50%",
+        transition: "width 0.4s ease, height 0.4s ease, border-radius 0.3s ease",
+        overflow: "hidden",
+        zIndex: 2147483000,
+      }}
+    >
       <div ref={buttonRef} className="rcb-launcher-wrapper">
         <button
           className={`rcb-launcher ${open ? 'open' : ''}`}
@@ -94,14 +107,18 @@ export default function Widget({ apiBase, source, title }: { apiBase: string; so
       <div
         ref={popupRef}
         className={`rcb-popup ${open ? 'open' : 'closed'}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title || 'Pathway Chatbot'}
+        style={{
+          opacity: open ? 1 : 0,
+          transition: "opacity 0.3s ease",
+        }}
       >
-        <div className="rcb-popup-inner">
-          <App apiBase={apiBase} source={source} title={title} />
-        </div>
+        {open && (
+          <div className="rcb-popup-inner">
+            <App apiBase={apiBase} source={source} title={title} />
+          </div>
+        )}
       </div>
+
     </div>
   )
 }
