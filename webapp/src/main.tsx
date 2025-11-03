@@ -15,7 +15,7 @@ function mount() {
   const cfg = (window as any).RAG_CHATBOT_CONFIG || {}
   const apiBase: string = cfg.apiBase || 'https://api.chat.pathway.training'
 
-  createRoot(rootEl).render(<Widget apiBase={apiBase} source={source} title={"Pathway Chatbot"} />)
+  createRoot(rootEl).render(<Widget apiBase={apiBase} source={source} title={"Pathway Chatbot (Beta)"} />)
 }
 
 mount()
