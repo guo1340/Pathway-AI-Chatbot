@@ -13,7 +13,8 @@ function mount() {
 
   // From WP (wp_localize_script) or standalone index.html shim
   const cfg = (window as any).RAG_CHATBOT_CONFIG || {}
-  const apiBase: string = cfg.apiBase || 'https://api.chat.pathway.training'
+  // const apiBase: string = cfg.apiBase || 'https://api.chat.pathway.training'
+  const apiBase: string = cfg.apiBase || 'http://localhost:8000'
 
   createRoot(rootEl).render(<Widget apiBase={apiBase} source={source} title={"Pathway Chatbot (Beta)"} />)
 }

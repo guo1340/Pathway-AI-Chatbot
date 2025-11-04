@@ -75,7 +75,7 @@ def iterative_retrieve(self, query: str, k: int = TOP_K, max_passes: int = 3) ->
 
     for pass_i in range(max_passes):
         # Retrieve as usual
-        new_docs = self.retrieve(query, k=k * 2)
+        new_docs = self.retrieve(query, k=k)
 
         # Filter out duplicates (same source + page)
         unique = []
@@ -319,12 +319,16 @@ class RagPipeline:
 
 
     def answer(self, query: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, str]]]:
-        ctx_docs = self.retrieve(query, k=k)
+        ctx_docs = iterative_retrieve(self, query, k=k, max_passes=3)
+        print(f"⚙️ Running LLM for query: {query}, retrieved {len(ctx_docs)} context docs")
         ctx_docs = self._expand_adjacent_pages(ctx_docs, window=2)
         # Optional minor quality filter to drop obviously irrelevant junk
         ctx_docs = [d for d in ctx_docs if len(d.page_content.split()) > 10]
         if not ctx_docs:
             ctx_docs = self.retrieve(query, k=k)  # retry without the soft filter if emptied
+        
+        # Sort context docs by page number (if available) to preserve logical order
+        ctx_docs.sort(key=lambda d: d.metadata.get("page", d.metadata.get("page_number", 0)))
         
         # Build the numbered context block that the LLM will cite as [n]
         context = "\n\n".join(
@@ -402,6 +406,17 @@ Rules:
         # Invoke the LLM
         resp = self.llm.invoke(prompt)
         text = resp.content if hasattr(resp, "content") else str(resp)
+
+        # --- Detect incomplete numbered list ---
+        if re.search(r"(?m)^\d+\.", text):
+            numbers = [int(n) for n in re.findall(r"(?m)^(\d+)\.", text)]
+            item_count = len(numbers)
+            unique_count = len(set(numbers))
+            expected_count = re.search(r"\b(\d{1,2})\b.*(truth|commandment|beatitude|article|tenet)", query, re.I)
+
+            if expected_count and unique_count < int(expected_count.group(1)):
+                print(f"⚙️ Detected incomplete or partial list ({unique_count}/{expected_count.group(1)}). Retrying...")
+                normalized_text = "list may not be complete"
         
         # --- Auto-retry if the AI says it does not have enough information ---
         refusal_phrases = [
@@ -410,6 +425,9 @@ Rules:
             "not enough information",
             "cannot answer",
             "no relevant information",
+            "list may not be complete",              
+            "appears to be truncated",               
+            "context does not include all items",
         ]
 
         # normalize text early
@@ -478,6 +496,10 @@ Rules:
             citations = [c for i, c in enumerate(citations, start=1) if i in used_indices]
             # remove duplicates and keep only valid indices
             citations = citations[:len(used_indices)]
+        else:
+            # model gave no [n], but we still have retrieved docs — keep first few
+            citations = citations[:min(len(ctx_docs), k)]
+
 
         
         # Debug: print the response text to inspect it
@@ -518,14 +540,9 @@ Rules:
             # 6) Trim citation list to match remapped range
             citations = citations[: len(mapping)]
 
-
-        
-        # 🧠 NEW: hide citations if AI says it cannot answer
-        normalized = text.lower().strip()
-
         # detect refusal phrases
         refusal_detected = any(
-            phrase in normalized
+            phrase in normalized_text
             for phrase in [
                 "cannot answer",
                 "insufficient context",
@@ -577,4 +594,5 @@ def _file_to_url(src: str) -> str:
     base = os.path.basename(src)
     safe_base = quote(base, safe="#?()[]!$&',;=:@")  # allow useful URL chars
     api_base = os.getenv("API_BASE", "http://localhost:8000").rstrip("/")
+    # api_base = os.getenv("API_BASE", "https://api.chat.pathway.training").rstrip("/")
     return f"{api_base}/api/files/{safe_base}"

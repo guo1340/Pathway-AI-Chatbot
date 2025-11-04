@@ -41,6 +41,7 @@ class ChatIn(BaseModel):
     query: str = Field(..., min_length=1)
     source: Optional[str] = None
     conversation_id: Optional[str] = None
+    history: Optional[List[Dict[str, Any]]] = None  
 
 
 class ChatOut(BaseModel):
@@ -185,6 +186,56 @@ def get_file(name: str):
 # main.py (replace only the /api/upload route and add a small env at top)
 
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))  # optional soft guard
+
+@app.post("/api/ask", response_model=ChatOut)
+def ask(body: ChatIn, request: Request):
+    """
+    Accepts:
+      - query: user question
+      - conversation_id: optional existing conversation id
+      - history: optional array of past messages [{who: 'you'|'ai', text: str}]
+    """
+    conv_id = body.conversation_id or f"conv-{uuid.uuid4().hex[:8]}"
+
+    # 🧠 Get the conversation memory if exists, otherwise new
+    history = CONV.setdefault(conv_id, [])
+    history.append({"role": "user", "content": body.query})
+
+    # 🧠 Combine the history into a contextual prompt (last few turns only)
+    history_text = ""
+    if isinstance(body, dict):
+        hist = body.get("history", [])
+    else:
+        hist = getattr(body, "history", None) or []
+    if hist and isinstance(hist, list):
+        recent = hist[-6:]  # limit to last few to stay within token limits
+        history_text = "\n".join(
+            f"{'User' if m.get('who') == 'you' else 'Assistant'}: {m.get('text', '')}"
+            for m in recent
+        )
+
+    # 🧠 Combine conversation + current question
+    if history_text.strip():
+        query_with_history = f"{history_text}\n\nUser: {body.query}"
+    else:
+        query_with_history = body.query
+
+    # 🧠 Generate the RAG answer
+    answer, citations = PIPE.answer(query_with_history)
+
+    # Normalize and map citations
+    norm_citations, old_to_new = _normalize_citations_with_map(citations, request)
+    answer = _renumber_answer_markers(answer, old_to_new)
+
+    # Store in conversation memory
+    history.append({
+        "role": "assistant",
+        "content": answer,
+        "citations": norm_citations
+    })
+
+    return ChatOut(answer=answer, citations=norm_citations, conversation_id=conv_id)
+
 
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...)):

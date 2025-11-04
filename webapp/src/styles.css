@@ -29,7 +29,7 @@ body,
   left: 10px;
   bottom: calc(100% - 66px - 10px);
   /* initial bottom auto-adjust */
-  cursor: move;
+  /* cursor: move; */
 }
 
 .rcb-launcher {
@@ -97,7 +97,7 @@ body,
   top: 10px;
   /* default top position */
   z-index: 2147483000;
-  cursor: move;
+  /* cursor: move; */
 }
 
 /* --- Popup alignment: slides horizontally from left --- */
