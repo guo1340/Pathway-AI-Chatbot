@@ -1,4 +1,5 @@
 import React from 'react'
+import { GiNuclearBomb } from "react-icons/gi";
 
 // --- Inline API call (replaces need for api.ts) ---
 async function askRag(
@@ -193,7 +194,7 @@ export default function App({
           className="clear-btn"
           title="Clear chat memory"
         >
-          🧹
+          <GiNuclearBomb />
         </button>
         {/* this needs a better icon */}
       </div>
