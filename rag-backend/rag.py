@@ -336,16 +336,16 @@ class RagPipeline:
         )
 
         # --- Save context to local file ---
-        try:
-            with open("context.txt", "a", encoding="utf-8") as f:
-                f.write("=" * 80 + "\n")
-                f.write(f"🧠 Query: {query}\n")
-                f.write("-" * 80 + "\n")
-                f.write("📄 Context Sent to Model:\n")
-                f.write(context)
-                f.write("\n" + "=" * 80 + "\n\n")
-        except Exception as e:
-            print(f"⚠️ Failed to write context.txt: {e}")
+        # try:
+        #     with open("context.txt", "a", encoding="utf-8") as f:
+        #         f.write("=" * 80 + "\n")
+        #         f.write(f"🧠 Query: {query}\n")
+        #         f.write("-" * 80 + "\n")
+        #         f.write("📄 Context Sent to Model:\n")
+        #         f.write(context)
+        #         f.write("\n" + "=" * 80 + "\n\n")
+        # except Exception as e:
+        #     print(f"⚠️ Failed to write context.txt: {e}")
 
 
         # Build richer citations: include page numbers and add #page=N to URLs
