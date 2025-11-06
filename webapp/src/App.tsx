@@ -39,6 +39,8 @@ export default function App({
   const [msgs, setMsgs] = React.useState<Msg[]>([])
   const [q, setQ] = React.useState('')
   const [busy, setBusy] = React.useState(false)
+  const [thinkingDots, setThinkingDots] = React.useState('');
+  const longestText = 'Thinking...';
   const [convId, setConvId] = React.useState<string | undefined>(undefined)
   const logRef = React.useRef<HTMLDivElement | null>(null)
   const inputRef = React.useRef<HTMLTextAreaElement | null>(null)
@@ -60,6 +62,23 @@ export default function App({
   React.useEffect(() => {
     sessionStorage.setItem('chat_history', JSON.stringify(msgs))
   }, [msgs])
+
+  // Animate "Thinking..." dots while busy
+  React.useEffect(() => {
+    if (!busy) {
+      setThinkingDots('');
+      return;
+    }
+
+    let count = 0;
+    const interval = setInterval(() => {
+      count = (count + 1) % 4; // cycles 0→1→2→3→0
+      setThinkingDots('.'.repeat(count));
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [busy]);
+
 
   // ---- helpers ----
   function basenameFromUrl(u?: string) {
@@ -184,13 +203,27 @@ export default function App({
     sessionStorage.removeItem('chat_history')
   }
 
+  function handleRipple(e: React.MouseEvent<HTMLButtonElement>) {
+    const button = e.currentTarget;
+    button.classList.remove("ripple-active"); // reset if still active
+    void button.offsetWidth; // force reflow to restart animation
+    button.classList.add("ripple-active");
+
+    // optional: remove after animation ends
+    setTimeout(() => button.classList.remove("ripple-active"), 600);
+  }
+
   // ---- render ----
   return (
     <div className="rcb-card" role="complementary" aria-label="RAG Chatbot">
       <div className="rcb-head">
         {title || 'Pathway Chatbot (Beta)'}
         <button
-          onClick={clearConversation}
+          onClick={(e) => {
+            handleRipple(e);
+            clearConversation();
+          }
+          }
           className="clear-btn"
           title="Clear chat memory"
         >
@@ -201,10 +234,17 @@ export default function App({
 
       <div className="rcb-log" id="rcb-log" ref={logRef}>
         {msgs.length === 0 ? (
-          <div className="rcb-msg ai">
-            <span className="ai-title">Pathway's bot:</span>
-            <p className="ai-text">👋 Hi there! Got a question? I’m here to help.</p>
-          </div>
+          <>
+            <div className="rcb-msg ai">
+              <span className="ai-title">Pathway's bot:</span>
+              <p className="ai-text">👋 Hi there! Got a question? I’m here to help.</p>
+            </div>
+            <div className="rcb-msg ai disclaimer">
+              <p className="ai-text disclaimer-text">
+                ⚠️ This bot can make mistakes — please check the sources given at the end of each answer.
+              </p>
+            </div>
+          </>
         ) : (
           msgs.map((m, i) => {
             const deduped = dedupeCitations(m.citations)
@@ -276,8 +316,9 @@ export default function App({
           className={busy ? '' : 'send-button'}
           onClick={send}
           disabled={busy}
+          style={busy ? { minWidth: `${longestText.length + 2}ch`, textAlign: 'center' } : {}}
         >
-          {busy ? 'Thinking…' : 'Send'}
+          {busy ? `Thinking${thinkingDots}` : 'Send'}
         </button>
       </div>
     </div>
