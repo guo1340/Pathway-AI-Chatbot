@@ -593,6 +593,6 @@ def _file_to_url(src: str) -> str:
     """
     base = os.path.basename(src)
     safe_base = quote(base, safe="#?()[]!$&',;=:@")  # allow useful URL chars
-    api_base = os.getenv("API_BASE", "http://localhost:8000").rstrip("/")
-    # api_base = os.getenv("API_BASE", "https://api.chat.pathway.training").rstrip("/")
+    # api_base = os.getenv("API_BASE", "http://localhost:8000").rstrip("/")
+    api_base = os.getenv("API_BASE", "https://api.chat.pathway.training").rstrip("/")
     return f"{api_base}/api/files/{safe_base}"
