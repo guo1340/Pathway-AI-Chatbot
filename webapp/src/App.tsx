@@ -123,30 +123,42 @@ export default function App({
 
   // ---- send message ----
   async function send() {
-    const query = q.trim()
-    if (!query || busy) return
-    setQ('')
-    if (inputRef.current) inputRef.current.style.height = 'auto'
+    const query = q.trim();
+    if (!query || busy) return;
+
+    // --- 🛡️ SAFEGUARD: prevent huge prompts ---
+    const estTokens = Math.ceil(query.length / 4); // rough estimate: 4 chars ≈ 1 token
+    const maxTokens = 5000; // safe upper limit for your backend (gpt-4o TPM cap)
+    if (estTokens > maxTokens) {
+      alert(
+        `Your message is too long (${estTokens.toLocaleString()} tokens estimated).\n\n` +
+        `Please shorten or summarize it below ${maxTokens.toLocaleString()} tokens before sending.`
+      );
+      return;
+    }
+
+    setQ('');
+    if (inputRef.current) inputRef.current.style.height = 'auto';
 
     const newUserMsg: Msg = {
       who: 'you',
       text: query,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    }
+    };
 
-    setMsgs((m) => [...m, newUserMsg])
-    setBusy(true)
+    setMsgs((m) => [...m, newUserMsg]);
+    setBusy(true);
     try {
       const data = await askRag(apiBase, {
         query,
         source,
         conversation_id: convId,
         history: msgs, // send full conversation memory
-      })
+      });
 
-      setConvId(data.conversation_id)
-      const answer = data.answer || ''
-      const citations: Citation[] | undefined = data.citations
+      setConvId(data.conversation_id);
+      const answer = data.answer || '';
+      const citations: Citation[] | undefined = data.citations;
 
       setMsgs((m) => [
         ...m,
@@ -156,27 +168,27 @@ export default function App({
           citations,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
-      ])
+      ]);
 
       // Typing animation
       await new Promise<void>((resolve) => {
-        let i = 0
+        let i = 0;
         const step = () => {
-          i = Math.min(i + 2, answer.length)
+          i = Math.min(i + 2, answer.length);
           setMsgs((m) => {
-            if (!m.length) return m
-            const lastIdx = m.length - 1
-            const last = m[lastIdx]
-            if (last.who !== 'ai') return m
-            const next = [...m]
-            next[lastIdx] = { ...last, text: answer.slice(0, i) }
-            return next
-          })
-          if (i < answer.length) setTimeout(step, 16)
-          else resolve()
-        }
-        setTimeout(step, 16)
-      })
+            if (!m.length) return m;
+            const lastIdx = m.length - 1;
+            const last = m[lastIdx];
+            if (last.who !== 'ai') return m;
+            const next = [...m];
+            next[lastIdx] = { ...last, text: answer.slice(0, i) };
+            return next;
+          });
+          if (i < answer.length) setTimeout(step, 16);
+          else resolve();
+        };
+        setTimeout(step, 16);
+      });
     } catch (e: any) {
       setMsgs((m) => [
         ...m,
@@ -185,10 +197,11 @@ export default function App({
           text: `Error: ${e.message}`,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
-      ])
+      ]);
     }
-    setBusy(false)
+    setBusy(false);
   }
+
 
   // auto-scroll to bottom on new messages
   React.useEffect(() => {
