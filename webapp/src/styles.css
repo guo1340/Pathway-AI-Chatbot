@@ -437,38 +437,65 @@ body,
 
 .ai-text {
   display: inline-block;
-  /* so it only wraps the text width */
   background-color: #e3e5e7;
-  /* your chosen background color */
+  /* Chat bubble background */
   color: #000000;
-  /* readable text color */
   padding: 8px 13px;
-  /* inner spacing */
   border-radius: 20px;
-  /* rounded corners for “bubble” look */
   max-width: 100%;
-  /* prevent it from stretching too far */
   word-wrap: break-word;
-  /* wrap long words */
   margin: 4px 0;
-  /* small spacing around */
+
+  /* ✅ new additions */
+  white-space: pre-wrap;
+  /* preserves \n line breaks */
+  line-height: 1.5;
+  /* better text spacing */
+  text-align: left;
 }
 
+.ai-text p {
+  margin: 0.4em 0;
+  /* space between paragraphs */
+}
+
+.ai-text::before {
+  content: '';
+  /* keeps layout consistent */
+}
+
+/* Optional: nicer look for lines that start with "-" */
+.ai-text {
+  white-space: pre-wrap;
+}
+
+.ai-text::first-line {
+  text-indent: 0;
+}
+
+.ai-text span.bullet {
+  display: block;
+  margin-left: 0.5em;
+}
+
+/* Inline citation styling */
+.inline-citation {
+  color: #0066cc;
+  text-decoration: none;
+  font-weight: 500;
+  cursor: pointer;
+  margin-left: 2px;
+}
+
+.inline-citation:hover {
+  text-decoration: underline;
+}
+
+/* Timestamp */
 .timestamp {
   font-size: 0.75em;
   color: #999;
   margin-top: 4px;
   text-align: right;
   padding-right: 4px;
-}
-
-.inline-citation {
-  color: #0066cc;
-  text-decoration: none;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.inline-citation:hover {
-  text-decoration: underline;
 }

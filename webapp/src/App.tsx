@@ -281,8 +281,19 @@ export default function App({
                   <span className="ai-title">
                     {m.who === 'you' ? 'You:' : "Pathway's bot:"}
                   </span>
-                  <div className={m.who === 'you' ? 'user-text' : 'ai-text'}>
-                    {renderWithInlineCitations(m.text, m.citations)}
+                  <div
+                    className={m.who === 'you' ? 'user-text' : 'ai-text'}
+                    style={{ whiteSpace: 'pre-wrap' }}
+                  >
+                    {renderWithInlineCitations(
+                      m.text
+                        // turn leading "- " into bullets
+                        .replace(/^-+\s+/gm, '• ')
+                        // remove stray "-" before citations or EOL
+                        .replace(/\s*-\s*(?=\[\d+\]|\n|$)/g, ''),
+                      m.citations
+                    )}
+
                   </div>
                   {m.who === 'ai' && <div className="timestamp">{m.time}</div>}
                 </div>
