@@ -370,6 +370,12 @@ class RagPipeline:
 
         # Clean, explicit prompt to avoid hallucination
         prompt = f"""You are a concise assistant that must answer using ONLY the provided context.
+        Conversation Priority Rules:
+- ALWAYS treat the most recent user message as the main question.
+- Only use earlier conversation history if the latest user message clearly depends on it.
+- Ignore old conversation topics that are unrelated to the latest question, even if they are very long.
+- Never allow previous topics to override or dominate the current question.
+If the latest user message asks for a list, fact, definition, or simple information, ignore all previous conversation that is not directly related.
 
 You may reason from context clues to interpret abbreviations, acronyms, or partial terms if their likely meaning can be clearly inferred from the text provided. 
 For example, if a repeated acronym appears near specific phrases, titles, or descriptions that indicate what it likely refers to, you may use that inferred meaning. 

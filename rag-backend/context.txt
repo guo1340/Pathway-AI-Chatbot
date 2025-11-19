@@ -1,0 +1,337 @@
+
+⚙️ Second retrieval pass triggered due to incomplete response.
+Added 4 new docs.
+  - ./docs\GaryB.McGeeChar_2014__PeopleoftheSpiritTheA (401-500).pdf p.42
+  - ./docs\GaryB.McGeeChar_2014__PeopleoftheSpiritTheA (501-538).pdf p.28
+  - ./docs\Inspiration_Inerrancy_and_Authority_of_Scripture.pdf p.1
+  - ./docs\Premillennial_Eschatology.pdf p.4
+📄 Expanded Context Sent to Model:
+[1] SPIRITUAL WARFARE AND THE BELIEVER  POSITION PAPER  (ADOPTED BY THE GENERAL PRESBYTERY IN SESSION JULY 30, 2019)  Introduction  The Assemblies of God affirms the reality of spiritual warfare, acknowledging that the Christ-follower is engaged in a conflict in the world, with the flesh, and with the devil. Believers do not make this affirmation with any fear, because the apostle John provides the assurances that “the one who is in you is greater than the one who is the world” (1 John 4:4), and “the One who was born of God keeps them safe, and the evil one cannot harm them” (1 John 5:18).1 The believer, indwelt and empowered by the Holy Spirit, is more than a conqueror (Romans 8:31–39). Such assurance, however, is no license for failing to take seriously the challenges posed by ongoing opposition to the kingdom of God.  Followers of Christ must remember that the “struggle is not against flesh and blood, but against the rulers, against the authorities, against the powers of this dark world
+
+[2] to the kingdom of God.  Followers of Christ must remember that the “struggle is not against flesh and blood, but against the rulers, against the authorities, against the powers of this dark world and against the spiritual forces of evil in the heavenly realms” (Ephesians 6:12). Jesus summarized the divine expectation for humans: “Love the Lord your God with all your heart and with all your soul and with all your mind” and “Love your neighbor as yourself” (Matthew 22:37, 39). From the fall into sin (Genesis 3:1–19), the devil has opposed humanity’s fulfillment of God’s purpose. The perversion, misdirection, and disruption of the intended love for God and neighbor is the opening used by the devil to torment humanity and create the warfare that continues to this day.  The triad—world, flesh, and devil—as a description of the arena in which spiritual warfare takes place is firmly rooted in the biblical tradition. The apostle Paul, in Ephesians 2:1–3, identifies these three as the areas of
+
+[3] and devil—as a description of the arena in which spiritual warfare takes place is firmly rooted in the biblical tradition. The apostle Paul, in Ephesians 2:1–3, identifies these three as the areas of the battle for humans. “As for you, you were dead in your transgressions and sins, in which you used to live when you followed the ways of this world and of the ruler of the kingdom of the air, the spirit who is now at work in those who are disobedient. All of us also lived among them at one time, gratifying the cravings of our flesh and following its desires and thoughts.”  This paper will make use of this threefold lens through which to discuss spiritual warfare and the believer. All believers face this battle, and they do so more than adequately equipped for victory by the powerful indwelling of the Holy Spirit. The result of spiritual warfare, because of the work of the Spirit in and through believers, will be victory.  Spiritual Warfare and the World  The biblical writers understand
+
+[4] of the Holy Spirit. The result of spiritual warfare, because of the work of the Spirit in and through believers, will be victory.  Spiritual Warfare and the World  The biblical writers understand the concept of the world in several ways. They use it to describe the physical world that God created and decreed that it be filled with His glory (Isaiah 6:3; John 1:9; Acts 17:24). The world is also used to refer to the land on which humans live, and even the humans who are dwelling there (Matthew 4:8; 24:14; Luke 4:5). The world is that which God so loved that He gave His Son to die for its redemption (John 3:16).  However, because of the sinful orientation of the world, it is opposed to God and His people. The world is also described as the domain of Satan (John 12:31; 14:30; 16:11) and as the world system of God-rejectors and their cherished values (John 17:6; James 4:4; 1 John 5:19).  1 All biblical citations are from the New International Version (2011) (NIV) unless otherwise
+
+[5] and as the world system of God-rejectors and their cherished values (John 17:6; James 4:4; 1 John 5:19).  1 All biblical citations are from the New International Version (2011) (NIV) unless otherwise identified.
+
+[6] A BIBLICALLY INFORMED RESPONSE TO THE SIN OF RACISM POSITION PAPER (ADOPTED BY THE GENERAL PRESBYTERY IN SESSION AUGUST 1, 2023)  Introduction The Assemblies of God affirms racism is a sin and calls for repentance for those who participate in it and those who fail to address it. In 1989, at the 43rd General Council, the church adopted a resolution on racism that reaffirmed a long-standing position of the church. “The Assemblies of God oppose the sin of racism in any form” and calls “any and all to repentance who have participated in the sin of racism through personal thought or action, or through church and social structures, or through inactivity in addressing racism as individuals or as a church.”1   Racism is a supporting combination of assumptions, beliefs, and practices that categorizes groups of people along a spectrum, from superior to inferior, based on physical characteristics (such as color of skin and eyes, and type of hair), ancestry, language, and region of origin. This
+
+[7] groups of people along a spectrum, from superior to inferior, based on physical characteristics (such as color of skin and eyes, and type of hair), ancestry, language, and region of origin. This categorization justifies disdain, hatred, and inequitable treatment against those deemed inferior and social advantages for those deemed superior. All forms of racism, as well as all the various means of justification and rationalization offered by its proponents, fall short and run counter to the biblical teaching regarding human equality before God. Consequently, a biblically informed response recognizes that all expressions of racism are sinful because they demean God’s good creation, undermine human dignity, and violate biblical standards of justice.  Biblical Perspective on Racism The Bible, the Word of God, is the final arbiter of faith and practice for followers of Jesus. It reveals God’s will and purposes for humans, indeed for all creation. It is completely authoritative, does not
+
+[8] the Word of God, is the final arbiter of faith and practice for followers of Jesus. It reveals God’s will and purposes for humans, indeed for all creation. It is completely authoritative, does not fail, and cannot be defeated. The biblical teaching and message, rather than cultural or ideological perspectives, must be determinative of what the Church believes and how it lives out its beliefs in the world. The Bible presents the unity and diversity of the plan of God for humans, calls for equal standing before Him for all humans, and demands that His justice be conducted within the human realm.
+
+[9] 1 43rd General Council of the Assemblies of God, “Resolution 20: Racism,” August 8–13, 1989. https://news.ag.org/en/News/Resolution-on-Racism. The opposition of the Assemblies of God to racism was reaffirmed by, Executive Presbytery, “Statement on George Floyd, Racism, and Racial Reconciliation,” June 3, 2020.
+
+[10] CHURCH MISSION AND PEACEMAKING  POSITION PAPER  (ADOPTED BY THE GENERAL PRESBYTERY IN SESSION AUGUST 1 & 3, 2015)   “Peacemakers who sow in peace reap a harvest of righteousness” (James 3:18, NIV).1  The Assemblies of God considers peacemaking to be intrinsic to the Church’s mission.  Our “priority reason for being” is:  (1) “To be an agency of God for evangelizing the world” (Acts 1:8; Matthew 28:19–20; Mark 16:15–16); (2) “To be a corporate body in which man may worship God” (1 Corinthians 12:13); (3) “To be a channel of God’s purpose to build a body of saints being perfected in the image of His Son” (1 Corinthians 12:28; 14:12; Ephesians 4:11–16); and, (4) “To be a people who demonstrate God’s love and compassion for all the world” (Psalm 112:9; Galatians 2:10; 6:10; James 1:27).  Peace emanates from the very character of the Triune God who is “the God of peace” (Romans 15:33).  The gospel therefore is “The gospel of peace” which is proclaimed in evangelism (Ephesians 6:15),
+
+[11] Peace emanates from the very character of the Triune God who is “the God of peace” (Romans 15:33).  The gospel therefore is “The gospel of peace” which is proclaimed in evangelism (Ephesians 6:15), pervades the relational context of authentic worship, provides an essential ethos for building the body of Christ, and is expressed and extended by demonstrating God’s love and compassion for the world.  God’s ultimate design for His world and all its inhabitants is and has always been for them to be at peace with Him, themselves, each other, and His creation.  Peace Disrupted  At the beginning of the human story, Adam and Eve enjoyed perfect peace in four relationships.  They were at peace with God, their personal self, each other, and God’s created order.  Through these four relationships, God intended for humans to fulfill their purpose to worship and serve Him in a beautiful, hospitable, orderly, and peaceful world.  However, when Adam and Eve yielded to temptation, followed their own
+
+[12] intended for humans to fulfill their purpose to worship and serve Him in a beautiful, hospitable, orderly, and peaceful world.  However, when Adam and Eve yielded to temptation, followed their own desires, and rebelled against God, their sin damaged all four of these relationships, and humanity fell into depravity and strife.  Thereafter, to this present time, and until Jesus Christ returns to establish His kingdom, fallen humanity has been, is, and will continue to be alienated from God, themselves, other people, and creation (Genesis 3:1–8).  Peace is elusive where God’s Word and will are unknown or unheeded.  Hope for Peace Restored  In its most basic meaning, the word peace describes the quality of relationships.  The Hebrew word shalom, usually translated “peace,” captures analogically what God’s peace is all about.  It may best be understood as access to the “good life,” a life in which God’s good intentions for humanity are being realized.  Shalom denotes the absence of
+
+[13] what God’s peace is all about.  It may best be understood as access to the “good life,” a life in which God’s good intentions for humanity are being realized.  Shalom denotes the absence of conflict or war which is a necessary condition for human flourishing.  But even more basically it speaks of harmony with God, oneself, one another, and God’s creation.  Shalom therefore is a profoundly spiritual word, deeply rooted in the awareness that all blessings of life flow from God the Creator.
+
+[14] 1 All biblical citations unless otherwise indicated are from the New international Version (2011).
+
+[15] 1 
+REVIVAL AND SPIRITUAL RENEWAL
+(Adopted by the General Presbytery in session, August 5-6, 2024)
+Summary 
+Revival can mean different things to different people, including times of spiritual 
+renewal in the believer, spiritual awakening in culture, or a heightened sense of the 
+presence of God in the church. Examples in the Bible and c hurch history offer 
+various ways to understand and experience r evival. This paper offers guidance on 
+how to prepare for unique times of revival, regardless of how they might look, and offers 
+signs of both healthy and unhealthy revivals in the modern Church.  
+Definition and Context for Revival 
+The word revival can encompass a range of definitions. In the narrowest sense, 
+revival pertains to restoring God’s people to a holy and prioritized relationship with Him. 
+The term describes a period in history when something spec ial took place, such as  the 
+Azusa Street Revival. It can sometimes describe a scheduled s piritual emphasis, like a
+
+[16] The term describes a period in history when something spec ial took place, such as  the 
+Azusa Street Revival. It can sometimes describe a scheduled s piritual emphasis, like a 
+church revival or camp meeting. People also use the ter m to characterize a large influx 
+of conversions. In all these definitions, the emphasis is on a time of heightened 
+spiritual awareness and desire, usually in a certain p lace at a certain time. 
+In a sense, revival is returning to the spiritual life where we s hould have been all 
+along, living a holy life with godly priorities and ministering to those around us. 
+Throughout Scripture and history, God has revived His people by c alling those who are 
+wavering back to complete devotion. These moments lead to a fresh surge of 
+spiritual life marked by  renewed holiness, vitality, commitment, and service when 
+we respond to Him. On a personal level, Christians experience renewed love for
+
+[17] spiritual life marked by  renewed holiness, vitality, commitment, and service when 
+we respond to Him. On a personal level, Christians experience renewed love for 
+God and others, conviction of personal and cor porate sin, and awakening from the 
+slumber of apathy and wor ldliness. In this sense, revival is returning to a more ideal 
+spiritually devoted state with an increased awareness of God’s presence.  
+For many, revival suggests a s eason of generaliz ed spiritual renewal in the church 
+or awakening in the community. Some would distinguish the terminology, so that 
+“spiritual renewal” refers to a renewed commitment to God on the part of believers, while 
+increased conversions within the larger com munity constitutes a “spiritual awakening.” 
+Some would restrict revival to a time of unusual awareness of God’s presence within the 
+church, which can then lead to spiritual renewal and awakening. Others would treat 
+those terms as synonymous.
+
+[18] church, which can then lead to spiritual renewal and awakening. Others would treat 
+those terms as synonymous.  
+There can be a tendency to use the term revival as a catchall word for  any unique 
+spiritual or emotional experience or servic e. To  do so diminishes the meaning. At its 
+core, we can understand revival as a time when a group of believers commits again 
+to the holy life, loving community, and divine mission God intends for His people. God 
+calls believers to be fully devoted disc iples who enjoy a vibr ant spiritual life and 
+engage in reaching the lost. A community of believers who is already healthy and alive 
+does not need revival.
+
+[19] Its human and historical idealization is pictured in an oft-quoted passage from Israel’s “golden age”:  “During Solomon's lifetime Judah and Israel, from Dan to Beersheba, lived in safety (betach), everyone under their own vine and under their own fig tree” (1 Kings 4:25).  But as the biblical record makes clear, Solomon’s splendid and affluent kingdom by no means perfectly represented the mature shalom into which Israel’s God desired to bring His ancient covenant people and indeed all humankind (Micah 4:4).  Though the people whom God created were all too soon and too willingly alienated, the promise of a final and perfect realization of shalom is nonetheless found throughout the Scriptures.  Immediately following the Fall of our first parents is God’s promise that the seed of the woman would one day defeat the deceiver (Genesis 3:15).  This promise is followed by God’s promise to Abraham and his descendents that “all peoples on earth will be blessed through you” (Genesis 12:3).
+
+[20] have given over to the world’s forces and place pressure on believers to do likewise. As a warning from biblical history to contemporary Christians, Israel was challenged repeatedly by God about the danger of allowing the people of the land of Canaan to lead them away from God to the worship of their gods.  In the warfare between the believer and the evil forces in the world, the resources for victory are spiritual, not political. The apostle John gave the primary challenge for engaging the pressures from the fallen world by saying, “Do not love the world or anything in the world. If anyone loves the world, love for the Father is not in them” (1 John 2:15). Supreme love for God, the antithesis of loving the world, is the antidote to the challenges of the world. Jude’s call for believers to build themselves up in the most holy faith and pray in the Holy Spirit (Jude 20) allows the Spirit to pray through them “in accordance with the will of God” (Romans 8:26–27). Such prayer is powerful
+
+[21] Law in the temple and led the people in renewing God’s covenant, which included removing 
+the idols across the land, bringing reform, and celebrating the Passover (2 Ki ngs 22–23; 
+2 Chronicles 34–35). Josiah turned to the Lord “with all his heart and with all his soul and 
+with all his strength, in accordance with all the Law of Moses” (2 Kings 23:25). In each of 
+these stories, God’s  people learned that they were living below God’s  standard of 
+faithfulness and holiness and turned their hearts back to God.  
+ 
+The New Testament has a somewhat different paradigm . The ministry of Jesus through 
+the Holy Spirit was itself a calling of the people of Israel back to God. Through the power 
+of the Holy Spirit, Jesus and the disciples preached the reality of the kingdom of God, 
+bringing transformation to people’s lives. The Holy Spirit empowered Jewish believers to 
+reach the lost, including Gentiles, and establish the Church.
+
+[22] and diminish the status of humans are sinful at their core.  Unfortunately, because of the reality of the fallen condition, the perspective is not held universally. Many, including some within the Church, reject such equal valuation of all humans, tending to judgments that lead to diminishing the personhood of some individuals and groups. Yet, the Bible clearly teaches, directly and indirectly, the equality of all human beings.   First, Israel, created by the Lord as the people of promise and witness to the world, received from Him the message that they would be a blessing to all (Genesis 12:2–3; 18:16–19). Throughout the Old Testament, God blessed peoples outside of Israel (Hagar in Genesis 16; Egypt in Genesis 41; Rahab in Joshua 6; Ruth in Ruth 4; the widow of Zarephath in 1 Kings 17; Naaman in 2 Kings 5, etc.) due to their connection to Israelites. God offered promises of blessing to other nations in relationship to God’s self (Isaiah 19:25; Jeremiah 48:47).  Second, the Law God
+
+[23] Spiritual Warfare and the Flesh  The New Testament uses flesh (sarx) to describe human nature and flesh, and body (soma) to depict the human body. Often flesh is used to speak of the weaker aspects of human nature, subject to temptation (Matthew 26:41; 2 Peter 2:18). Paul warns against being enslaved by the desires of the flesh (Ephesians 2:3), and challenges believers not to allow their minds to be set on the flesh (Romans 8:5–7).  The warfare with the flesh is with the fallen nature of humankind, which is now directed away from God and His will toward sinful inclinations and desires. In the fall into sin, Adam and Eve yielded to the temptation to have their eyes opened, be like God, and know good and evil (Genesis 3:5). Instead of continuing to recognize God as supreme and allow Him to be the determinant of what is right and wrong, they chose to exalt themselves and to direct their own lives. Such sin caused them to be no longer turned toward God but to be turned inward on
+
+[24] Him to be the determinant of what is right and wrong, they chose to exalt themselves and to direct their own lives. Such sin caused them to be no longer turned toward God but to be turned inward on themselves. The decision to remove God from His central place in human existence allowed evil to run unchecked, causing desires and passions to lead humankind away from the plan of God. This war with the fallen nature of humans, resisting what God decrees as right, still rages today.  Paul’s identification of the acts of the flesh is a reminder that spiritual warfare against the flesh is crucial for the believer. The list in Galatians 5:19–21, “sexual immorality, impurity and debauchery; idolatry and witchcraft; hatred, discord, jealousy, fits of rage, selfish ambition, dissensions, factions and envy; drunkenness, orgies, and the like,” is illustrative of the fallen human nature. The challenge in the warfare against the flesh is to crucify the passions and desires of the flesh and to live
+
+[25] envy; drunkenness, orgies, and the like,” is illustrative of the fallen human nature. The challenge in the warfare against the flesh is to crucify the passions and desires of the flesh and to live by and keep in step with the Spirit (Galatians 5:24–25).  The salvation provided by Christ grants freedom to the believer, but Paul cautions against using that freedom wrongly by indulging the flesh. Such indulgence denies the absolute expectation on the believer to “serve one another humbly in love” (Galatians 5:13). The direction of the unchecked flesh is to broken relationships and personal harm, which are antithetical to the work of the Spirit in the lives of believers. The tragic reality is that the flesh desires that which is against the Spirit, so to succeed in the warfare against the flesh, the believer must “walk by the Spirit” (Galatians 5:16–17).  The apostle Paul clearly states the biblical view of flesh, noting that the sinful passions are at work, leading to death (Romans 7:5).
+
+[26] the believer must “walk by the Spirit” (Galatians 5:16–17).  The apostle Paul clearly states the biblical view of flesh, noting that the sinful passions are at work, leading to death (Romans 7:5). The danger is that even though individuals have become believers, they could refuse to set their minds on the Spirit, choosing instead to yield to the desires of the flesh. Continuing refusal to allow the Spirit to govern their lives results in spiritual death because the flesh is hostile to God (Romans 8:5–8). Warring with the flesh grows out of the recognition that the work of Christ has dealt a mortal blow to the flesh. The believer engages in spiritual warfare against the flesh by choosing to allow the Spirit to lead, guide, and direct all their living. The Spirit provides resurrection life to the believer so that victory in the spiritual battle against the flesh can be realized (Romans 8:9–13).  Victory is gained over the flesh as the Spirit empowers one to overcome the desires of the
+
+[27] to the believer so that victory in the spiritual battle against the flesh can be realized (Romans 8:9–13).  Victory is gained over the flesh as the Spirit empowers one to overcome the desires of the flesh and its sinful activities. As the believer continues to allow the Holy Spirit to lead and guide them, He increasingly produces Christian character in their lives (Galatians 5:22–23). These fruit of the Spirit—love, joy, peace, forbearance, kindness, goodness, faithfulness, gentleness, and self-control—evidence victory in the spiritual warfare with the flesh.
+
+[28] standard by which to measure equal treatment and love was the expression of God’s character, one “who shows no partiality and accepts no bribes. He defends the cause of the fatherless and the widow, and loves the foreigner residing among you, giving them food and clothing” (Deuteronomy 10:14–22; see also Leviticus 19:33–34; Isaiah 56:6–8). The example of God, coupled with the reality that Israel knew what it was to be considered a foreigner—they had been born as slaves in Egypt—was used to evoke Israel’s love for all people groups.  Third, justice was not to be perverted based on racial, ethnic, or socioeconomic status. God forcefully warned that everyone should be treated equally and fairly when brought for judgment (Exodus 23:3–9; Leviticus 19:15; Deuteronomy 1:15–18; 24:17–18; 27:19). Provision was made during harvests for the sustenance of every person. The landowners were expected to allow all people—including foreigners—to benefit generously from the harvest so that their needs
+
+[29] Provision was made during harvests for the sustenance of every person. The landowners were expected to allow all people—including foreigners—to benefit generously from the harvest so that their needs could be met (Deuteronomy 24:19–22).  The message of the New Testament about the equal standing of every person builds upon the themes we see in the Old Testament. This is especially evident in the life and ministry of Christ. Jesus, in His ministry to Israel, recognized people in their own ethnic and cultural groups as recipients of God’s blessing (Matthew 8:10–11; Mark 7:24–30; Luke 4:25–27). Jesus affirmed that the house of God “will be called a house of prayer for all nations” (Mark 11:15–17; Isaiah 56:3–7), and His sacrificial death for the whole world was universal in its provision of salvation. The universality of this provision eliminates any excuse for making negative judgments or neglecting the value of others (Matthew 28:19; Mark 16:15; Luke 4:25–27; John 4:1–42). And, at the
+
+[30] salvation. The universality of this provision eliminates any excuse for making negative judgments or neglecting the value of others (Matthew 28:19; Mark 16:15; Luke 4:25–27; John 4:1–42). And, at the close of His earthly ministry, Jesus challenged His disciples to carry the gospel witness to the ends of the earth (Matthew 28:18–20; Acts 1:8). His inclusive commands that give no room given for making value distinctions between people and affirms the equality of human standing before God.  Other writings in the New Testament also affirm the equality of human beings. On the Day of Pentecost, the day we celebrate as the founding of the Church, in a miraculous act, people from multiple geographic regions marveled as they heard God's word in their own languages from those who had not known their language (Acts 2:3–12). That same day, Peter preached, “everyone who calls on the name of the Lord will be saved” (Acts 2:21). Later, at the house of Cornelius in Caesarea, Peter declared, “God does
+
+[31] language (Acts 2:3–12). That same day, Peter preached, “everyone who calls on the name of the Lord will be saved” (Acts 2:21). Later, at the house of Cornelius in Caesarea, Peter declared, “God does not show favoritism but accepts from every nation the one who fears him and does what is right” (Acts 10:34–35).   The apostle Paul declared that the common need for salvation by all renders distinctions between humans of no service in evaluating the worth and value of persons (Galatians 3:23–29; Colossians 3:11). The artificial and real divisions among humans introduced by sin that led to racism have been rendered powerless by the cross (Ephesians 2:11–22). Paul also used the analogy of the human body to the body of Christ to identify the equality and importance of all its members (1 Corinthians 12:12–27).  In a quintessential moment in the Book of Revelation, as the Spirit carried John to scenes in the heavenlies, he observed great multitudes “from every nation, tribe, people and
+
+[32] 12:12–27).  In a quintessential moment in the Book of Revelation, as the Spirit carried John to scenes in the heavenlies, he observed great multitudes “from every nation, tribe, people and language, standing before the throne and before the Lamb” (7:9). Their worship, ascribing glory to God for His great salvation, resounded through the heavenly realm. What a picture of God’s plan for the equality of all people. The gates of the New Jerusalem remain open for the nations who will bring their own “glory and honor” into it (Revelation 21:26), with all human beings united in equal standing before God without sacrificing their unique diversity.
+
+[33] or mourning or crying or pain, for the old order of things has passed away.” (Revelation 21:3–4)  Present Need for Peacemaking  Unfortunately, from the fall of Adam and Eve until the present, peace on our fallen planet has continued to be fragile indeed.  Human history, to be sure, has its finer moments with the emergence of lofty ideals, many realized extensively in the history of our own and other nations, past and present.  But unfortunately human history is also littered with the memories of wars, tyrannical and corrupt regimes, lawlessness, murder, slavery, even genocide.  Far from our having evolved into a kinder, gentler world, the dawning of the twenty-first century is brimming with a simmering mix of ancient barbarities, militant religions, and godless philosophies that seem perennially to threaten whatever moral progress has been accomplished in previous generations.  Moral turbulence notwithstanding and with all the more reason, the Scriptures reiterate again and again the
+
+[34] to threaten whatever moral progress has been accomplished in previous generations.  Moral turbulence notwithstanding and with all the more reason, the Scriptures reiterate again and again the imperative of peacemaking for every generation.  Dark ages and dark days are no reason for followers of Christ to cease faithful representation of the Prince of Peace!  Even so, with all realism, the New Testament anticipates that turmoil will continue, and indeed increase as the end of the age approaches.  In 2 Timothy 3:1–5, Paul predicts “terrible times” that will characterize many of the “last days.”  Among his descriptors of human depravity are such terms as “lovers of themselves (selfish),” “unforgiving,” and “treacherous,” all of which specifically identify characteristics that militate against peace and justice and often corrupt humankind’s best intended efforts toward those ends.  The Church in our time, and every time, has both the imperative and the challenge of pursuing peace and
+
+[35] peace and justice and often corrupt humankind’s best intended efforts toward those ends.  The Church in our time, and every time, has both the imperative and the challenge of pursuing peace and justice in societies often tumultuous and conflicted.  Great revivals of Christian faith and morals have often turned the tide of human history, and that possibility is always with those who believe and act on their faith.  Biblical Directives for Peacemaking  The Scriptures are replete with directives to make peace in the midst of injustice and turmoil.  The Psalmist proclaims:  “Turn from evil and do good; seek peace and pursue it” (Psalm 34:14).  The great writing prophets of the Old Testament severely condemned the dreadful social exploitation and injustice of the kingdoms of Israel and Judah in their prosperous but declining years.  Thus Amos confronted an outwardly religious but idolatrous and oppressive Israel:  Away with the noise of your songs! I will not listen to the music of your
+
+[36] in their prosperous but declining years.  Thus Amos confronted an outwardly religious but idolatrous and oppressive Israel:  Away with the noise of your songs! I will not listen to the music of your harps. But let justice roll on like a river,  righteousness like a never-failing stream! (5:23–24).  Similarly, Isaiah shortly thereafter confronted Judah, also outwardly religious but publicly corrupted by injustice and idolatry:  Stop doing wrong. Learn to do right; seek justice. Defend the oppressed. Take up the cause of the fatherless; plead the case of the widow (1:16–17).
+
+[37] 3 
+into a life of spiritual renewal or personal revival. We can build ourselves up by praying in 
+the Spirit and bring encouragement and gifts to others to build them up (1 Corinthians 14:4).  
+ 
+We are also warned about the possibility of needing to be spiritually revived after all this. 
+Paul warned us not to “grieve the Holy Spirit” by living in ways that diminish our spiritual 
+life (Ephesians 4:30). John wrote to the Church, not unbelievers, that if we “confess our 
+sins,” Jesus will forgive us and cleanse us from all that is in the way of us having a right 
+relationship with God (1 John 1:9).  James assured us that if we will “draw near to God, 
+he will draw near to us ” (James 4:8). Finally, Jesus warned the church in Ephesus that 
+even after they’ve done everything right, they had still lost their first love (Revelation 2:4). 
+Even the New Testament churches could be in a spiritual state that warranted revival.  
+ 
+Historic Revivals
+
+[38] Even the New Testament churches could be in a spiritual state that warranted revival.  
+ 
+Historic Revivals 
+ 
+Church history  includes a variety of revival s and spiritual awakenings.  The first 1 ,500 
+years saw small pockets of revival, such as in monastic communities , and large 
+movements that impacted nations.
+2 The Reformation provided one type of revival (though 
+it was not always healthy). 
+ 
+After the Reformation, there were several revivals of prayer and evangelism. The work of 
+Count Zinzendorf and the Moravians produced nonstop prayer for over a hundred years 
+and the sending of 2,400 missionaries. The cultural and spiritual revival of the First Great 
+Awakening affected both sides of the Atlantic under the leadership of  John Wesley, 
+George Whitefield, Jonathan Edwards, and others. The Second Great Awakening started 
+in the early 18 00s with the Cane Ridge Revival, continued under leaders like Charles 
+Finney, and made evangelism primary.
+
+[39] in the early 18 00s with the Cane Ridge Revival, continued under leaders like Charles 
+Finney, and made evangelism primary. 
+ 
+The modern Pentecostal Movement is the fruit of several revivals at the beginning of the 
+twentieth century. The 1904 Welsh Revival  under Evan Roberts saw more than one 
+hundred thousand conversions. The 1906 Mukti Mission Revival in India, led by Pandita 
+Ramabai, saw an explosion of evangelism among women and a renewal of spiritual gifts. 
+The Azusa Revival  (1906–1909), pastored by William J. Seymour,  launched the 
+Pentecostal revival globally . In the first two decades , Pentecostals led missions and 
+revivals in Africa (Lucy Farrow, John G. Lake, et al.), Europe (T. B. Barratt, Lewi Pethrus, 
+et al.), Oceania (Smith Wigglesworth, et al.), Asia (A.G. and Lillian Garr, et al.) and South 
+America (Daniel Berg, Gunnar Vingren, R. Edgar Miller, et al.).  
+ 
+The Assemblies of God owes its beginning to revivals and revivalists throughout the United
+
+[40] America (Daniel Berg, Gunnar Vingren, R. Edgar Miller, et al.).  
+ 
+The Assemblies of God owes its beginning to revivals and revivalists throughout the United 
+States who decided to cooperate to bring revival to every community and every nation.  
+There are also recognizable revivals that have taken place in modern days. In these historic 
+revivals, God has used many willing and humble hearts to bring transformation and new 
+life to His Church throughout the ages. God seems to stir revival in each generation, calling 
+believers back to their faith and reaching new people with the gospel. 
+ 
+2 For a more elaborate demonstration of Charismatic and Pentecostal expressions, see the appendix titled 
+“Pentecostal and Charismatic Timeline” in The New International Dictionary of Pentecostal and Charismatic 
+Movements (Grand Rapids, MI: Zondervan, 2003).
+
+[41] Spiritual Warfare and the Devil  Some may question theologically and practically if spiritual warfare against the devil is real and relevant to their lives and ministries. The consensus of Assemblies of God thought is that an unseen enemy, the devil, exists and is devoted to opposing God and destroying humanity. Immediately after He was anointed with the Holy Spirit to begin His public ministry, Jesus experienced a personal confrontation with the devil (Matthew 4:1–11; Mark 1:12–13; Luke 4:1–13). Later, Peter summarized Jesus’ ministry: “He went around doing good and healing all who were under the power of the devil” (Acts 10:38). The devil confronted Jesus repeatedly (Luke 4:13), and Christ’s representatives should expect no less. The war was and is real.  The biblical writers evidence belief in the existence of the devil, whom they depict as a personal entity. He is described as a serpent in the confrontation with Adam and Eve in Genesis 3. Capable of knowledge, speech, and
+
+[42] belief in the existence of the devil, whom they depict as a personal entity. He is described as a serpent in the confrontation with Adam and Eve in Genesis 3. Capable of knowledge, speech, and persuasion, all indicators of a personal entity, he tempted them, and they fell into sin. When Jesus was tempted by the devil, he conversed with Jesus, even using Scriptures, in the effort to divert Jesus from His mission (Matthew 4:1–11; Mark 1:12–13; Luke 4:1–13).  The devil is the adversary, a liar, and a deceiver. His opposition to God, His plan, and His people is fierce and relentless. However, the devil and the demonic forces allied with him are limited. They are not divine and lack the complete knowledge God expresses, they are not able to be present everywhere at the same time, and they are subject to God and His people. They do not have guaranteed access to human thoughts. The believer must be aware of their evil intentions and activities but should not fear them.  When God confronted
+
+[43] subject to God and His people. They do not have guaranteed access to human thoughts. The believer must be aware of their evil intentions and activities but should not fear them.  When God confronted Adam and Eve about their choice to turn away from His ultimate guidance and direction, to fall into sin and introduce sin to the entire human race, He pronounced the ultimate destiny of the devil. “I will put enmity between you and the woman, and between your offspring and hers; he will crush your head, and you will strike his heel” (Genesis 3:15). Revelation 19 and 20 make it clear that the devil and those demonic forces allied with him are destined for destruction.  The conflict between the believer and demonic forces can be understood as a spectrum of demonic influence, ranging in the degree of domination over a person’s life and in the variety of aspects of life where demonic control has taken place. The impact of demonic powers may be slight and almost undetectable. If one repents,
+
+[44] of domination over a person’s life and in the variety of aspects of life where demonic control has taken place. The impact of demonic powers may be slight and almost undetectable. If one repents, forsakes their sin and carnal activities, resists temptation, and calls upon the Spirit to cleanse and deliver, victory and freedom will be obtained. The extreme influence of the demonic could be called “possession” in which a person is controlled by demonic forces who manipulate the individual’s body, mind, and spirit for their destructive purposes.2 This extreme case of demonic control is indicative of continued movement away from, and abandonment of, a personal relationship with Jesus; the believer should gain victory in the spiritual conflict well before this extreme and not be subject to it.  While believers will engage in spiritual warfare and will be oppressed, they cannot be possessed by the demonic forces.  Great care must be taken not to confuse emotional and mental illnesses with
+
+[45] While believers will engage in spiritual warfare and will be oppressed, they cannot be possessed by the demonic forces.  Great care must be taken not to confuse emotional and mental illnesses with demonic activity. While the demonic activity may mimic the behavior exhibited in mental illness, to assert that they are the same can bring harm to individuals, preventing them from receiving the medical care needed. The wise counsel of godly doctors, counselors, and psychologists can be of assistance  2 With demon possession, the power of Satan takes control of the center of an individual’s personality. In such lives, demons can manifest themselves through temporary changes in personality, speech, bizarre physical behavior, physical and mental affliction, and self-destructive tendencies.
+
+[46] Elements of Biblical Justice  A significant consideration in the Assemblies of God’s opposition to racism is that racism violates the concept of biblical justice. Justice is a biblical theme that is developed from an understanding of the nature of God, who himself is just and righteous (Deuteronomy 10:18; 32:4; Job 37:23; Psalm 9:7; 10:17–18; 33:4–5; Isaiah 5:16; 30:18; Hosea 12:6). As the holy and just Sovereign of the creation, God expects justice (Micah 6:8). Consequently, when we act unjustly, whether with respect to race or any other personal characteristic, we go against the divine nature and order.    A foundational element of biblical justice is the understanding that God intended for human beings to be a community from the beginning (Genesis 1:27). Human beings are bound together by far more commonalities than what may distinguish them from one another. Every member of the community shares the threats and injuries against other members. In the same way, the successes are
+
+[47] by far more commonalities than what may distinguish them from one another. Every member of the community shares the threats and injuries against other members. In the same way, the successes are shared. This demands that each person in the community assume care and responsibilities for all others in the community. It is far too easy to lose the sense of community as populations grow, but biblical justice begins with this understanding.  In biblical justice, there is a place for identifying with the sins of the larger community and calling out in confession for forgiveness (Nehemiah 1:1–11; Daniel 9:1–19). For both Nehemiah and Daniel, there was a release of God’s intervention when they prayed, confessing the sins of the people. They wanted God to express His forgiveness to the community.   Additionally, biblical justice recognizes that people have individual responsibility before God. For example, both Jeremiah and Ezekiel warned Israel explicitly that they could not merely blame
+
+[48] Additionally, biblical justice recognizes that people have individual responsibility before God. For example, both Jeremiah and Ezekiel warned Israel explicitly that they could not merely blame their sin on the larger community (Jeremiah 31:29–30; Ezekiel 18:1–4). The community at large needs to repent, asking for the forgiveness of God for all forms of injustice and the failure to speak against it. However, individuals cannot escape their personal need to do the same.  The Scriptures are clear that racism must not only be addressed on an individual basis, but also corporately, whether in the church or the world. For example, the institutional understanding of the relationship between lender and borrower would allow the lender to charge interest and to receive a pledge for the loan. However, this system could be oppressive, so the Lord provided relief for those who would be harmed by the institution (Exodus 22:25–27). The prophet Jeremiah warns against those who use the system to
+
+[49] this system could be oppressive, so the Lord provided relief for those who would be harmed by the institution (Exodus 22:25–27). The prophet Jeremiah warns against those who use the system to harm others: “Woe to him who builds his palace by unrighteousness, his upper rooms by injustice, making his own people work for nothing, not paying them for their labor” (Jeremiah 22:13). In the New Testament, James similarly warns those he identifies as rich for failing to honor laborers for their labor (James 5:1–6).  The moral and ethical principles behind these Scriptural commands necessitate equal opportunity not only in lending institutions or compensation but should also apply to other practices and processes. As individuals and as a church we should oppose any practice or process that results in unfair or harmful treatment of individuals because of race.  Biblical justice calls for people to be concerned for those who are oppressed. Isaiah’s message noted the sinful condition of Israel
+
+[50] in unfair or harmful treatment of individuals because of race.  Biblical justice calls for people to be concerned for those who are oppressed. Isaiah’s message noted the sinful condition of Israel and urged them to repent. As part of the change that repentance would bring them, he noted they should “defend the oppressed. Take up the cause of the fatherless; plead the case of the widow” (Isaiah 1:17). The Psalmist pronounced a blessing on those who “have regard for the weak” (Psalm 41:1). The writer of Proverbs offered an additional challenge for readers to “speak up for those who cannot speak for themselves, for the rights of all who are destitute. Speak up and judge fairly; defend the rights of the poor and needy” (Proverbs 31:8–9).
+
+[51] As we know very well, for the most part those appeals fell on deaf ears, and both nations continued their blind march to disintegration and exile.  By the time of Jesus, God’s people were no longer a theocracy ruled by a Davidic king, but a vassal state ruled by tyrannical Rome.  In that oppressive setting, with the Jewish people seething with resentment and revolt, Jesus yet preaches the prophetic message, “Blessed are the peacemakers, for they will be called children of God” (Matthew 5:9).  Paul writes, “Do not repay anyone evil for evil.  Be careful to do what is right in the eyes of everyone.  If it is possible, as far as it depends on you, live at peace with everyone” (Romans 12:17–18).  Later in the same epistle he urges, “Let us therefore make every effort to do what leads to peace and to mutual edification” (Romans 14:19).  The author of Hebrews commands:  “Make every effort to live in peace with everyone and to be holy” (Hebrews 12:14).  James promises, “Peacemakers who sow
+
+[52] and to mutual edification” (Romans 14:19).  The author of Hebrews commands:  “Make every effort to live in peace with everyone and to be holy” (Hebrews 12:14).  James promises, “Peacemakers who sow in peace raise a harvest of righteousness” (James 3:18).  When Jesus blesses those who make peace (Matthew 5:9), He is challenging and encouraging His followers to actively promote the restoration of relationships.  To believers deeply involved in the life of local congregations, Paul writes, “Make every effort to keep the unity of the Spirit through the bond of peace” (Ephesians 4:3).  This is an exhortation rarely heeded in fractious congregations and communities!  Nonetheless, peacemaking and peacekeeping are a vital part of the “ministry of reconciliation” that God has given to us through Christ (2 Corinthians 5:18).  It is inspiring to remember that these exhortations first came to believers striving to be peacemakers under far more dangerous and difficult conditions than exist in
+
+[53] Christ (2 Corinthians 5:18).  It is inspiring to remember that these exhortations first came to believers striving to be peacemakers under far more dangerous and difficult conditions than exist in advanced modern societies.  But even today, there are many places in our world where extremely dangerous conditions threaten the very lives, not to mention the peacemaking efforts of believers.  Certainly, for those of us who are free and uniquely empowered to bring reconciliation and hope to various communities at home and abroad, the imperative for peacemaking is inescapable.  Biblical Means of Achieving Peace  As we have repeatedly emphasized, genuine peace comes only from and through God who is the wellspring of peacemaking.  As Paul notes (Romans 4:5; 5:6), God has taken the first step of peacemaking by offering redemption through Jesus Christ, whereby we have “peace with God through our Lord Jesus Christ” (Romans 5:1).  This includes personal and experiential peace:  “And the peace of
+
+[54] by offering redemption through Jesus Christ, whereby we have “peace with God through our Lord Jesus Christ” (Romans 5:1).  This includes personal and experiential peace:  “And the peace of God, which transcends all understanding, will guard your hearts and your minds in Christ Jesus” (Philippians 4:7).  Jesus further personalizes it declaring that He is the One who gives peace:  “Peace I leave with you; my peace I give you” (John 14:27).  Taking this reconciling gospel of peace (Ephesians 6:15) to others in turn is the first and most basic means of peacemaking (Matthew 5:9).  Beyond sharing the gospel of peace, the Scriptures are not univocal regarding other means of accomplishing peace or addressing conflict.  In the Old Testament, God’s will for human behavior is epitomized in the Ten Commandments (Exodus 20:1–17; Deuteronomy 5:1–21) which are in turn distilled into two, love for God and love for neighbor (Deuteronomy 6:5; Leviticus 19:18; Matthew 22:37–40).  If necessary, force is
+
+[55] (Exodus 20:1–17; Deuteronomy 5:1–21) which are in turn distilled into two, love for God and love for neighbor (Deuteronomy 6:5; Leviticus 19:18; Matthew 22:37–40).  If necessary, force is used to resolve conflicts.  In the New Testament, there is more emphasis on accomplishing peace through nonviolent means.  In the Sermon on the Mount, Jesus advocates a nonviolent response to evil when He instructs us to turn the other cheek, go the second mile, or relinquish our shirts when sued for our coats.  However, the
+
+[56] 4 
+How Do You Prepare for Revival? 
+ 
+Preparing for revival involves a blending of divine and human activity. First, we recognize 
+that revival depends upon the Lord since human beings cannot produce it on their  own. 
+Since revival is about moving hearts toward God, we recognize that the Holy Spirit is the 
+prime mover, administrator, and initiator. At the same time, most biblical examples included 
+people who recognized that they were living below God’s  standard and called out in 
+repentance. God’s answer to that cry is a revival of His mercy with His restoring love and 
+power. 
+ 
+A commitment to prayer is one element regularly seen in revivals. Many Christians have 
+relied on the wording of 2 Chronicles 7:14
+3 as a guide to revival.  God’s people must be 
+willing to humble themselves, pray for God to come near, seek His face (restoring 
+relationship), and turn from their wicked ways. This is very similar to James’s admonition
+
+[57] willing to humble themselves, pray for God to come near, seek His face (restoring 
+relationship), and turn from their wicked ways. This is very similar to James’s admonition 
+that we should submit ourselves to God and humble ourselves (James 4:7–9). We should 
+“come near to God,” and He will draw near to us when we wash ourselves and renew our 
+commitment to the Lord.  This attitude of continual submission to God brings about the 
+personal revival we desire. 
+ 
+Another sometimes missed element is the preparation needed for a community to steward 
+a revival. Are churches ready to accommodate crowds larger than the building's design 
+planned for? Are there  available workers on all levels to handle the crowd (greeters, 
+parking attendants, children’s workers, altar ministers, etc.)? Have churches planned how 
+to follow up on an influx of new converts and disciple them to Christian maturity?  
+ 
+How Can Leaders Prepare Their Churches for Revival?
+
+[58] to follow up on an influx of new converts and disciple them to Christian maturity?  
+ 
+How Can Leaders Prepare Their Churches for Revival? 
+ 
+Some pastors have tried to cultivate a spiritual environment in order to replicate revivals 
+from other places. This is a mistake.  Our priority should not be to create a revival that 
+mimics what is happe ning elsewhere but to cultivate a healthy spiritual environment 
+where experiencing God becomes normal.  Some of the ways churches can foster that 
+environment are as follows.  
+ 
+Healthy Leadership 
+Are we, as leaders, growing spiritually and allowing others to help carry the burden and 
+avoid burnout? A healthy church must have people who have responded to God's call 
+and have prepared to lead and equip others to minister to people. Leaders must be willing, 
+in preparation for revival, to lead in repentance and humility.  
+ 
+Discipleship 
+Do we provide consistent opportunities for new converts to grow and mature? Healthy
+
+[59] in preparation for revival, to lead in repentance and humility.  
+ 
+Discipleship 
+Do we provide consistent opportunities for new converts to grow and mature? Healthy 
+discipleship systems lead people to wholeness by dealing with brokenness and sin. 
+ 
+ 
+3 For a longer discussion of the context of 2 Chronicles 7:14 and its application to today, see Martin Selman, 
+2 Chronicles: An Introduction and Commentary, in Tyndale Old Testament Commentaries vol. 11 (Downers Grove, IL: 
+IVP Academic, 1994).
+
+[60] stories. Our feelings about the Old Testament, and the Pentateuch in particular, soon 
+began to change as this advanced student of the Word made these books come alive. 
+Nothing was omitted as T.J. read aloud every single verse, explaining each term 
+and deﬁ  ning various individual words. A big, black Bible was always at his side, but he 
+much preferred reading from small, separate paperback books of the Bible. They were 
+much easier for him to hold close to his face as he sat on a high stool with both arms 
+resting on the lectern. 
+Fifty years of strenuous preaching had greatly taxed the voice of our lovable 
+instructor. It wasn’t exactly melodious as he spoke into the small microphone clipped 
+to his lapel. But, oh, the truths that came forth from that scholar of the Word! We con-
+sidered him a scholar because he could tell us what was in every chapter of the Bible 
+and could quote most of it, too. But T.J. thought of himself as “just a student” of God’s 
+precious Word.
+
+[61] a. His virgin birth (Matthew 1:23; Luke 1:31,35). 
+b. His sinless life (Hebrews 7:26; 1 Peter 2:22).
+c. His miracles (Acts 2:22; 10:38).
+d. His substitutionary work on the cross (1 Corinthians 15:3; 2 Corinthians 5:21).
+e. His bodily resurrection from the dead (Matthew 28:6; Luke 24:39; 1 Corinthians 
+15:4).
+f. His exaltation to the right hand of God (Acts 1:9,11; 2:33; Philippians 2:9–11; 
+Hebrews 1:3).
+4. THE FALL OF MAN
+Man was created good and upright; for God said, “Let us make man in our 
+image, after our likeness.” However, man by voluntary transgression fell and thereby 
+incurred not only physical death but also spiritual death, which is separation from 
+God (Genesis 1:26,27; 2:17; 3:6; Romans 5:12–19).
+5. THE SALVATION OF MAN
+Man’s only hope of redemption is through the shed blood of Jesus Christ the Son 
+of God.
+APPENDIX 1: STATEMENT OF FUNDAMENTAL TRUTHS  
+529
+
+[62] accomplished.”2  Whether we take this allusion to the Hebrew alphabet literally or figuratively, the force is the same.  Jesus thought of the Scriptures as being eternally significant even in their slightest detail.  If Jesus did not believe in the full inspiration and infallibility of the Scriptures, the force of His argument is lost.  Jesus’ insistence on the truthfulness and authority of every part of the Scriptures is seen in other passages as well.  In John 10:34–38, He points to a brief statement from the Psalms (82:6) and argues that neither it nor the other parts of the Law can be broken.  If Jesus had thought of the Scriptures as being only partially inspired and subject to errors of detail, He certainly would not have spoken as He did.  In Matthew 22:32, the validity of Christ’s statement rests on a precise scriptural detail, namely, the present tense of the verb, “I am.”  In His questioning of the Pharisees in Matthew 22:43–45, the force of the dialogue rests on the use of
+
+[63] 5 
+Fundamental Truth 14 also affirms that Jesus’ com ing includes a future for  Israel. 
+Drawing from Paul’s prom ise that “all Israel will be saved” (Romans 11:26–27), it 
+notes that the reign of Chr ist will mean the “ salvation of national Israel.” In 
+affirming this, it does not mean that Jewish people today do not need Chr ist as 
+Savior and Messiah. The A ssemblies of God has long emphasized evangelis m 
+among the Jewish people. This line affirms that Christ’s future messianic k ingdom 
+will bring salvation to Jewis h people as promis ed in the Old Testament bec ause 
+they will accept Jesus as M essiah.  
+While respecting that other Bible-b elieving traditions may interpret the Millennium 
+in different ways, the Assemblies of God has always held that premillennialism best 
+affirms the core beliefs in the imminent return of Christ, the resurrection of the 
+Church, the fulfillment of biblical pr omises r egarding the mes sianic kingdom, and all
+================================================================================
+
