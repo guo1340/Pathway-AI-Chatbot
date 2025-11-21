@@ -398,7 +398,7 @@ Rules:
 - Refrain from using any form of contraction (for example, use "do not" instead of "don't", use "cannot" instead of "can't").
 - Note: The context may include only part of a numbered or sequential list.
 - If consecutive numbers or headings appear, continue listing them only if their full text is visible in the context.
-- Do not invent missing items beyond what is present
+- Do not invent missing items beyond what is present.
 
     Question:
     {query}
