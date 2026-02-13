@@ -49,12 +49,24 @@ export default function App({
   const logRef = React.useRef<HTMLDivElement | null>(null)
   const inputRef = React.useRef<HTMLTextAreaElement | null>(null)
   const cfg = (window as any).RAG_CHATBOT_CONFIG || {}
-  const injectedToken = (cfg.token as string | undefined) || undefined
 
-  // Prefer WP-injected apiBase when available
-  const effectiveApiBase = (cfg.apiBase as string | undefined) || apiBase
+  const qs = new URLSearchParams(window.location.search)
+  const tokenFromUrl = qs.get("token") || undefined
+  const apiBaseFromUrl = qs.get("apiBase") || undefined
+
+  const injectedToken =
+    (cfg.token as string | undefined) ||
+    tokenFromUrl ||
+    undefined
+
+  // Prefer URL apiBase (iframe), then WP injected, then prop
+  const effectiveApiBase =
+    apiBaseFromUrl ||
+    (cfg.apiBase as string | undefined) ||
+    apiBase
 
   const authToken: string | null = injectedToken ?? null
+
   const authReady = true
 
 
