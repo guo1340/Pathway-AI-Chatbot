@@ -54,10 +54,8 @@ export default function App({
   // Prefer WP-injected apiBase when available
   const effectiveApiBase = (cfg.apiBase as string | undefined) || apiBase
 
-  const [authToken] = React.useState<string | null>(injectedToken || null)
-  const [authReady] = React.useState(true)
-
-
+  const authToken: string | null = injectedToken ?? null
+  const authReady = true
 
 
   // 🧠 Load conversation from sessionStorage on mount
