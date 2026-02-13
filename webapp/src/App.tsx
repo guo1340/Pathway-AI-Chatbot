@@ -276,7 +276,16 @@ export default function App({
     <div className="rcb-card" role="complementary" aria-label="RAG Chatbot">
       <div className="rcb-head">
         {/* {title || 'Pathway Chatbot (Beta)'} */}
-        <img src="/Logo.png" alt="Pathway Logo" className="header-logo" />
+        <img
+          src="/Logo.png"
+          alt="Pathway Logo"
+          className="header-logo"
+          style={{ cursor: "pointer" }}
+          onClick={() => {
+            window.location.href = "https://pathway.training";
+          }}
+        />
+
         <button
           onClick={(e) => {
             handleRipple(e);
