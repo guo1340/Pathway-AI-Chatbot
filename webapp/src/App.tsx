@@ -4,6 +4,7 @@ import { GiNuclearBomb } from "react-icons/gi";
 // --- Inline API call (replaces need for api.ts) ---
 async function askRag(
   apiBase: string,
+  token: string,
   body: {
     query: string
     source?: string
@@ -13,7 +14,10 @@ async function askRag(
 ): Promise<any> {
   const res = await fetch(`${apiBase}/api/ask`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
     body: JSON.stringify(body),
   })
   if (!res.ok) {
@@ -44,6 +48,17 @@ export default function App({
   const [convId, setConvId] = React.useState<string | undefined>(undefined)
   const logRef = React.useRef<HTMLDivElement | null>(null)
   const inputRef = React.useRef<HTMLTextAreaElement | null>(null)
+  const cfg = (window as any).RAG_CHATBOT_CONFIG || {}
+  const injectedToken = (cfg.token as string | undefined) || undefined
+
+  // Prefer WP-injected apiBase when available
+  const effectiveApiBase = (cfg.apiBase as string | undefined) || apiBase
+
+  const [authToken] = React.useState<string | null>(injectedToken || null)
+  const [authReady] = React.useState(true)
+
+
+
 
   // 🧠 Load conversation from sessionStorage on mount
   React.useEffect(() => {
@@ -92,21 +107,47 @@ export default function App({
     }
   }
 
-  function toHttpUrl(c: Citation, apiBase: string) {
+  function appendToken(url: string, token?: string | null) {
+    if (!token) return url
+    const [base, hash] = url.split('#')
+    const join = base.includes('?') ? '&' : '?'
+    return `${base}${join}token=${encodeURIComponent(token)}${hash ? `#${hash}` : ''}`
+  }
+
+  function toHttpUrl(c: Citation, apiBase: string, token?: string | null) {
     if (!c.url) return undefined
-    if (c.url.startsWith('http')) return c.url
-    if (c.url.startsWith('/')) return c.url
+
+    // Absolute URL already
+    if (c.url.startsWith('http')) {
+      // If it is your secured file endpoint, add token
+      if (c.url.includes('/api/files/')) {
+        return appendToken(c.url, token)
+      }
+      return c.url
+    }
+
+    // If it is already a root-relative path
+    if (c.url.startsWith('/')) {
+      const abs = `${apiBase.replace(/\/$/, '')}${c.url}`
+      if (abs.includes('/api/files/')) return appendToken(abs, token)
+      return abs
+    }
+
+    // file://... -> convert to /api/files/<name>
     if (c.url.startsWith('file://')) {
       const name = basenameFromUrl(c.url)
       if (name) {
         const [file, fragment] = name.split('#')
         const safeFile = encodeURIComponent(file)
         const fragPart = fragment ? `#${fragment}` : ''
-        return `${apiBase.replace(/\/$/, '')}/api/files/${safeFile}${fragPart}`
+        const abs = `${apiBase.replace(/\/$/, '')}/api/files/${safeFile}${fragPart}`
+        return appendToken(abs, token)
       }
     }
+
     return c.url
   }
+
 
   function dedupeCitations(citations?: Citation[]) {
     if (!citations?.length) return []
@@ -123,6 +164,13 @@ export default function App({
 
   // ---- send message ----
   async function send() {
+
+    if (!authReady) return
+    if (!authToken) {
+      setMsgs((m) => [...m, { who: 'ai', text: 'Not authorized.' }])
+      return
+    }
+
     const query = q.trim()
     if (!query || busy) return
     setQ('')
@@ -137,7 +185,7 @@ export default function App({
     setMsgs((m) => [...m, newUserMsg])
     setBusy(true)
     try {
-      const data = await askRag(apiBase, {
+      const data = await askRag(effectiveApiBase, authToken, {
         query,
         source,
         conversation_id: convId,
@@ -217,7 +265,8 @@ export default function App({
   return (
     <div className="rcb-card" role="complementary" aria-label="RAG Chatbot">
       <div className="rcb-head">
-        {title || 'Pathway Chatbot (Beta)'}
+        {/* {title || 'Pathway Chatbot (Beta)'} */}
+        <img src="/Logo.png" alt="Pathway Logo" className="header-logo" />
         <button
           onClick={(e) => {
             handleRipple(e);
@@ -239,11 +288,6 @@ export default function App({
               <span className="ai-title">Pathway's bot:</span>
               <p className="ai-text">👋 Hi there! Got a question? I’m here to help.</p>
             </div>
-            <div className="rcb-msg ai disclaimer">
-              <p className="ai-text disclaimer-text">
-                ⚠️ This bot can make mistakes — please check the sources given at the end of each answer.
-              </p>
-            </div>
           </>
         ) : (
           msgs.map((m, i) => {
@@ -257,7 +301,7 @@ export default function App({
                 const idx = parseInt(match[1], 10) - 1
                 const citation = citations[idx]
                 if (!citation) return part
-                const href = toHttpUrl(citation, apiBase)
+                const href = toHttpUrl(citation, effectiveApiBase, authToken)
                 const title =
                   citation.title || basenameFromUrl(citation.url) || 'source'
                 return (
@@ -291,7 +335,7 @@ export default function App({
                         .replace(/^-+\s+/gm, '• ')
                         // remove stray "-" before citations or EOL
                         .replace(/\s*-\s*(?=\[\d+\]|\n|$)/g, ''),
-                      m.citations
+                      deduped
                     )}
 
                   </div>
@@ -303,35 +347,43 @@ export default function App({
         )}
       </div>
 
-      <div className="rcb-row">
-        <textarea
-          ref={inputRef}
-          id="message"
-          placeholder="Type a message..."
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value)
-            e.target.style.height = 'auto'
-            e.target.style.height = `${e.target.scrollHeight}px`
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              send()
-            }
-          }}
-          rows={1}
-          className="chat-input"
-        />
-        <button
-          className={busy ? '' : 'send-button'}
-          onClick={send}
-          disabled={busy}
-          style={busy ? { minWidth: `${longestText.length + 2}ch`, textAlign: 'center' } : {}}
-        >
-          {busy ? `Thinking${thinkingDots}` : 'Send'}
-        </button>
+      <div className="chat-disclaimer-wrap">
+        <div className="chat-disclaimer">
+          ⚠️ This bot can make mistakes — please check the sources given at the end of each answer.
+        </div>
       </div>
+      <div className='question-container'>
+        <div className="rcb-row">
+          <textarea
+            ref={inputRef}
+            id="message"
+            placeholder="Type a message..."
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value)
+              e.target.style.height = 'auto'
+              e.target.style.height = `${e.target.scrollHeight}px`
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                send()
+              }
+            }}
+            rows={1}
+            className="chat-input"
+          />
+          <button
+            className={busy ? '' : 'send-button'}
+            onClick={send}
+            disabled={busy}
+            style={busy ? { minWidth: `${longestText.length + 2}ch`, textAlign: 'center' } : {}}
+          >
+            {busy ? `Thinking${thinkingDots}` : 'Send'}
+          </button>
+        </div>
+      </div>
+
     </div>
   )
 }

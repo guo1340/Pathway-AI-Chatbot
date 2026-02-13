@@ -9,6 +9,40 @@ body,
   background: transparent;
 } */
 
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+#rag-chatbot-root {
+  height: 100vh;
+  width: 100vw;
+  font-family: ui-sans-serif, system-ui, -apple-system;
+}
+
+/* Fullscreen card */
+.rcb-card {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  /* override old max-width: 720px */
+  border-radius: 0;
+  /* optional: remove rounded corners for true fullscreen */
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+/* Make the log take remaining space */
+.rcb-log {
+  flex: 1;
+  height: auto;
+  /* override old fixed height: 380px */
+  overflow: auto;
+}
+
 :root {
   --radius: 14px;
 }
@@ -162,12 +196,6 @@ body,
   /* box-shadow: 0 16px 48px rgba(0, 0, 0, .22); */
 }
 
-.rcb-card {
-  max-width: 720px;
-  margin: 0;
-  border-radius: var(--radius);
-  /* box-shadow: 0 4px 12px rgba(0, 0, 0, .04); */
-}
 
 .rcb-head {
   display: flex;
@@ -177,7 +205,7 @@ body,
   font-size: 1.1rem;
   font-weight: 600;
   padding: 1rem;
-  background-color: rgb(78, 152, 147);
+  /* background-color: rgb(78, 152, 147); */
   /* color: white; */
 }
 
@@ -286,10 +314,17 @@ body,
   margin-top: .25rem;
 }
 
+.question-container {
+  display: flex;
+  justify-content: center;
+}
+
 .rcb-row {
   display: flex;
   gap: .5rem;
-  padding: .75rem;
+  min-width: 900px;
+  max-width: 75vw;
+  padding: .75rem 5rem 2rem 5rem;
 }
 
 .chat-input {
@@ -427,7 +462,7 @@ body,
   /* inner spacing */
   border-radius: 20px;
   /* rounded corners for “bubble” look */
-  max-width: 100%;
+  max-width: 60vw;
   /* prevent it from stretching too far */
   word-wrap: break-word;
   /* wrap long words */
@@ -442,7 +477,7 @@ body,
   color: #000000;
   padding: 8px 13px;
   border-radius: 20px;
-  max-width: 100%;
+  max-width: 60vw;
   word-wrap: break-word;
   margin: 4px 0;
 
@@ -498,4 +533,50 @@ body,
   margin-top: 4px;
   text-align: right;
   padding-right: 4px;
+}
+
+.chat-disclaimer {
+  font-size: 0.9rem;
+  color: #555;
+  background-color: #f3f3f3;
+  padding: 8px 14px;
+  border-radius: 12px;
+  line-height: 1.4;
+
+  max-width: 100%;
+  /* match bubble width */
+  margin: 0 auto 0.75rem auto;
+  /* center horizontally */
+  text-align: center;
+  /* center text inside */
+}
+
+.chat-disclaimer-wrap {
+  display: flex;
+  justify-content: center;
+  /* ✅ centers horizontally */
+  /* padding: 0 1rem; */
+  /* breathing room on small screens */
+  /* margin-bottom: 0.75rem; */
+}
+
+.chat-disclaimer {
+  display: inline-block;
+  /* ✅ shrink to content */
+  width: fit-content;
+  /* ✅ prevents full-width */
+  max-width: 60vw;
+  /* your desired width limit */
+  text-align: center;
+
+  font-size: 0.9rem;
+  color: #555;
+  background-color: #f3f3f3;
+  padding: 8px 14px;
+  border-radius: 12px;
+  line-height: 1.4;
+}
+
+.header-logo {
+  max-width: 250px;
 }
