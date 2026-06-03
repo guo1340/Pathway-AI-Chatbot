@@ -168,6 +168,10 @@
         <div>
           <div class="mode-text" id="modeLabel">Loading…</div>
           <div class="mode-sub" id="modeSub"></div>
+          <a id="localLink" href="http://localhost:5173" target="_blank"
+            style="display:none;font-size:0.8rem;color:var(--accent);margin-top:4px;text-decoration:none">
+            → Open local bot at localhost:5173
+          </a>
         </div>
       </div>
       <button class="btn-primary btn-lg" id="toggleBtn" onclick="toggleMode()">Switch Mode</button>
@@ -299,16 +303,23 @@ function applyMode(mode) {
   const label = document.getElementById('modeLabel');
   const sub   = document.getElementById('modeSub');
   const btn   = document.getElementById('toggleBtn');
+  const link  = document.getElementById('localLink');
   if (mode === 'live') {
-    dot.className  = 'dot dot-live';
+    dot.className     = 'dot dot-live';
     label.textContent = 'Live';
     sub.textContent   = 'api.chat.pathway.training';
     btn.textContent   = '⇄ Switch to Local';
+    link.style.display = 'none';
   } else {
-    dot.className  = 'dot dot-local';
-    label.textContent = 'Local';
-    sub.textContent   = 'localhost:8000';
+    dot.className     = 'dot dot-local';
+    label.textContent = 'Local (starting up…)';
+    sub.textContent   = 'backend: localhost:8000 · frontend: localhost:5173';
     btn.textContent   = '⇄ Switch to Live';
+    link.style.display = 'block';
+    // Update label once servers have had time to start
+    setTimeout(() => {
+      if (currentMode === 'local') label.textContent = 'Local';
+    }, 12000);
   }
 }
 

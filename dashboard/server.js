@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const { Client } = require('ssh2');
 const https = require('https');
 const os = require('os');
@@ -96,6 +96,44 @@ async function sftpUpload(localPath, remoteName) {
   });
 }
 
+// ── Local server management ───────────────────────────────────────────────────
+let localProcs = [];
+
+function startLocalServers() {
+  if (localProcs.length) return; // already running
+
+  const backend = spawn('uv', ['run', 'main.py'], {
+    cwd: path.join(PROJECT_ROOT, 'rag-backend'),
+    shell: true,
+    windowsHide: true,
+  });
+
+  const frontend = spawn('npm', ['run', 'dev'], {
+    cwd: path.join(PROJECT_ROOT, 'webapp'),
+    shell: true,
+    windowsHide: true,
+  });
+
+  localProcs = [backend, frontend];
+
+  backend.on('exit',  () => { localProcs = localProcs.filter(p => p !== backend);  });
+  frontend.on('exit', () => { localProcs = localProcs.filter(p => p !== frontend); });
+}
+
+function stopLocalServers() {
+  for (const proc of localProcs) {
+    try {
+      // /T kills the full process tree so uv/node children die too
+      spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { shell: true, windowsHide: true });
+    } catch {}
+  }
+  localProcs = [];
+}
+
+// Clean up if the dashboard itself is closed
+process.on('exit', stopLocalServers);
+process.on('SIGINT', () => { stopLocalServers(); process.exit(); });
+
 // ── JWT helper ────────────────────────────────────────────────────────────────
 // Generates a short-lived HS256 JWT matching the backend's verify_api_key logic.
 // Requires no external packages — uses Node's built-in crypto module.
@@ -162,12 +200,14 @@ app.get('/api/status', (req, res) => {
   }
 });
 
-// Toggle mode
+// Toggle mode + start/stop local servers automatically
 app.post('/api/toggle', (req, res) => {
   try {
     const current = detectMode();
     const target = current === 'live' ? 'local' : 'live';
     applyToggle(target);
+    if (target === 'local') startLocalServers();
+    else stopLocalServers();
     res.json({ mode: target });
   } catch (e) {
     res.status(500).json({ error: e.message });
