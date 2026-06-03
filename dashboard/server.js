@@ -255,6 +255,36 @@ app.post('/api/server/restart', async (req, res) => {
   }
 });
 
+// Sync prompt to server: git pull on server → pm2 restart → /api/reload
+app.post('/api/server/sync-prompt', async (req, res) => {
+  try {
+    await sshExec('cd /home/ubuntu/Pathway-AI-Chatbot && git pull');
+    await sshExec('pm2 restart rag-backend --update-env');
+    await new Promise(r => setTimeout(r, 3000));
+
+    const envContent = await sshExec('cat /home/ubuntu/Pathway-AI-Chatbot/rag-backend/.env');
+    const secretMatch = envContent.match(/^PATHWAY_RAG_JWT_SECRET=(.+)$/m);
+    if (!secretMatch) throw new Error('PATHWAY_RAG_JWT_SECRET not found in server .env');
+    const jwtSecret = secretMatch[1].trim().replace(/^["']|["']$/g, '');
+    const token = generateJWT(jwtSecret);
+
+    await new Promise((resolve, reject) => {
+      const reqOut = https.request(
+        'https://api.chat.pathway.training/api/reload',
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } },
+        (resp) => { resp.resume(); resolve(); }
+      );
+      reqOut.on('error', reject);
+      reqOut.setTimeout(15000, () => reqOut.destroy(new Error('Reload request timed out')));
+      reqOut.end();
+    });
+
+    res.json({ success: true, message: 'Server updated and bot reloaded with new prompt.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Get bot prompt
 app.get('/api/prompt', (req, res) => {
   try {

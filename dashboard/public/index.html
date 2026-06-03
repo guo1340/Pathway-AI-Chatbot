@@ -224,6 +224,10 @@
         <button class="btn-primary" id="savePromptBtn" onclick="savePrompt()">Save Prompt</button>
       </div>
     </div>
+    <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:0.78rem;color:var(--muted)">After saving &amp; pushing via Git, sync the new prompt to the live server:</span>
+      <button class="btn-success" id="syncPromptBtn" onclick="syncPrompt()">↑ Sync Prompt to Server</button>
+    </div>
   </div>
 
   <!-- ── Server Controls ── -->
@@ -528,6 +532,28 @@ async function loadPrompt() {
   } catch (e) {
     status.textContent = '⚠ ' + e.message;
     status.style.color = 'var(--danger)';
+  }
+}
+
+async function syncPrompt() {
+  const btn    = document.getElementById('syncPromptBtn');
+  const status = document.getElementById('promptStatus');
+  setLoading(btn, true, ' Syncing…');
+  status.textContent = 'Pulling latest code on server, restarting backend…';
+  status.style.color = 'var(--muted)';
+  try {
+    const r = await fetch('/api/server/sync-prompt', { method: 'POST' });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    status.textContent = '✓ ' + d.message;
+    status.style.color = 'var(--success)';
+    toast('Prompt live on server');
+  } catch (e) {
+    status.textContent = '⚠ ' + e.message;
+    status.style.color = 'var(--danger)';
+    toast('Sync failed: ' + e.message, 'err');
+  } finally {
+    setLoading(btn, false);
   }
 }
 
