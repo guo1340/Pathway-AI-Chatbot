@@ -97,6 +97,22 @@ async function sftpUpload(localPath, remoteName) {
 }
 
 // ── Local server management ───────────────────────────────────────────────────
+
+// Resolve full path for executables that live in user-only PATH locations
+function findExe(name) {
+  try {
+    const result = require('child_process').execSync(`where ${name}`, { encoding: 'utf8', shell: true });
+    return result.trim().split(/\r?\n/)[0].trim();
+  } catch {
+    return name; // fall back to bare name and hope for the best
+  }
+}
+
+const UV_EXE  = findExe('uv');
+const NPM_EXE = findExe('npm');
+console.log(`uv  → ${UV_EXE}`);
+console.log(`npm → ${NPM_EXE}`);
+
 let localProcs = [];
 let backendLogs = [];
 
@@ -104,13 +120,12 @@ function startLocalServers() {
   if (localProcs.length) return;
   backendLogs = [];
 
-  // Use cmd /c so Windows resolves uv/npm from the user's PATH reliably
-  const backend = spawn('cmd', ['/c', 'uv run main.py'], {
+  const backend = spawn(UV_EXE, ['run', 'main.py'], {
     cwd: path.join(PROJECT_ROOT, 'rag-backend'),
     windowsHide: true,
   });
 
-  const frontend = spawn('cmd', ['/c', 'npm run dev'], {
+  const frontend = spawn(NPM_EXE, ['run', 'dev'], {
     cwd: path.join(PROJECT_ROOT, 'webapp'),
     windowsHide: true,
   });
