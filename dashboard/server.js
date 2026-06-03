@@ -125,6 +125,7 @@ function startLocalServers() {
   const backend = spawn(UV_EXE, ['run', 'main.py'], {
     cwd: path.join(PROJECT_ROOT, 'rag-backend'),
     windowsHide: true,
+    env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
   });
 
   const frontend = spawn('cmd', ['/c', 'npm', 'run', 'dev'], {
