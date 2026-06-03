@@ -97,6 +97,19 @@ async function sftpUpload(localPath, remoteName) {
   });
 }
 
+async function sftpUploadTo(localPath, fullRemotePath) {
+  const conn = await createSSHClient();
+  return new Promise((resolve, reject) => {
+    conn.sftp((err, sftp) => {
+      if (err) { conn.end(); return reject(err); }
+      sftp.fastPut(localPath, fullRemotePath, err => {
+        conn.end();
+        err ? reject(err) : resolve();
+      });
+    });
+  });
+}
+
 // ── Local server management ───────────────────────────────────────────────────
 
 // Find uv.exe by checking known Windows install locations
@@ -354,10 +367,13 @@ app.post('/api/server/restart', async (req, res) => {
   }
 });
 
-// Sync prompt to server: git pull on server → pm2 restart → /api/reload
+// Sync prompt to server: SFTP prompt.txt directly → pm2 restart → /api/reload
 app.post('/api/server/sync-prompt', async (req, res) => {
   try {
-    await sshExec('cd /home/ubuntu/Pathway-AI-Chatbot && git pull');
+    await sftpUploadTo(
+      PROMPT_FILE,
+      '/home/ubuntu/Pathway-AI-Chatbot/rag-backend/prompt.txt'
+    );
     await sshExec('pm2 restart rag-backend --update-env');
     await new Promise(r => setTimeout(r, 3000));
 
@@ -378,7 +394,7 @@ app.post('/api/server/sync-prompt', async (req, res) => {
       reqOut.end();
     });
 
-    res.json({ success: true, message: 'Server updated and bot reloaded with new prompt.' });
+    res.json({ success: true, message: 'Prompt uploaded to server and bot reloaded.' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
