@@ -4,7 +4,7 @@ import { GiNuclearBomb } from "react-icons/gi";
 // --- Inline API call (replaces need for api.ts) ---
 async function askRag(
   apiBase: string,
-  token: string,
+  token: string | null,
   body: {
     query: string
     source?: string
@@ -12,12 +12,14 @@ async function askRag(
     history?: Msg[]   // full message history
   }
 ): Promise<any> {
-  const res = await fetch(`${apiBase}/api/ask`, {
+  // Authenticated WordPress users hit /api/ask; public users hit /api/chat
+  const endpoint = token ? `${apiBase}/api/ask` : `${apiBase}/api/chat`
+  const headers: HeadersInit = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
+    headers,
     body: JSON.stringify(body),
   })
   if (!res.ok) {
@@ -176,10 +178,6 @@ export default function App({
   async function send() {
 
     if (!authReady) return
-    if (!authToken) {
-      setMsgs((m) => [...m, { who: 'ai', text: 'Not authorized.' }])
-      return
-    }
 
     const query = q.trim()
     if (!query || busy) return
