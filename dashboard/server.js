@@ -102,13 +102,13 @@ let localProcs = [];
 function startLocalServers() {
   if (localProcs.length) return; // already running
 
-  const backend = spawn('uv', ['run', 'main.py'], {
+  const backend = spawn('uv run main.py', {
     cwd: path.join(PROJECT_ROOT, 'rag-backend'),
     shell: true,
     windowsHide: true,
   });
 
-  const frontend = spawn('npm', ['run', 'dev'], {
+  const frontend = spawn('npm run dev', {
     cwd: path.join(PROJECT_ROOT, 'webapp'),
     shell: true,
     windowsHide: true,
