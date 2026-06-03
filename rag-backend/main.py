@@ -228,7 +228,7 @@ def chat(body: ChatIn, request: Request):
 
 
 @app.get("/api/files/{name}")
-def get_file(name: str, user=Depends(require_auth_from_header_or_query)):
+def get_file(name: str):
     """
     Streams a file from DOCS_DIR.
     - Protects against path traversal.
