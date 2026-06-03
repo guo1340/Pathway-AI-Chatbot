@@ -98,36 +98,51 @@ async function sftpUpload(localPath, remoteName) {
 
 // ── Local server management ───────────────────────────────────────────────────
 let localProcs = [];
+let backendLogs = [];
 
 function startLocalServers() {
-  if (localProcs.length) return; // already running
+  if (localProcs.length) return;
+  backendLogs = [];
 
-  const backend = spawn('uv run main.py', {
+  // Use cmd /c so Windows resolves uv/npm from the user's PATH reliably
+  const backend = spawn('cmd', ['/c', 'uv run main.py'], {
     cwd: path.join(PROJECT_ROOT, 'rag-backend'),
-    shell: true,
     windowsHide: true,
   });
 
-  const frontend = spawn('npm run dev', {
+  const frontend = spawn('cmd', ['/c', 'npm run dev'], {
     cwd: path.join(PROJECT_ROOT, 'webapp'),
-    shell: true,
     windowsHide: true,
   });
+
+  // Capture backend output so errors are visible in the dashboard
+  const capture = (data) => {
+    const lines = data.toString().split('\n').map(l => l.trim()).filter(Boolean);
+    lines.forEach(l => {
+      console.log('[backend]', l);
+      backendLogs.push(l);
+    });
+    if (backendLogs.length > 200) backendLogs = backendLogs.slice(-200);
+  };
+  backend.stdout?.on('data', capture);
+  backend.stderr?.on('data', capture);
 
   localProcs = [backend, frontend];
-
-  backend.on('exit',  () => { localProcs = localProcs.filter(p => p !== backend);  });
+  backend.on('exit',  (code) => {
+    backendLogs.push(`[exited with code ${code}]`);
+    localProcs = localProcs.filter(p => p !== backend);
+  });
   frontend.on('exit', () => { localProcs = localProcs.filter(p => p !== frontend); });
 }
 
 function stopLocalServers() {
   for (const proc of localProcs) {
     try {
-      // /T kills the full process tree so uv/node children die too
-      spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { shell: true, windowsHide: true });
+      spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { windowsHide: true });
     } catch {}
   }
   localProcs = [];
+  backendLogs = [];
 }
 
 // Clean up if the dashboard itself is closed
@@ -190,6 +205,11 @@ function gitExec(command) {
 const upload = multer({ dest: os.tmpdir() });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+
+// Backend startup logs (for debugging local mode)
+app.get('/api/local-logs', (req, res) => {
+  res.json({ logs: backendLogs, running: localProcs.length > 0 });
+});
 
 // Current mode (live vs local)
 app.get('/api/status', (req, res) => {

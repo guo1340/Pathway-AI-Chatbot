@@ -176,6 +176,13 @@
       </div>
       <button class="btn-primary btn-lg" id="toggleBtn" onclick="toggleMode()">Switch Mode</button>
     </div>
+    <div id="backendLogWrap" class="hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+        <span style="font-size:0.75rem;color:var(--muted)">Local backend output</span>
+        <button class="btn-ghost" style="padding:4px 10px;font-size:0.75rem" onclick="loadBackendLogs()">↻</button>
+      </div>
+      <div class="log" id="backendLog" style="max-height:180px">Waiting for output…</div>
+    </div>
   </div>
 
   <!-- ── Documents ── -->
@@ -310,13 +317,16 @@ function applyMode(mode) {
     sub.textContent   = 'api.chat.pathway.training';
     btn.textContent   = '⇄ Switch to Local';
     link.style.display = 'none';
+    document.getElementById('backendLogWrap').classList.add('hidden');
+    stopLogPolling();
   } else {
     dot.className     = 'dot dot-local';
     label.textContent = 'Local (starting up…)';
     sub.textContent   = 'backend: localhost:8000 · frontend: localhost:5173';
     btn.textContent   = '⇄ Switch to Live';
     link.style.display = 'block';
-    // Update label once servers have had time to start
+    document.getElementById('backendLogWrap').classList.remove('hidden');
+    startLogPolling();
     setTimeout(() => {
       if (currentMode === 'local') label.textContent = 'Local';
     }, 12000);
@@ -526,6 +536,29 @@ async function gitPush() {
   } finally {
     setLoading(btn, false);
   }
+}
+
+// ── Backend logs ─────────────────────────────────────────────────────────────
+let logPoller = null;
+
+async function loadBackendLogs() {
+  try {
+    const r = await fetch('/api/local-logs');
+    const d = await r.json();
+    const el = document.getElementById('backendLog');
+    el.textContent = d.logs.length ? d.logs.join('\n') : 'No output yet…';
+    el.scrollTop = el.scrollHeight;
+  } catch {}
+}
+
+function startLogPolling() {
+  loadBackendLogs();
+  logPoller = setInterval(loadBackendLogs, 2000);
+}
+
+function stopLogPolling() {
+  clearInterval(logPoller);
+  logPoller = null;
 }
 
 // ── Prompt Editor ────────────────────────────────────────────────────────────
