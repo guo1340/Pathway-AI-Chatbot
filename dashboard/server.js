@@ -98,20 +98,21 @@ async function sftpUpload(localPath, remoteName) {
 
 // ── Local server management ───────────────────────────────────────────────────
 
-// Resolve full path for executables that live in user-only PATH locations
-function findExe(name) {
-  try {
-    const result = require('child_process').execSync(`where ${name}`, { encoding: 'utf8', shell: true });
-    return result.trim().split(/\r?\n/)[0].trim();
-  } catch {
-    return name; // fall back to bare name and hope for the best
+// Find uv.exe by checking known Windows install locations
+function findUv() {
+  const candidates = [
+    path.join(os.homedir(), '.local', 'bin', 'uv.exe'),
+    path.join(os.homedir(), '.cargo', 'bin', 'uv.exe'),
+    path.join(process.env.LOCALAPPDATA || '', 'uv', 'bin', 'uv.exe'),
+  ];
+  for (const p of candidates) {
+    try { if (fs.existsSync(p)) return p; } catch {}
   }
+  return 'uv'; // last resort
 }
 
-const UV_EXE  = findExe('uv');
-const NPM_EXE = findExe('npm');
-console.log(`uv  → ${UV_EXE}`);
-console.log(`npm → ${NPM_EXE}`);
+const UV_EXE = findUv();
+console.log(`uv → ${UV_EXE}`);
 
 let localProcs = [];
 let backendLogs = [];
@@ -120,17 +121,17 @@ function startLocalServers() {
   if (localProcs.length) return;
   backendLogs = [];
 
+  // uv.exe can be spawned directly; npm.cmd needs cmd.exe to interpret it
   const backend = spawn(UV_EXE, ['run', 'main.py'], {
     cwd: path.join(PROJECT_ROOT, 'rag-backend'),
     windowsHide: true,
   });
 
-  const frontend = spawn(NPM_EXE, ['run', 'dev'], {
+  const frontend = spawn('cmd', ['/c', 'npm', 'run', 'dev'], {
     cwd: path.join(PROJECT_ROOT, 'webapp'),
     windowsHide: true,
   });
 
-  // Capture backend output so errors are visible in the dashboard
   const capture = (data) => {
     const lines = data.toString().split('\n').map(l => l.trim()).filter(Boolean);
     lines.forEach(l => {
@@ -141,6 +142,10 @@ function startLocalServers() {
   };
   backend.stdout?.on('data', capture);
   backend.stderr?.on('data', capture);
+
+  // Must handle error events or Node.js will crash the whole dashboard server
+  backend.on('error',  (err) => { backendLogs.push(`[error] ${err.message}`); console.error('[backend]', err.message); });
+  frontend.on('error', (err) => { backendLogs.push(`[frontend error] ${err.message}`); console.error('[frontend]', err.message); });
 
   localProcs = [backend, frontend];
   backend.on('exit',  (code) => {
