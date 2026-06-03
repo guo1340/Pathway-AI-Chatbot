@@ -21,15 +21,6 @@ const REMOTE_DOCS = '/home/ubuntu/Pathway-AI-Chatbot/rag-backend/docs';
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const PROMPT_FILE = path.join(PROJECT_ROOT, 'rag-backend', 'prompt.txt');
 
-// Read DASHBOARD_API_KEY from rag-backend/.env so it never has to be hardcoded here
-function readEnvKey(keyName) {
-  try {
-    const content = fs.readFileSync(path.join(PROJECT_ROOT, 'rag-backend', '.env'), 'utf8');
-    const match = content.match(new RegExp(`^${keyName}=(.+)$`, 'm'));
-    return match ? match[1].trim().replace(/^["']|["']$/g, '') : null;
-  } catch { return null; }
-}
-const DASHBOARD_API_KEY = readEnvKey('DASHBOARD_API_KEY');
 
 // ── Toggle file definitions ───────────────────────────────────────────────────
 // Each entry has the exact two-line block as it appears in live vs local mode.
@@ -225,7 +216,7 @@ app.post('/api/server/restart', async (req, res) => {
     await new Promise((resolve, reject) => {
       const reqOut = https.request(
         'https://api.chat.pathway.training/api/reload',
-        { method: 'POST', headers: { 'x-api-key': DASHBOARD_API_KEY || '' } },
+        { method: 'POST' },
         (resp) => { resp.resume(); resolve(); }
       );
       reqOut.on('error', reject);
