@@ -169,7 +169,7 @@
           <div class="mode-text" id="modeLabel">Loading…</div>
           <div class="mode-sub" id="modeSub"></div>
           <a id="localLink" href="http://localhost:5173" target="_blank"
-            style="display:none;font-size:0.8rem;color:var(--accent);margin-top:4px;text-decoration:none">
+            style="display:none;font-size:0.8rem;color:var(--muted);margin-top:4px;text-decoration:none;pointer-events:none">
             → Open local bot at localhost:5173
           </a>
         </div>
@@ -319,17 +319,18 @@ function applyMode(mode) {
     link.style.display = 'none';
     document.getElementById('backendLogWrap').classList.add('hidden');
     stopLogPolling();
+    stopHealthPolling();
   } else {
     dot.className     = 'dot dot-local';
-    label.textContent = 'Local (starting up…)';
+    label.textContent = 'Local — backend starting…';
     sub.textContent   = 'backend: localhost:8000 · frontend: localhost:5173';
     btn.textContent   = '⇄ Switch to Live';
     link.style.display = 'block';
+    link.style.color = 'var(--muted)';
+    link.style.pointerEvents = 'none';
     document.getElementById('backendLogWrap').classList.remove('hidden');
     startLogPolling();
-    setTimeout(() => {
-      if (currentMode === 'local') label.textContent = 'Local';
-    }, 12000);
+    startHealthPolling();
   }
 }
 
@@ -536,6 +537,39 @@ async function gitPush() {
   } finally {
     setLoading(btn, false);
   }
+}
+
+// ── Local backend health polling ──────────────────────────────────────────────
+let healthPoller = null;
+
+async function checkHealth() {
+  try {
+    const r = await fetch('/api/local-health');
+    const d = await r.json();
+    const link  = document.getElementById('localLink');
+    const label = document.getElementById('modeLabel');
+    if (d.ready) {
+      label.textContent       = 'Local — backend ready ✓';
+      link.style.color        = 'var(--accent)';
+      link.style.pointerEvents = 'auto';
+      stopHealthPolling();
+    } else {
+      label.textContent        = 'Local — backend starting…';
+      link.style.color         = 'var(--muted)';
+      link.style.pointerEvents = 'none';
+    }
+  } catch {}
+}
+
+function startHealthPolling() {
+  stopHealthPolling();
+  checkHealth();
+  healthPoller = setInterval(checkHealth, 2500);
+}
+
+function stopHealthPolling() {
+  clearInterval(healthPoller);
+  healthPoller = null;
 }
 
 // ── Backend logs ─────────────────────────────────────────────────────────────

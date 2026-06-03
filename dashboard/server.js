@@ -5,6 +5,7 @@ const fs = require('fs');
 const { exec, spawn } = require('child_process');
 const { Client } = require('ssh2');
 const https = require('https');
+const http  = require('http');
 const os = require('os');
 const crypto = require('crypto');
 
@@ -230,6 +231,23 @@ const upload = multer({ dest: os.tmpdir() });
 // Backend startup logs (for debugging local mode)
 app.get('/api/local-logs', (req, res) => {
   res.json({ logs: backendLogs, running: localProcs.length > 0 });
+});
+
+// Ping localhost:8000/api/health — returns {ready: bool}
+function checkLocalBackend() {
+  return new Promise((resolve) => {
+    const req = http.get('http://localhost:8000/api/health', { timeout: 2000 }, (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error',   () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+  });
+}
+
+app.get('/api/local-health', async (req, res) => {
+  if (!localProcs.length) return res.json({ ready: false, running: false });
+  const ready = await checkLocalBackend();
+  res.json({ ready, running: true });
 });
 
 // Current mode (live vs local)
