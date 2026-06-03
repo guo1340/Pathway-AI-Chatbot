@@ -4,6 +4,12 @@ import uuid
 import mimetypes
 from typing import Optional, List, Dict, Any, Tuple
 from urllib.parse import quote
+import time
+import hmac
+import hashlib
+import base64
+import json
+from fastapi import Depends, Header, Query
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
@@ -18,6 +24,8 @@ load_dotenv()
 PORT = int(os.getenv("PORT", "8000"))
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
 DOCS_DIR = os.getenv("DOCS_DIR", "./docs")  # used by /api/files route
+JWT_SECRET = os.getenv("PATHWAY_RAG_JWT_SECRET", "")
+JWT_REQUIRED_CAP = os.getenv("JWT_REQUIRED_CAP", "edit_posts")
 
 app = FastAPI(title="RAG Backend", version="0.1.0")
 
@@ -50,6 +58,71 @@ class ChatOut(BaseModel):
     conversation_id: str
 # ----------------------------
 
+def _b64url_decode(s: str) -> bytes:
+    s += "=" * (-len(s) % 4)
+    return base64.urlsafe_b64decode(s.encode())
+
+def _verify_jwt_hs256(token: str) -> dict:
+    """
+    Verify HS256 JWT: signature + exp + required capability.
+    """
+    if not JWT_SECRET:
+        # Better to fail closed in production
+        raise HTTPException(status_code=500, detail="Server misconfigured (missing JWT secret)")
+
+    try:
+        header_b64, payload_b64, sig_b64 = token.split(".")
+        signing_input = f"{header_b64}.{payload_b64}".encode()
+
+        sig = _b64url_decode(sig_b64)
+        expected = hmac.new(JWT_SECRET.encode(), signing_input, hashlib.sha256).digest()
+        if not hmac.compare_digest(sig, expected):
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        payload = json.loads(_b64url_decode(payload_b64))
+
+        exp = int(payload.get("exp", 0))
+        if exp <= int(time.time()):
+            raise HTTPException(status_code=401, detail="Token expired")
+
+        caps = payload.get("cap", []) or []
+        if JWT_REQUIRED_CAP and JWT_REQUIRED_CAP not in caps:
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+        return payload
+
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+def require_auth(authorization: Optional[str] = Header(default=None)) -> dict:
+    """
+    Read Bearer token from Authorization header.
+    """
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing token")
+    token = authorization.split(" ", 1)[1].strip()
+    return _verify_jwt_hs256(token)
+
+
+def require_auth_from_header_or_query(
+    authorization: Optional[str] = Header(default=None),
+    token: Optional[str] = Query(default=None),
+) -> dict:
+    """
+    Allows auth via:
+    - Authorization: Bearer <jwt>
+    - ?token=<jwt>   (needed for <a href> downloads)
+    """
+    if authorization and authorization.lower().startswith("bearer "):
+        jwt = authorization.split(" ", 1)[1].strip()
+        return _verify_jwt_hs256(jwt)
+    if token:
+        return _verify_jwt_hs256(token)
+    raise HTTPException(status_code=401, detail="Missing token")
+
 
 @app.get("/api/health")
 def health():
@@ -57,7 +130,7 @@ def health():
 
 
 @app.post("/api/reload")
-def reload_index():
+def reload_index(user=Depends(require_auth)):
     PIPE.reload()
     return {"status": "reloaded"}
 
@@ -155,7 +228,7 @@ def chat(body: ChatIn, request: Request):
 
 
 @app.get("/api/files/{name}")
-def get_file(name: str):
+def get_file(name: str, user=Depends(require_auth_from_header_or_query)):
     """
     Streams a file from DOCS_DIR.
     - Protects against path traversal.
@@ -188,7 +261,7 @@ def get_file(name: str):
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))  # optional soft guard
 
 @app.post("/api/ask", response_model=ChatOut)
-def ask(body: ChatIn, request: Request):
+def ask(body: ChatIn, request: Request, user=Depends(require_auth)):
     """
     Accepts:
       - query: user question
@@ -238,7 +311,7 @@ def ask(body: ChatIn, request: Request):
 
 
 @app.post("/api/upload")
-async def upload(file: UploadFile = File(...)):
+async def upload(file: UploadFile = File(...), user=Depends(require_auth)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
 

@@ -1,6 +1,6 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import Widget from './Widget'
+import App from './App'
 import './styles.css'
 
 function mount() {
@@ -16,7 +16,9 @@ function mount() {
   const apiBase: string = cfg.apiBase || 'https://api.chat.pathway.training'
   // const apiBase: string = cfg.apiBase || 'http://localhost:8000'
 
-  createRoot(rootEl).render(<Widget apiBase={apiBase} source={source} title={"Pathway Chatbot (Beta)"} />)
+  createRoot(rootEl).render(
+    <App apiBase={apiBase} source={source} title={title || 'Pathway Chatbot (Beta)'} />
+  )
 }
 
 mount()
