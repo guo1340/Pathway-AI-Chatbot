@@ -123,7 +123,7 @@ function startLocalServers() {
   backendLogs = [];
 
   // uv.exe can be spawned directly; npm.cmd needs cmd.exe to interpret it
-  const backend = spawn(UV_EXE, ['run', 'main.py'], {
+  const backend = spawn(UV_EXE, ['run', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '8000', '--no-reload'], {
     cwd: path.join(PROJECT_ROOT, 'rag-backend'),
     windowsHide: true,
     env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
