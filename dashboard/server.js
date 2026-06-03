@@ -333,34 +333,20 @@ app.delete('/api/docs/:filename', async (req, res) => {
   }
 });
 
-// Restart pm2 backend on server + call /api/reload with JWT auth
+// Call /api/reload via localhost on the server (bypasses nginx, no auth needed)
+async function sshReload() {
+  const status = await sshExec(
+    `curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8000/api/reload`
+  );
+  if (status.trim() !== '200') throw new Error(`Reload returned HTTP ${status.trim()}`);
+}
+
+// Restart pm2 backend on server + reload index via localhost (bypasses nginx)
 app.post('/api/server/restart', async (req, res) => {
   try {
-    // 1. Restart the backend process
-    await sshExec('pm2 restart rag-backend');
-
-    // 2. Wait for it to come back up
+    await sshExec('pm2 restart rag-backend --update-env');
     await new Promise(r => setTimeout(r, 3000));
-
-    // 3. Read the JWT secret from the server's .env via SSH
-    const envContent = await sshExec('cat /home/ubuntu/Pathway-AI-Chatbot/rag-backend/.env');
-    const secretMatch = envContent.match(/^PATHWAY_RAG_JWT_SECRET=(.+)$/m);
-    if (!secretMatch) throw new Error('PATHWAY_RAG_JWT_SECRET not found in server .env — ask your developer to add it');
-    const jwtSecret = secretMatch[1].trim().replace(/^["']|["']$/g, '');
-
-    // 4. Generate a short-lived token and call /api/reload
-    const token = generateJWT(jwtSecret);
-    await new Promise((resolve, reject) => {
-      const reqOut = https.request(
-        'https://api.chat.pathway.training/api/reload',
-        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } },
-        (resp) => { resp.resume(); resolve(); }
-      );
-      reqOut.on('error', reject);
-      reqOut.setTimeout(15000, () => reqOut.destroy(new Error('Reload request timed out')));
-      reqOut.end();
-    });
-
+    await sshReload();
     res.json({ success: true, message: 'Backend restarted and bot reloaded.' });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -376,23 +362,7 @@ app.post('/api/server/sync-prompt', async (req, res) => {
     );
     await sshExec('pm2 restart rag-backend --update-env');
     await new Promise(r => setTimeout(r, 3000));
-
-    const envContent = await sshExec('cat /home/ubuntu/Pathway-AI-Chatbot/rag-backend/.env');
-    const secretMatch = envContent.match(/^PATHWAY_RAG_JWT_SECRET=(.+)$/m);
-    if (!secretMatch) throw new Error('PATHWAY_RAG_JWT_SECRET not found in server .env');
-    const jwtSecret = secretMatch[1].trim().replace(/^["']|["']$/g, '');
-    const token = generateJWT(jwtSecret);
-
-    await new Promise((resolve, reject) => {
-      const reqOut = https.request(
-        'https://api.chat.pathway.training/api/reload',
-        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } },
-        (resp) => { resp.resume(); resolve(); }
-      );
-      reqOut.on('error', reject);
-      reqOut.setTimeout(15000, () => reqOut.destroy(new Error('Reload request timed out')));
-      reqOut.end();
-    });
+    await sshReload();
 
     res.json({ success: true, message: 'Prompt uploaded to server and bot reloaded.' });
   } catch (e) {
