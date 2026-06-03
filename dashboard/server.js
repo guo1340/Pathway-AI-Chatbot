@@ -6,6 +6,7 @@ const { exec } = require('child_process');
 const { Client } = require('ssh2');
 const https = require('https');
 const os = require('os');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = 3131;
@@ -93,6 +94,19 @@ async function sftpUpload(localPath, remoteName) {
       });
     });
   });
+}
+
+// ── JWT helper ────────────────────────────────────────────────────────────────
+// Generates a short-lived HS256 JWT matching the backend's verify_api_key logic.
+// Requires no external packages — uses Node's built-in crypto module.
+function generateJWT(secret, caps = ['edit_posts'], ttlSeconds = 300) {
+  const header  = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({
+    exp: Math.floor(Date.now() / 1000) + ttlSeconds,
+    cap: caps,
+  })).toString('base64url');
+  const sig = crypto.createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url');
+  return `${header}.${payload}.${sig}`;
 }
 
 // ── Toggle helpers ────────────────────────────────────────────────────────────
@@ -207,22 +221,34 @@ app.delete('/api/docs/:filename', async (req, res) => {
   }
 });
 
-// Restart pm2 backend on server + call /api/reload
+// Restart pm2 backend on server + call /api/reload with JWT auth
 app.post('/api/server/restart', async (req, res) => {
   try {
+    // 1. Restart the backend process
     await sshExec('pm2 restart rag-backend');
-    // Wait a moment for backend to come up, then reload
+
+    // 2. Wait for it to come back up
     await new Promise(r => setTimeout(r, 3000));
+
+    // 3. Read the JWT secret from the server's .env via SSH
+    const envContent = await sshExec('cat /home/ubuntu/Pathway-AI-Chatbot/rag-backend/.env');
+    const secretMatch = envContent.match(/^PATHWAY_RAG_JWT_SECRET=(.+)$/m);
+    if (!secretMatch) throw new Error('PATHWAY_RAG_JWT_SECRET not found in server .env — ask your developer to add it');
+    const jwtSecret = secretMatch[1].trim().replace(/^["']|["']$/g, '');
+
+    // 4. Generate a short-lived token and call /api/reload
+    const token = generateJWT(jwtSecret);
     await new Promise((resolve, reject) => {
       const reqOut = https.request(
         'https://api.chat.pathway.training/api/reload',
-        { method: 'POST' },
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } },
         (resp) => { resp.resume(); resolve(); }
       );
       reqOut.on('error', reject);
       reqOut.setTimeout(15000, () => reqOut.destroy(new Error('Reload request timed out')));
       reqOut.end();
     });
+
     res.json({ success: true, message: 'Backend restarted and bot reloaded.' });
   } catch (e) {
     res.status(500).json({ error: e.message });
