@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pathway AI Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --border: #2a2d3a;
+      --accent: #6366f1;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+    header {
+      padding: 18px 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 14px;
+    }
+    header svg { flex-shrink: 0; }
+    header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+    header span { font-size: 0.85rem; color: var(--muted); margin-left: 4px; }
+
+    main { max-width: 860px; margin: 0 auto; padding: 28px 24px; display: grid; gap: 20px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 24px;
+    }
+    .card-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    /* ── Mode Toggle ── */
+    .mode-row { display: flex; align-items: center; justify-content: space-between; }
+    .mode-info { display: flex; align-items: center; gap: 10px; }
+    .dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+    .dot-live  { background: var(--success); box-shadow: 0 0 10px var(--success); }
+    .dot-local { background: var(--warning); box-shadow: 0 0 10px var(--warning); }
+    .dot-unknown { background: var(--muted); }
+    .mode-text { font-size: 1.05rem; font-weight: 600; }
+    .mode-sub  { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+
+    /* ── Buttons ── */
+    button {
+      cursor: pointer; border: none; border-radius: 9px;
+      font-size: 0.875rem; font-weight: 600; padding: 10px 18px;
+      transition: opacity 0.15s, transform 0.1s;
+      display: inline-flex; align-items: center; gap: 7px;
+    }
+    button:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
+    button:active:not(:disabled) { transform: translateY(0); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-danger  { background: var(--danger);  color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-ghost   { background: var(--border);  color: var(--text); }
+    .btn-lg { font-size: 0.95rem; padding: 12px 24px; }
+
+    /* ── Dropzone ── */
+    .dropzone {
+      border: 2px dashed var(--border); border-radius: 10px;
+      padding: 36px 20px; text-align: center; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .dropzone:hover, .dropzone.drag-over {
+      border-color: var(--accent); background: rgba(99,102,241,0.06);
+    }
+    .dropzone-icon { font-size: 2rem; margin-bottom: 8px; }
+    .dropzone strong { display: block; margin-bottom: 4px; }
+    .dropzone p { font-size: 0.8rem; color: var(--muted); }
+    .dropzone input { display: none; }
+
+    /* ── Progress ── */
+    .progress-wrap { margin-top: 14px; }
+    .progress-bar  { background: var(--border); border-radius: 4px; height: 5px; overflow: hidden; }
+    .progress-fill { background: var(--accent); height: 100%; transition: width 0.3s; border-radius: 4px; }
+    .progress-label { font-size: 0.78rem; color: var(--muted); margin-top: 6px; }
+
+    /* ── Doc List ── */
+    .doc-list { display: flex; flex-direction: column; gap: 7px; margin-top: 16px; }
+    .doc-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 9px;
+    }
+    .doc-item-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .doc-name { font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .doc-size { font-size: 0.75rem; color: var(--muted); flex-shrink: 0; margin-left: 6px; }
+    .doc-list-empty { color: var(--muted); text-align: center; padding: 20px 0; font-size: 0.875rem; }
+    .doc-list-footer { display: flex; justify-content: flex-end; margin-top: 12px; }
+
+    /* ── Git ── */
+    .git-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+    .commit-row { display: flex; gap: 10px; margin-top: 12px; }
+    input[type="text"] {
+      flex: 1; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 9px; color: var(--text); font-size: 0.875rem;
+      padding: 10px 14px; outline: none;
+    }
+    input[type="text"]:focus { border-color: var(--accent); }
+    input[type="text"]::placeholder { color: var(--muted); }
+
+    /* ── Log output ── */
+    .log {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
+      padding: 12px 14px; font-family: 'Cascadia Code', 'Consolas', monospace;
+      font-size: 0.78rem; color: var(--muted); max-height: 150px;
+      overflow-y: auto; margin-top: 14px; white-space: pre-wrap; word-break: break-all;
+    }
+    .log.hidden { display: none; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block; width: 13px; height: 13px;
+      border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.65s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 22px; right: 22px; z-index: 999;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 11px; padding: 12px 18px; font-size: 0.875rem;
+      transform: translateY(70px); opacity: 0;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+      max-width: 340px;
+    }
+    #toast.show   { transform: translateY(0); opacity: 1; }
+    #toast.ok     { border-color: var(--success); }
+    #toast.err    { border-color: var(--danger); }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+    <rect width="28" height="28" rx="8" fill="#6366f1"/>
+    <path d="M7 14c0-3.866 3.134-7 7-7s7 3.134 7 7-3.134 7-7 7" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="14" cy="14" r="2.5" fill="#fff"/>
+  </svg>
+  <h1>Pathway AI Dashboard <span>local</span></h1>
+</header>
+
+<main>
+
+  <!-- ── Server Mode ── -->
+  <div class="card">
+    <div class="card-title">Server Mode</div>
+    <div class="mode-row">
+      <div class="mode-info">
+        <div class="dot dot-unknown" id="modeDot"></div>
+        <div>
+          <div class="mode-text" id="modeLabel">Loading…</div>
+          <div class="mode-sub" id="modeSub"></div>
+        </div>
+      </div>
+      <button class="btn-primary btn-lg" id="toggleBtn" onclick="toggleMode()">Switch Mode</button>
+    </div>
+  </div>
+
+  <!-- ── Documents ── -->
+  <div class="card">
+    <div class="card-title">Bot Documents — server rag-backend/docs</div>
+
+    <div class="dropzone" id="dropzone"
+      onclick="document.getElementById('fileInput').click()"
+      ondragover="onDragOver(event)"
+      ondragleave="onDragLeave(event)"
+      ondrop="onDrop(event)">
+      <div class="dropzone-icon">📂</div>
+      <strong>Drop files here or click to browse</strong>
+      <p>Files go directly to the server's docs folder</p>
+      <input type="file" id="fileInput" multiple onchange="uploadFiles(this.files)" />
+    </div>
+
+    <div class="progress-wrap hidden" id="progressWrap">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="progress-label" id="progressLabel"></div>
+    </div>
+
+    <div class="doc-list" id="docList">
+      <div class="doc-list-empty">Connecting to server…</div>
+    </div>
+
+    <div class="doc-list-footer">
+      <button class="btn-ghost" onclick="loadDocs()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <!-- ── Bot Prompt ── -->
+  <div class="card">
+    <div class="card-title">Bot Prompt &amp; Rules</div>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:12px">
+      Edit the instructions the AI follows when answering questions.
+      Changes take effect on the <strong style="color:var(--text)">next query</strong> — no restart needed.
+    </p>
+    <textarea id="promptEditor" spellcheck="false"
+      style="width:100%;height:340px;background:var(--bg);border:1px solid var(--border);border-radius:9px;
+             color:var(--text);font-family:'Cascadia Code','Consolas',monospace;font-size:0.8rem;
+             padding:14px;resize:vertical;outline:none;line-height:1.6"
+      onfocus="this.style.borderColor='var(--accent)'"
+      onblur="this.style.borderColor='var(--border)'"
+      placeholder="Loading prompt…"></textarea>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+      <span id="promptStatus" style="font-size:0.78rem;color:var(--muted)"></span>
+      <div style="display:flex;gap:10px">
+        <button class="btn-ghost" onclick="loadPrompt()">↺ Reset</button>
+        <button class="btn-primary" id="savePromptBtn" onclick="savePrompt()">Save Prompt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Server Controls ── -->
+  <div class="card">
+    <div class="card-title">Server Controls</div>
+    <div>
+      <button class="btn-success" id="restartBtn" onclick="restartBackend()">
+        ⟳ Restart Backend &amp; Reload Bot
+      </button>
+    </div>
+    <div class="log hidden" id="serverLog"></div>
+  </div>
+
+  <!-- ── Git ── -->
+  <div class="card">
+    <div class="card-title">Git Workflow</div>
+    <div class="git-buttons">
+      <button class="btn-ghost" id="pullBtn" onclick="gitPull()">↓ Pull</button>
+      <button class="btn-primary" id="pushBtn" onclick="gitPush()">↑ Push</button>
+    </div>
+    <div class="commit-row">
+      <input type="text" id="commitMsg" placeholder="Commit message…"
+        onkeydown="if(event.key==='Enter') gitCommit()" />
+      <button class="btn-ghost" id="commitBtn" onclick="gitCommit()">Commit</button>
+    </div>
+    <div class="log hidden" id="gitLog"></div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtSize(b) {
+  if (!b || b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+
+let toastTimer;
+function toast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = (type === 'ok' ? '✓ ' : '✗ ') + msg;
+  el.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3800);
+}
+
+function setLoading(btn, yes, label = '') {
+  btn.disabled = yes;
+  if (yes) btn.dataset.orig = btn.innerHTML;
+  btn.innerHTML = yes
+    ? `<span class="spinner"></span>${label}`
+    : (btn.dataset.orig || btn.textContent);
+}
+
+// ── Mode ─────────────────────────────────────────────────────────────────────
+let currentMode = null;
+
+function applyMode(mode) {
+  currentMode = mode;
+  const dot   = document.getElementById('modeDot');
+  const label = document.getElementById('modeLabel');
+  const sub   = document.getElementById('modeSub');
+  const btn   = document.getElementById('toggleBtn');
+  if (mode === 'live') {
+    dot.className  = 'dot dot-live';
+    label.textContent = 'Live';
+    sub.textContent   = 'api.chat.pathway.training';
+    btn.textContent   = '⇄ Switch to Local';
+  } else {
+    dot.className  = 'dot dot-local';
+    label.textContent = 'Local';
+    sub.textContent   = 'localhost:8000';
+    btn.textContent   = '⇄ Switch to Live';
+  }
+}
+
+async function loadStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    applyMode(d.mode);
+  } catch (e) {
+    document.getElementById('modeLabel').textContent = 'Error: ' + e.message;
+  }
+}
+
+async function toggleMode() {
+  const btn = document.getElementById('toggleBtn');
+  setLoading(btn, true, ' Switching…');
+  try {
+    const r = await fetch('/api/toggle', { method: 'POST' });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    applyMode(d.mode);
+    toast(`Switched to ${d.mode === 'live' ? 'Live' : 'Local'} mode`);
+  } catch (e) {
+    toast('Toggle failed: ' + e.message, 'err');
+  } finally {
+    setLoading(btn, false);
+    // Re-draw btn text based on current mode
+    applyMode(currentMode);
+  }
+}
+
+// ── Documents ────────────────────────────────────────────────────────────────
+async function loadDocs() {
+  const list = document.getElementById('docList');
+  list.innerHTML = '<div class="doc-list-empty">Loading…</div>';
+  try {
+    const r = await fetch('/api/docs');
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    if (!d.files.length) {
+      list.innerHTML = '<div class="doc-list-empty">No documents on server</div>';
+      return;
+    }
+    list.innerHTML = d.files.map(f => `
+      <div class="doc-item" id="doc-${esc(encodeURIComponent(f.name))}">
+        <div class="doc-item-left">
+          <span>📄</span>
+          <span class="doc-name" title="${esc(f.name)}">${esc(f.name)}</span>
+          <span class="doc-size">${fmtSize(f.size)}</span>
+        </div>
+        <button class="btn-danger" style="padding:6px 12px;font-size:0.78rem"
+          onclick="deleteDoc(${JSON.stringify(f.name)})">Remove</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="doc-list-empty" style="color:var(--danger)">⚠ ${esc(e.message)}</div>`;
+  }
+}
+
+async function deleteDoc(name) {
+  if (!confirm(`Remove "${name}" from the server?`)) return;
+  try {
+    const r = await fetch('/api/docs/' + encodeURIComponent(name), { method: 'DELETE' });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    toast(`Removed ${name}`);
+    loadDocs();
+  } catch (e) {
+    toast('Delete failed: ' + e.message, 'err');
+  }
+}
+
+// ── Drag & Drop ──────────────────────────────────────────────────────────────
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.add('drag-over');
+}
+function onDragLeave() {
+  document.getElementById('dropzone').classList.remove('drag-over');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('drag-over');
+  uploadFiles(e.dataTransfer.files);
+}
+
+async function uploadFiles(files) {
+  if (!files || !files.length) return;
+  const wrap  = document.getElementById('progressWrap');
+  const fill  = document.getElementById('progressFill');
+  const label = document.getElementById('progressLabel');
+  wrap.classList.remove('hidden');
+  let success = 0;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    fill.style.width = Math.round((i / files.length) * 100) + '%';
+    label.textContent = `Uploading ${file.name} (${i + 1}/${files.length})…`;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r = await fetch('/api/docs/upload', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      success++;
+    } catch (e) {
+      toast(`Failed: ${file.name} — ${e.message}`, 'err');
+    }
+  }
+
+  fill.style.width = '100%';
+  label.textContent = `Done — ${success}/${files.length} file(s) uploaded`;
+  if (success) toast(`Uploaded ${success} file(s)`);
+  setTimeout(() => wrap.classList.add('hidden'), 2500);
+  document.getElementById('fileInput').value = '';
+  loadDocs();
+}
+
+// ── Server Controls ──────────────────────────────────────────────────────────
+async function restartBackend() {
+  const btn = document.getElementById('restartBtn');
+  const log = document.getElementById('serverLog');
+  log.classList.remove('hidden');
+  log.textContent = 'Sending restart command to server…\n(pm2 restart rag-backend + /api/reload — takes ~5 sec)';
+  setLoading(btn, true, ' Restarting…');
+  try {
+    const r = await fetch('/api/server/restart', { method: 'POST' });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    log.textContent = '✓ ' + d.message;
+    toast('Backend restarted & bot reloaded');
+  } catch (e) {
+    log.textContent = '✗ ' + e.message;
+    toast('Restart failed: ' + e.message, 'err');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+// ── Git ──────────────────────────────────────────────────────────────────────
+function showGitLog(text) {
+  const log = document.getElementById('gitLog');
+  log.classList.remove('hidden');
+  log.textContent = text;
+}
+
+async function gitPull() {
+  const btn = document.getElementById('pullBtn');
+  setLoading(btn, true, ' Pulling…');
+  showGitLog('Running git pull…');
+  try {
+    const r = await fetch('/api/git/pull', { method: 'POST' });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    showGitLog(d.output || 'Already up to date.');
+    toast('Pull complete');
+  } catch (e) {
+    showGitLog('✗ ' + e.message);
+    toast('Pull failed: ' + e.message, 'err');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+async function gitCommit() {
+  const msg = document.getElementById('commitMsg').value.trim();
+  if (!msg) { toast('Enter a commit message', 'err'); return; }
+  const btn = document.getElementById('commitBtn');
+  setLoading(btn, true, ' Committing…');
+  showGitLog('Running git add . && git commit…');
+  try {
+    const r = await fetch('/api/git/commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg }),
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    showGitLog(d.output || 'Committed.');
+    document.getElementById('commitMsg').value = '';
+    toast('Changes committed');
+  } catch (e) {
+    showGitLog('✗ ' + e.message);
+    toast('Commit failed: ' + e.message, 'err');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+async function gitPush() {
+  const btn = document.getElementById('pushBtn');
+  setLoading(btn, true, ' Pushing…');
+  showGitLog('Running git push…');
+  try {
+    const r = await fetch('/api/git/push', { method: 'POST' });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    showGitLog(d.output || 'Pushed.');
+    toast('Push complete');
+  } catch (e) {
+    showGitLog('✗ ' + e.message);
+    toast('Push failed: ' + e.message, 'err');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+// ── Prompt Editor ────────────────────────────────────────────────────────────
+async function loadPrompt() {
+  const ta     = document.getElementById('promptEditor');
+  const status = document.getElementById('promptStatus');
+  ta.value = '';
+  status.textContent = 'Loading…';
+  try {
+    const r = await fetch('/api/prompt');
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    ta.value = d.content;
+    status.textContent = 'Loaded from rag-backend/prompt.txt';
+  } catch (e) {
+    status.textContent = '⚠ ' + e.message;
+    status.style.color = 'var(--danger)';
+  }
+}
+
+async function savePrompt() {
+  const btn    = document.getElementById('savePromptBtn');
+  const status = document.getElementById('promptStatus');
+  const content = document.getElementById('promptEditor').value;
+  setLoading(btn, true, ' Saving…');
+  status.textContent = '';
+  try {
+    const r = await fetch('/api/prompt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    status.textContent = 'Saved — takes effect on next bot query';
+    status.style.color = 'var(--success)';
+    toast('Prompt saved');
+  } catch (e) {
+    status.textContent = '⚠ ' + e.message;
+    status.style.color = 'var(--danger)';
+    toast('Save failed: ' + e.message, 'err');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+loadStatus();
+loadDocs();
+loadPrompt();
+</script>
+</body>
+</html>

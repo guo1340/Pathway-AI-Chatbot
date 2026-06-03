@@ -1,0 +1,299 @@
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { exec } = require('child_process');
+const { Client } = require('ssh2');
+const https = require('https');
+const os = require('os');
+
+const app = express();
+const PORT = 3131;
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ── Config ────────────────────────────────────────────────────────────────────
+const PEM_KEY_PATH = 'D:/AI Chat/Pathway-Backend-Key.pem';
+const SSH_HOST = 'ec2-3-14-127-116.us-east-2.compute.amazonaws.com';
+const SSH_USER = 'ubuntu';
+const REMOTE_DOCS = '/home/ubuntu/Pathway-AI-Chatbot/rag-backend/docs';
+const PROJECT_ROOT = path.resolve(__dirname, '..');
+const PROMPT_FILE = path.join(PROJECT_ROOT, 'rag-backend', 'prompt.txt');
+
+// Read DASHBOARD_API_KEY from rag-backend/.env so it never has to be hardcoded here
+function readEnvKey(keyName) {
+  try {
+    const content = fs.readFileSync(path.join(PROJECT_ROOT, 'rag-backend', '.env'), 'utf8');
+    const match = content.match(new RegExp(`^${keyName}=(.+)$`, 'm'));
+    return match ? match[1].trim().replace(/^["']|["']$/g, '') : null;
+  } catch { return null; }
+}
+const DASHBOARD_API_KEY = readEnvKey('DASHBOARD_API_KEY');
+
+// ── Toggle file definitions ───────────────────────────────────────────────────
+// Each entry has the exact two-line block as it appears in live vs local mode.
+// Newlines are normalized to \n when reading files.
+const TOGGLE_FILES = [
+  {
+    name: 'webapp/index.html',
+    file: path.join(PROJECT_ROOT, 'webapp', 'index.html'),
+    live:  '        // apiBase: "http://localhost:8000", // RAG backend locally\n        apiBase: "https://api.chat.pathway.training",',
+    local: '        apiBase: "http://localhost:8000", // RAG backend locally\n        // apiBase: "https://api.chat.pathway.training",',
+  },
+  {
+    name: 'webapp/src/main.tsx',
+    file: path.join(PROJECT_ROOT, 'webapp', 'src', 'main.tsx'),
+    live:  "  const apiBase: string = cfg.apiBase || 'https://api.chat.pathway.training'\n  // const apiBase: string = cfg.apiBase || 'http://localhost:8000'",
+    local: "  // const apiBase: string = cfg.apiBase || 'https://api.chat.pathway.training'\n  const apiBase: string = cfg.apiBase || 'http://localhost:8000'",
+  },
+  {
+    name: 'rag-backend/rag.py',
+    file: path.join(PROJECT_ROOT, 'rag-backend', 'rag.py'),
+    live:  '    # api_base = os.getenv("API_BASE", "http://localhost:8000").rstrip("/")\n    api_base = os.getenv("API_BASE", "https://api.chat.pathway.training").rstrip("/")',
+    local: '    api_base = os.getenv("API_BASE", "http://localhost:8000").rstrip("/")\n    # api_base = os.getenv("API_BASE", "https://api.chat.pathway.training").rstrip("/")',
+  },
+];
+
+// ── SSH helpers ───────────────────────────────────────────────────────────────
+function getPrivateKey() {
+  try {
+    return fs.readFileSync(PEM_KEY_PATH);
+  } catch (e) {
+    throw new Error(`Cannot read PEM key at ${PEM_KEY_PATH}: ${e.message}`);
+  }
+}
+
+function createSSHClient() {
+  return new Promise((resolve, reject) => {
+    const conn = new Client();
+    conn.on('ready', () => resolve(conn))
+        .on('error', reject)
+        .connect({ host: SSH_HOST, port: 22, username: SSH_USER, privateKey: getPrivateKey() });
+  });
+}
+
+async function sshExec(command) {
+  const conn = await createSSHClient();
+  return new Promise((resolve, reject) => {
+    conn.exec(command, (err, stream) => {
+      if (err) { conn.end(); return reject(err); }
+      let out = '', errOut = '';
+      stream
+        .on('close', (code) => {
+          conn.end();
+          code === 0 ? resolve(out) : reject(new Error(errOut || `SSH command exited with code ${code}`));
+        })
+        .on('data', d => out += d)
+        .stderr.on('data', d => errOut += d);
+    });
+  });
+}
+
+async function sftpUpload(localPath, remoteName) {
+  const conn = await createSSHClient();
+  return new Promise((resolve, reject) => {
+    conn.sftp((err, sftp) => {
+      if (err) { conn.end(); return reject(err); }
+      const remotePath = `${REMOTE_DOCS}/${remoteName}`;
+      sftp.fastPut(localPath, remotePath, err => {
+        conn.end();
+        err ? reject(err) : resolve();
+      });
+    });
+  });
+}
+
+// ── Toggle helpers ────────────────────────────────────────────────────────────
+function readNorm(filePath) {
+  return fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n');
+}
+
+function detectMode() {
+  const { file, live } = TOGGLE_FILES[0];
+  const content = readNorm(file);
+  if (content.includes(live)) return 'live';
+  return 'local';
+}
+
+function applyToggle(targetMode) {
+  const errors = [];
+  for (const entry of TOGGLE_FILES) {
+    let content = readNorm(entry.file);
+    const from = targetMode === 'live' ? entry.local : entry.live;
+    const to   = targetMode === 'live' ? entry.live  : entry.local;
+    if (content.includes(to)) continue; // already in target state
+    if (!content.includes(from)) {
+      errors.push(`Pattern not found in ${entry.name}`);
+      continue;
+    }
+    content = content.replace(from, to);
+    fs.writeFileSync(entry.file, content, 'utf8');
+  }
+  if (errors.length) throw new Error(errors.join('; '));
+}
+
+// ── Git helper ────────────────────────────────────────────────────────────────
+function gitExec(command) {
+  return new Promise((resolve, reject) => {
+    exec(command, { cwd: PROJECT_ROOT }, (err, stdout, stderr) => {
+      if (err) reject(new Error(stderr || stdout || err.message));
+      else resolve((stdout + stderr).trim());
+    });
+  });
+}
+
+// ── Multer (temp file storage for uploads) ────────────────────────────────────
+const upload = multer({ dest: os.tmpdir() });
+
+// ── Routes ────────────────────────────────────────────────────────────────────
+
+// Current mode (live vs local)
+app.get('/api/status', (req, res) => {
+  try {
+    res.json({ mode: detectMode() });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Toggle mode
+app.post('/api/toggle', (req, res) => {
+  try {
+    const current = detectMode();
+    const target = current === 'live' ? 'local' : 'live';
+    applyToggle(target);
+    res.json({ mode: target });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Upload a document to the server via SFTP
+app.post('/api/docs/upload', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file provided' });
+  const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+  try {
+    await sftpUpload(req.file.path, originalName);
+    fs.unlink(req.file.path, () => {});
+    res.json({ success: true, filename: originalName });
+  } catch (e) {
+    fs.unlink(req.file.path, () => {});
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// List documents on the server
+app.get('/api/docs', async (req, res) => {
+  try {
+    const output = await sshExec(`ls -la "${REMOTE_DOCS}"`);
+    const files = output.split('\n')
+      .filter(line => /^-/.test(line))
+      .map(line => {
+        const parts = line.split(/\s+/);
+        const name = parts.slice(8).join(' ');
+        const size = parseInt(parts[4]) || 0;
+        return { name, size };
+      })
+      .filter(f => f.name);
+    res.json({ files });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Delete a document from the server
+app.delete('/api/docs/:filename', async (req, res) => {
+  const filename = req.params.filename;
+  if (filename.includes('/') || filename.includes('..') || filename.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  try {
+    await sshExec(`rm "${REMOTE_DOCS}/${filename}"`);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Restart pm2 backend on server + call /api/reload
+app.post('/api/server/restart', async (req, res) => {
+  try {
+    await sshExec('pm2 restart rag-backend');
+    // Wait a moment for backend to come up, then reload
+    await new Promise(r => setTimeout(r, 3000));
+    await new Promise((resolve, reject) => {
+      const reqOut = https.request(
+        'https://api.chat.pathway.training/api/reload',
+        { method: 'POST', headers: { 'x-api-key': DASHBOARD_API_KEY || '' } },
+        (resp) => { resp.resume(); resolve(); }
+      );
+      reqOut.on('error', reject);
+      reqOut.setTimeout(15000, () => reqOut.destroy(new Error('Reload request timed out')));
+      reqOut.end();
+    });
+    res.json({ success: true, message: 'Backend restarted and bot reloaded.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get bot prompt
+app.get('/api/prompt', (req, res) => {
+  try {
+    const content = fs.existsSync(PROMPT_FILE) ? fs.readFileSync(PROMPT_FILE, 'utf8') : '';
+    res.json({ content });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Save bot prompt
+app.post('/api/prompt', (req, res) => {
+  const { content } = req.body;
+  if (content === undefined) return res.status(400).json({ error: 'content is required' });
+  try {
+    fs.writeFileSync(PROMPT_FILE, content, 'utf8');
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Git: pull
+app.post('/api/git/pull', async (req, res) => {
+  try {
+    const output = await gitExec('git pull');
+    res.json({ output });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Git: add + commit
+app.post('/api/git/commit', async (req, res) => {
+  const { message } = req.body;
+  if (!message || !message.trim()) return res.status(400).json({ error: 'Commit message is required' });
+  try {
+    await gitExec('git add .');
+    const output = await gitExec(`git commit -m ${JSON.stringify(message.trim())}`);
+    res.json({ output });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Git: push
+app.post('/api/git/push', async (req, res) => {
+  try {
+    const output = await gitExec('git push');
+    res.json({ output });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+app.listen(PORT, () => {
+  console.log(`\n  Pathway Dashboard → http://localhost:${PORT}\n`);
+});

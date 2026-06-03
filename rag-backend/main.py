@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any, Tuple
 from urllib.parse import quote
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -16,6 +16,11 @@ from rag import RagPipeline
 load_dotenv()
 
 PORT = int(os.getenv("PORT", "8000"))
+DASHBOARD_API_KEY = os.getenv("DASHBOARD_API_KEY")
+
+def verify_api_key(x_api_key: str = Header(None)):
+    if not DASHBOARD_API_KEY or x_api_key != DASHBOARD_API_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
 DOCS_DIR = os.getenv("DOCS_DIR", "./docs")  # used by /api/files route
 
@@ -57,7 +62,7 @@ def health():
 
 
 @app.post("/api/reload")
-def reload_index():
+def reload_index(_: None = Depends(verify_api_key)):
     PIPE.reload()
     return {"status": "reloaded"}
 
@@ -238,7 +243,7 @@ def ask(body: ChatIn, request: Request):
 
 
 @app.post("/api/upload")
-async def upload(file: UploadFile = File(...)):
+async def upload(file: UploadFile = File(...), _: None = Depends(verify_api_key)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
 
