@@ -57,12 +57,27 @@ function getPrivateKey() {
   }
 }
 
-function createSSHClient() {
+function createSSHClient(retries = 3, delayMs = 2000) {
   return new Promise((resolve, reject) => {
-    const conn = new Client();
-    conn.on('ready', () => resolve(conn))
-        .on('error', reject)
-        .connect({ host: SSH_HOST, port: 22, username: SSH_USER, privateKey: getPrivateKey() });
+    const attempt = (remaining) => {
+      const conn = new Client();
+      conn.on('ready', () => resolve(conn))
+          .on('error', (err) => {
+            conn.end();
+            if (remaining > 1) {
+              setTimeout(() => attempt(remaining - 1), delayMs);
+            } else {
+              reject(err);
+            }
+          })
+          .connect({
+            host: SSH_HOST, port: 22,
+            username: SSH_USER,
+            privateKey: getPrivateKey(),
+            readyTimeout: 30000,
+          });
+    };
+    attempt(retries);
   });
 }
 
