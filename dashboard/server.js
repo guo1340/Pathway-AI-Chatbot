@@ -353,7 +353,8 @@ app.post('/api/server/restart', async (req, res) => {
   }
 });
 
-// Sync prompt to server: SFTP prompt.txt directly → pm2 restart → /api/reload
+// Sync prompt to server: SFTP prompt.txt → restart only (no re-index needed,
+// prompt.txt is read fresh on every query)
 app.post('/api/server/sync-prompt', async (req, res) => {
   try {
     await sftpUploadTo(
@@ -361,10 +362,7 @@ app.post('/api/server/sync-prompt', async (req, res) => {
       '/home/ubuntu/Pathway-AI-Chatbot/rag-backend/prompt.txt'
     );
     await sshExec('pm2 restart rag-backend --update-env');
-    await new Promise(r => setTimeout(r, 3000));
-    await sshReload();
-
-    res.json({ success: true, message: 'Prompt uploaded to server and bot reloaded.' });
+    res.json({ success: true, message: 'Prompt synced — bot will use it on the next query.' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
