@@ -1,5 +1,6 @@
 import os, uuid, glob, html
-from typing import List, Tuple, Optional, Dict
+import hashlib
+from typing import List, Tuple, Optional, Dict, Any
 from dataclasses import dataclass
 import re
 
@@ -19,11 +20,29 @@ load_dotenv()
 # ------- config -------
 DOCS_DIR = os.getenv("DOCS_DIR", "./docs")
 CHROMA_DIR = os.getenv("CHROMA_DIR", "./chroma_store")
-CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "600"))
+CHUNK_MAX_SIZE = int(os.getenv("CHUNK_MAX_SIZE", os.getenv("CHUNK_SIZE", "600")))
+CHUNK_MIN_SIZE = int(os.getenv("CHUNK_MIN_SIZE", "200"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
+PDF_OCR_ENABLED = os.getenv("PDF_OCR_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
+PDF_OCR_ENGINE = os.getenv("PDF_OCR_ENGINE", "auto").lower()
+PDF_OCR_MIN_TEXT_CHARS = int(os.getenv("PDF_OCR_MIN_TEXT_CHARS", "40"))
+PDF_OCR_DPI = int(os.getenv("PDF_OCR_DPI", "200"))
+PDF_OCR_LANGUAGE = os.getenv("PDF_OCR_LANGUAGE", "eng")
+TESSERACT_CMD = os.getenv("TESSERACT_CMD", "").strip()
 TOP_K = int(os.getenv("TOP_K", "4"))
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.2"))
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
+
+if CHUNK_MIN_SIZE < 1 or CHUNK_MIN_SIZE > CHUNK_MAX_SIZE:
+    raise ValueError("CHUNK_MIN_SIZE must be between 1 and CHUNK_MAX_SIZE")
+if CHUNK_OVERLAP < 0 or CHUNK_OVERLAP >= CHUNK_MAX_SIZE:
+    raise ValueError("CHUNK_OVERLAP must be smaller than CHUNK_MAX_SIZE")
+if PDF_OCR_MIN_TEXT_CHARS < 0:
+    raise ValueError("PDF_OCR_MIN_TEXT_CHARS cannot be negative")
+if PDF_OCR_DPI < 72:
+    raise ValueError("PDF_OCR_DPI must be at least 72")
+if PDF_OCR_ENGINE not in {"auto", "tesseract", "rapidocr"}:
+    raise ValueError("PDF_OCR_ENGINE must be auto, tesseract, or rapidocr")
 
 # OpenAI defaults
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -100,36 +119,222 @@ def iterative_retrieve(self, query: str, k: int = TOP_K, max_passes: int = 3) ->
 
 
 # ------- helpers -------
-def _load_docs_from_dir(path: str) -> List[Document]:
-    docs: List[Document] = []
-    # load .md / .txt
-    for fp in glob.glob(os.path.join(path, "**", "*.md"), recursive=True) + \
-               glob.glob(os.path.join(path, "**", "*.txt"), recursive=True):
-        loader = TextLoader(fp, encoding="utf-8")
-        for d in loader.load():
-            d.metadata["source"] = fp
-            docs.append(d)
-    # load .html
-    for fp in glob.glob(os.path.join(path, "**", "*.html"), recursive=True):
-        loader = BSHTMLLoader(fp, open_encoding="utf-8")
-        for d in loader.load():
-            d.metadata["source"] = fp
-            docs.append(d)
-    # load .pdf
-    for fp in glob.glob(os.path.join(path, "**", "*.pdf"), recursive=True):
+def _supported_file_paths(path: str) -> List[str]:
+    paths: List[str] = []
+    for extension in ("md", "txt", "html", "pdf"):
+        paths.extend(glob.glob(os.path.join(path, "**", f"*.{extension}"), recursive=True))
+    return sorted(set(paths))
+
+_RAPID_OCR = None
+
+def _ocr_image(image) -> Tuple[str, str]:
+    tesseract_error = None
+    if PDF_OCR_ENGINE in {"auto", "tesseract"}:
         try:
-            loader = PyPDFLoader(fp)
-            for d in loader.load():
-                d.metadata["source"] = fp
-                docs.append(d)
-        except Exception:
-            # skip unreadable pdfs; consider logging
-            continue
+            import pytesseract
+
+            if TESSERACT_CMD:
+                pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
+            pytesseract.get_tesseract_version()
+            return (
+                pytesseract.image_to_string(image, lang=PDF_OCR_LANGUAGE).strip(),
+                "tesseract",
+            )
+        except Exception as exc:
+            tesseract_error = exc
+            if PDF_OCR_ENGINE == "tesseract":
+                raise RuntimeError(
+                    "Scanned PDF OCR requires the Tesseract executable. Install "
+                    "Tesseract and set TESSERACT_CMD if it is not available on PATH."
+                ) from exc
+
+    if PDF_OCR_ENGINE in {"auto", "rapidocr"}:
+        try:
+            import numpy as np
+            from rapidocr_onnxruntime import RapidOCR
+
+            global _RAPID_OCR
+            if _RAPID_OCR is None:
+                _RAPID_OCR = RapidOCR()
+            result, _ = _RAPID_OCR(np.asarray(image))
+            text = "\n".join(line[1] for line in (result or []) if len(line) > 1)
+            return text.strip(), "rapidocr"
+        except Exception as exc:
+            raise RuntimeError(
+                "Scanned PDF OCR failed. Install the locked RapidOCR dependencies "
+                "or configure a working Tesseract executable."
+            ) from exc
+
+    raise RuntimeError("Scanned PDF OCR is not configured") from tesseract_error
+
+def _load_pdf_docs(fp: str) -> List[Document]:
+    native_docs = PyPDFLoader(fp).load()
+    if not PDF_OCR_ENABLED:
+        return [doc for doc in native_docs if (doc.page_content or "").strip()]
+
+    pages_needing_ocr = [
+        index
+        for index, doc in enumerate(native_docs)
+        if len((doc.page_content or "").strip()) < PDF_OCR_MIN_TEXT_CHARS
+    ]
+    if not pages_needing_ocr:
+        return native_docs
+
+    try:
+        import fitz
+        from PIL import Image
+    except ImportError as exc:
+        raise RuntimeError(
+            "Scanned PDF pages require pymupdf and Pillow. Run `uv sync` "
+            "after updating dependencies."
+        ) from exc
+
+    with fitz.open(fp) as pdf:
+        for index in pages_needing_ocr:
+            page_number = native_docs[index].metadata.get("page", index)
+            if not isinstance(page_number, int) or page_number < 0 or page_number >= len(pdf):
+                page_number = index
+
+            page = pdf.load_page(page_number)
+            pixmap = page.get_pixmap(dpi=PDF_OCR_DPI, alpha=False)
+            image = Image.frombytes(
+                "RGB",
+                (pixmap.width, pixmap.height),
+                pixmap.samples,
+            )
+            text, engine = _ocr_image(image)
+            if text:
+                native_docs[index].page_content = text
+                native_docs[index].metadata["ocr"] = True
+                native_docs[index].metadata["ocr_engine"] = engine
+
+    return [doc for doc in native_docs if (doc.page_content or "").strip()]
+
+def _load_docs_from_file(fp: str) -> List[Document]:
+    docs: List[Document] = []
+    extension = os.path.splitext(fp)[1].lower()
+
+    if extension in {".md", ".txt"}:
+        loader = TextLoader(fp, encoding="utf-8")
+    elif extension == ".html":
+        loader = BSHTMLLoader(fp, open_encoding="utf-8")
+    elif extension == ".pdf":
+        loaded = _load_pdf_docs(fp)
+        for d in loaded:
+            d.metadata["source"] = fp
+            docs.append(d)
+        return docs
+    else:
+        return docs
+
+    try:
+        loaded = loader.load()
+    except Exception:
+        return docs
+
+    for d in loaded:
+        d.metadata["source"] = fp
+        docs.append(d)
     return docs
 
+def _load_docs_from_dir(path: str) -> List[Document]:
+    docs: List[Document] = []
+    for fp in _supported_file_paths(path):
+        docs.extend(_load_docs_from_file(fp))
+    return docs
+
+def _join_chunk_text(left: str, right: str) -> str:
+    max_overlap = min(CHUNK_OVERLAP, len(left), len(right))
+    for overlap in range(max_overlap, 0, -1):
+        if left.endswith(right[:overlap]):
+            return left + right[overlap:]
+    return f"{left}\n\n{right}"
+
+def _merge_small_chunks(chunks: List[Document]) -> List[Document]:
+    merged: List[Document] = []
+    pending: Optional[Document] = None
+
+    for chunk in chunks:
+        if pending is None:
+            pending = chunk
+            continue
+
+        combined = _join_chunk_text(pending.page_content, chunk.page_content)
+        if len(pending.page_content) < CHUNK_MIN_SIZE and len(combined) <= CHUNK_MAX_SIZE:
+            pending = Document(page_content=combined, metadata=dict(pending.metadata))
+            continue
+
+        merged.append(pending)
+        pending = chunk
+
+    if pending is not None:
+        if merged and len(pending.page_content) < CHUNK_MIN_SIZE:
+            combined = _join_chunk_text(merged[-1].page_content, pending.page_content)
+            if len(combined) <= CHUNK_MAX_SIZE:
+                merged[-1] = Document(
+                    page_content=combined,
+                    metadata=dict(merged[-1].metadata),
+                )
+            else:
+                merged.append(pending)
+        else:
+            merged.append(pending)
+
+    return merged
+
 def _split(docs: List[Document]) -> List[Document]:
-    splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
-    return splitter.split_documents(docs)
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=CHUNK_MAX_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+        separators=["\n\n", "\n", ". ", " ", ""],
+    )
+    chunks: List[Document] = []
+    for doc in docs:
+        chunks.extend(_merge_small_chunks(splitter.split_documents([doc])))
+    return chunks
+
+def _source_key(path: str) -> str:
+    return os.path.normcase(os.path.abspath(path))
+
+def _file_hash(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as source:
+        for block in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+def _chunk_config() -> str:
+    return f"{CHUNK_MIN_SIZE}:{CHUNK_MAX_SIZE}:{CHUNK_OVERLAP}"
+
+def _index_config(path: str) -> str:
+    config = _chunk_config()
+    if os.path.splitext(path)[1].lower() == ".pdf":
+        return (
+            f"{config}:pdf-ocr:{PDF_OCR_ENABLED}:{PDF_OCR_ENGINE}:{PDF_OCR_MIN_TEXT_CHARS}:"
+            f"{PDF_OCR_DPI}:{PDF_OCR_LANGUAGE}"
+        )
+    return config
+
+def _prepare_file_chunks(path: str, fingerprint: str) -> Tuple[List[Document], List[str]]:
+    chunks = _split(_load_docs_from_file(path))
+    source_key = _source_key(path)
+    chunk_config = _chunk_config()
+    index_config = _index_config(path)
+    ids: List[str] = []
+
+    for index, chunk in enumerate(chunks):
+        chunk.metadata["source"] = path
+        chunk.metadata["source_key"] = source_key
+        chunk.metadata["source_hash"] = fingerprint
+        chunk.metadata["chunk_config"] = chunk_config
+        chunk.metadata["index_config"] = index_config
+        chunk.metadata["chunk_index"] = index
+        chunk_id = hashlib.sha256(
+            f"{source_key}\0{fingerprint}\0{index_config}\0{index}\0{chunk.page_content}".encode("utf-8")
+        ).hexdigest()
+        ids.append(chunk_id)
+
+    return chunks, ids
 
 def _build_embeddings():
     if LLM_PROVIDER == "ollama":
@@ -148,44 +353,80 @@ class RagPipeline:
 
     @classmethod
     def from_disk(cls) -> "RagPipeline":
-        # (re)create index if missing; otherwise open persisted
-        embeddings = _build_embeddings()
-
-        if not os.path.exists(CHROMA_DIR) or not os.listdir(CHROMA_DIR):
-            os.makedirs(CHROMA_DIR, exist_ok=True)
-            base_docs = _load_docs_from_dir(DOCS_DIR)
-            chunks = _split(base_docs)
-            vectordb = Chroma.from_documents(
-                documents=chunks,
-                embedding=embeddings,
-                persist_directory=CHROMA_DIR,
-                collection_name="site-docs",
-            )
-        else:
-            vectordb = Chroma(
-                embedding_function=embeddings,
-                persist_directory=CHROMA_DIR,
-                collection_name="site-docs",
-            )
-        llm = _build_llm()
-        return cls(llm=llm, vectordb=vectordb)
-
-    def reload(self):
-        # drop + rebuild (simple approach)
-        try:
-            self.vectordb.delete_collection()
-        except Exception:
-            pass
         embeddings = _build_embeddings()
         os.makedirs(CHROMA_DIR, exist_ok=True)
-        base_docs = _load_docs_from_dir(DOCS_DIR)
-        chunks = _split(base_docs)
-        self.vectordb = Chroma.from_documents(
-            documents=chunks,
-            embedding=embeddings,
+        vectordb = Chroma(
+            embedding_function=embeddings,
             persist_directory=CHROMA_DIR,
             collection_name="site-docs",
         )
+        llm = _build_llm()
+        pipeline = cls(llm=llm, vectordb=vectordb)
+        if not vectordb.get(limit=1).get("ids"):
+            pipeline.reload()
+        return pipeline
+
+    def reload(self):
+        current_files = {
+            _source_key(path): path
+            for path in _supported_file_paths(DOCS_DIR)
+        }
+        indexed = self.vectordb.get(include=["metadatas"])
+        indexed_sources: Dict[str, Dict[str, Any]] = {}
+
+        for chunk_id, metadata in zip(
+            indexed.get("ids", []),
+            indexed.get("metadatas", []),
+        ):
+            metadata = metadata or {}
+            source = metadata.get("source")
+            if not source:
+                continue
+            source_key = metadata.get("source_key") or _source_key(source)
+            state = indexed_sources.setdefault(
+                source_key,
+                {"ids": [], "hashes": set(), "index_configs": set()},
+            )
+            state["ids"].append(chunk_id)
+            if metadata.get("source_hash"):
+                state["hashes"].add(metadata["source_hash"])
+            index_config = metadata.get("index_config") or metadata.get("chunk_config")
+            if index_config:
+                state["index_configs"].add(index_config)
+
+        summary = {"added": 0, "updated": 0, "deleted": 0, "unchanged": 0}
+
+        for source_key, path in current_files.items():
+            fingerprint = _file_hash(path)
+            previous = indexed_sources.get(source_key)
+            if (
+                previous
+                and previous["hashes"] == {fingerprint}
+                and previous["index_configs"] == {_index_config(path)}
+            ):
+                summary["unchanged"] += 1
+                continue
+
+            chunks, chunk_ids = _prepare_file_chunks(path, fingerprint)
+            if not chunks:
+                continue
+
+            # Add first so an embedding failure leaves the previous index intact.
+            self.vectordb.add_documents(chunks, ids=chunk_ids)
+            if previous:
+                old_ids = [chunk_id for chunk_id in previous["ids"] if chunk_id not in chunk_ids]
+                if old_ids:
+                    self.vectordb.delete(ids=old_ids)
+                summary["updated"] += 1
+            else:
+                summary["added"] += 1
+
+        for source_key, previous in indexed_sources.items():
+            if source_key not in current_files:
+                self.vectordb.delete(ids=previous["ids"])
+                summary["deleted"] += 1
+
+        return summary
 
     def retrieve(self, query: str, k: int = TOP_K) -> List[Document]:
         """

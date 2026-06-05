@@ -16,6 +16,7 @@ A lightweight Retrieval‑Augmented Generation chatbot for WordPress:
 
 - Node.js 18+ and npm
 - Python 3.10+
+- Optional Tesseract OCR for image-only scanned PDFs; the default automatic mode falls back to RapidOCR
 - A WordPress site (local or remote)
 
 ---
@@ -39,6 +40,11 @@ cd rag-backend
 uv venv && source .venv/bin/activate
 uv pip install -e . uvicorn python-dotenv
 ```
+
+For scanned PDF indexing, the default `PDF_OCR_ENGINE=auto` uses Tesseract when
+available and falls back to the locked RapidOCR dependency. To require
+Tesseract, set `PDF_OCR_ENGINE=tesseract`; if it is not on `PATH`, also set
+`TESSERACT_CMD` to the full executable path. Native text PDFs do not invoke OCR.
 
 ### Run
 

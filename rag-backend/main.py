@@ -341,7 +341,7 @@ async def upload(file: UploadFile = File(...), user=Depends(require_auth)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save: {e!s}")
 
-    # Reload the vector index after successful upload
+    # Incrementally sync the vector index after a successful upload.
     try:
         PIPE.reload()
     except Exception as e:
