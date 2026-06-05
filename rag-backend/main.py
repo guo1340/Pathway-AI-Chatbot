@@ -315,13 +315,18 @@ async def upload(file: UploadFile = File(...), user=Depends(require_auth)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
 
+    filename = os.path.basename(file.filename)
+    if os.path.splitext(filename)[1].lower() not in {".md", ".txt", ".html", ".pdf"}:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+
     os.makedirs(DOCS_DIR, exist_ok=True)
-    dest = os.path.join(DOCS_DIR, os.path.basename(file.filename))
+    dest = os.path.join(DOCS_DIR, filename)
+    temp_dest = os.path.join(DOCS_DIR, f".upload-{uuid.uuid4().hex}.tmp")
 
     size = 0
     chunk_size = 1024 * 1024  # 1MB
     try:
-        with open(dest, "wb") as f:
+        with open(temp_dest, "wb") as f:
             while True:
                 chunk = await file.read(chunk_size)
                 if not chunk:
@@ -331,14 +336,19 @@ async def upload(file: UploadFile = File(...), user=Depends(require_auth)):
                     # Clean up partial file and abort
                     f.close()
                     try:
-                        os.remove(dest)
+                        os.remove(temp_dest)
                     except Exception:
                         pass
                     raise HTTPException(status_code=413, detail="File too large")
                 f.write(chunk)
+        os.replace(temp_dest, dest)
     except HTTPException:
         raise
     except Exception as e:
+        try:
+            os.remove(temp_dest)
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=f"Failed to save: {e!s}")
 
     # Incrementally sync the vector index after a successful upload.
@@ -348,7 +358,7 @@ async def upload(file: UploadFile = File(...), user=Depends(require_auth)):
         # File saved, but indexing failed; surface a useful message
         raise HTTPException(status_code=500, detail=f"Saved but failed to index: {e!s}")
 
-    return {"status": "ok", "filename": file.filename, "bytes": size}
+    return {"status": "ok", "filename": filename, "bytes": size}
 
 
 

@@ -115,7 +115,243 @@ Verification required before push:
 - Run `git diff --check`.
 - Inspect the final staged file list and staged diff for credentials or generated data.
 
+### 2026-06-05 22:45:59 +08:00 - Local Dashboard Service Controls
+
+Completed independent local backend and frontend launch controls.
+
+Changes:
+
+- Added separate Launch Backend and Launch Frontend buttons.
+- Added backend and frontend health indicators and local links.
+- Split process tracking so either service can be launched independently.
+- Removed the unsupported Uvicorn `--no-reload` option.
+- Corrected the Vite health target to `http://localhost:5173`.
+- Kept coworker-specific project and SSH paths unchanged.
+
+Verification performed:
+
+- Dashboard server syntax and inline browser script parsing passed.
+- Frontend launch returned success and `http://localhost:5173` returned HTTP 200.
+- Backend launch returned success and `/api/health` became ready.
+- Local status correctly reported independently running services.
+
+### 2026-06-05 22:45:59 +08:00 - Local Dashboard Document Management
+
+Made local dashboard document operations compatible with the backend's authenticated incremental APIs.
+
+Changes:
+
+- Local document listing now reads `rag-backend/docs`.
+- Uploads are proxied to authenticated backend `POST /api/upload`.
+- Deletions remove the local file and call authenticated `POST /api/reload`.
+- Added short-lived JWT generation using the configured backend secret.
+- Added an in-memory local JWT fallback shared only with a backend process launched by the dashboard.
+- Preserved backend incremental indexing and OCR behavior by routing uploads through the backend.
+
+Verification performed:
+
+- Listed 39 existing local documents.
+- Uploaded a temporary text file through the dashboard; backend returned HTTP 200 and reported 79 bytes indexed.
+- Deleted the temporary file through the dashboard; authenticated reload returned HTTP 200.
+- Confirmed the temporary file was absent afterward and the document count returned to 39.
+- Removed the temporary source file after testing.
+
+### 2026-06-05 22:45:59 +08:00 - Remote Dashboard Operation Lock
+
+Locked remote operations until the backend is tested and approved for deployment.
+
+Changes:
+
+- Added a single `REMOTE_API_ENABLED=false` server flag.
+- Remote mode toggle, prompt sync, and restart routes now return HTTP 423.
+- Replaced remote action controls with buttons that open an explanatory dialog.
+- Dialog supports the Understood button, close button, backdrop click, and Escape key.
+- Left SSH host, key, user, and remote paths unchanged for the coworker's environment.
+
+Verification performed:
+
+- Remote toggle, prompt sync, and restart endpoints returned HTTP 423.
+- Static DOM checks confirmed the dialog text and all requested dismissal handlers are present.
+- Full visual browser interaction was not available because the in-app browser could not start in the Windows sandbox.
+
+### 2026-06-05 23:29:17 +08:00 - Full LOG.md Regression Run
+
+Executed every test procedure documented in this file, including the backend, OCR, incremental indexing, dashboard, remote lock, and release checks.
+
+Changes required after failed tests:
+
+- Corrected the ignored local OpenAI model setting from `gpt-40-mini` to `gpt-4o-mini`.
+- Prevented adjacent-page expansion from performing page arithmetic for text documents without numeric page metadata.
+- Changed the citation API base default to `http://localhost:8000` so local dashboard citations remain in the local stack; deployments can still set `API_BASE`.
+
+Verification performed:
+
+- All 18 isolated backend and API checks passed.
+- Local backend/frontend launch, duplicate prevention, upload, retrieval, citation, delete, and Chroma cleanup passed.
+- Remote toggle, prompt sync, and restart remained locked with HTTP 423.
+- All four dialog dismissal paths passed through execution of the actual browser script with a mocked DOM.
+- Python compilation, dependency lock validation, Vite build, dashboard JavaScript parsing, PHP lint, and `git diff --check` passed.
+- Detailed results are recorded in [`TEST_LOG.md`](TEST_LOG.md).
+
+### 2026-06-06 00:21:45 +08:00 - Dashboard Pre-Push Edge Hardening
+
+Executed the remaining dashboard pre-push failure, browser, prompt, and upload edge tests.
+
+Changes:
+
+- Restored a local document if deletion succeeds on disk but authenticated backend reload fails.
+- Restricted uploads to the backend-supported `.txt`, `.md`, `.html`, and `.pdf` extensions.
+- Used a temporary upload file and atomic replacement so rejected oversized replacements do not destroy an existing same-name document.
+- Preserved backend HTTP status codes through the dashboard upload proxy.
+- Added the supported file filter to the dashboard picker.
+- Fixed mobile horizontal overflow at a 390-pixel viewport.
+- Removed the dashboard Version Control section and its Git API routes.
+
+Verification performed:
+
+- Backend-stopped deletion restored the original file and returned a clear failure.
+- Multiple, duplicate, unsupported, oversized, and backend-stopped uploads produced the expected results.
+- Prompt save/read passed and the original prompt was restored to a zero Git diff.
+- Chrome desktop and true mobile emulation passed without horizontal overflow.
+- All test sources, temporary upload files, and Chroma chunks were removed.
+- Detailed results are recorded in [`TEST_LOG.md`](TEST_LOG.md).
+
 ## Steps and Instructions for Testing
+
+### Local Dashboard Service Controls
+
+1. Install the existing dashboard dependencies:
+
+   ```powershell
+   cd "E:\Pathway\AI Chat\Pathway-AI-Chatbot\dashboard"
+   npm install
+   ```
+
+2. Start the dashboard:
+
+   ```powershell
+   npm start
+   ```
+
+3. Open `http://localhost:3131`.
+4. Click Launch Backend.
+
+Expected result:
+
+- The backend status changes from stopped, to starting, to ready.
+- The backend health link becomes available.
+- Backend output appears in the local log panel.
+- `http://127.0.0.1:8000/api/health` returns `{"status":"ok"}`.
+
+5. Click Launch Frontend.
+
+Expected result:
+
+- The frontend status changes from stopped, to starting, to ready.
+- The local chatbot link becomes available.
+- `http://localhost:5173` loads the Vite chatbot.
+- Repeated launch clicks do not start duplicate tracked processes.
+
+### Local Dashboard Document Management
+
+1. Launch the local backend from the dashboard and wait for Ready.
+2. Upload a small `.txt`, `.md`, `.html`, or `.pdf` test file through the dropzone.
+
+Expected result:
+
+- Upload progress completes successfully.
+- The backend receives an authenticated `/api/upload` request.
+- The file appears in the local document list.
+- Only the new or changed file is embedded; unchanged files are skipped.
+- Scanned PDFs use the configured OCR fallback.
+
+3. Ask the local chatbot a question containing unique text from the uploaded file.
+
+Expected result:
+
+- The answer can retrieve the new content and cite the uploaded document.
+
+4. Click Remove for the test file and confirm.
+
+Expected result:
+
+- The file disappears from `rag-backend/docs`.
+- The dashboard calls authenticated `/api/reload`.
+- Chunks belonging to the removed file are deleted from Chroma.
+- Other documents remain indexed.
+
+### Remote Dashboard Operation Lock
+
+1. Click Remote Sync Locked or Remote Restart Locked.
+
+Expected result:
+
+- A dialog explains that remote uploads and server changes are unavailable because the updated backend is not deployment-tested.
+
+2. Open and close the dialog using each method:
+
+- Click Understood.
+- Click the `x` close button.
+- Click the empty backdrop outside the dialog.
+- Press Escape.
+
+Expected result:
+
+- Every method closes the dialog.
+- No remote HTTP or SSH operation is performed.
+
+### Text Document Retrieval Regression
+
+1. Launch the backend and frontend from the local dashboard.
+2. Upload a visible `.txt` file containing a unique phrase.
+3. Ask the local chatbot a question that includes the unique phrase.
+
+Expected result:
+
+- The upload is indexed without rebuilding unchanged documents.
+- The chat request returns HTTP 200; text documents without page metadata do not raise an adjacent-page error.
+- The answer retrieves the unique phrase and cites the uploaded file.
+- The citation URL begins with `http://localhost:8000` unless `API_BASE` is explicitly configured.
+
+4. Delete the test document from the dashboard.
+
+Expected result:
+
+- The source disappears from `rag-backend/docs` and the dashboard list.
+- Authenticated `/api/reload` removes only that document's Chroma chunks.
+
+### Dashboard Upload and Delete Failure Cases
+
+1. Stop the local backend and try to delete an existing test document.
+
+Expected result:
+
+- The dashboard returns a failure stating that index reload failed.
+- The source file is restored with unchanged content.
+
+2. Start the backend and upload two supported files together.
+3. Upload a changed file using the same filename.
+
+Expected result:
+
+- Both supported files upload and index successfully.
+- The duplicate filename replaces and re-indexes that document.
+
+4. Try uploading an unsupported extension.
+5. Set a small `MAX_UPLOAD_MB` test value and upload a larger same-name replacement.
+
+Expected result:
+
+- Unsupported files return HTTP 400 and are not saved.
+- Oversized files return HTTP 413.
+- An existing same-name document remains unchanged after the oversized upload.
+- No `.upload-*.tmp` files remain.
+
+3. Directly call `/api/toggle`, `/api/server/sync-prompt`, or `/api/server/restart`.
+
+Expected result:
+
+- Each route returns HTTP 423 with the remote-lock explanation.
 
 ### Content-Aware Document Chunking
 

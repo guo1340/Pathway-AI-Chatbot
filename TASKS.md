@@ -33,7 +33,10 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## Priority 6: Dashboard
 
-- [ ] Complete the operations dashboard for switching between local and live environments, managing bot documents, editing prompts and rules, and controlling the bot.
+- [x] Complete the local operations dashboard for launching the backend and frontend, managing local bot documents, editing the local prompt, and monitoring local service status.
+- [x] Make local document upload and deletion compatible with the backend's authenticated incremental upload/reload APIs.
+- [x] Lock remote dashboard operations and explain the deployment-testing limitation in a dismissible dialog.
+- [ ] Re-enable live environment controls after the updated backend and indexing workflow are approved for deployment.
 - [ ] Replace SSH-based document management, prompt synchronization, and backend restart operations with authenticated HTTPS backend APIs so dashboard access does not depend on the operator's IP address.
 - [ ] Add dashboard authentication before allowing access beyond the current local machine. The dashboard can upload and delete documents, edit prompts, and run git commands.
 
@@ -50,6 +53,11 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Added configurable content-aware chunk sizing with small-chunk merging.
 - [x] Added fingerprint-based incremental indexing for new, changed, and deleted files.
 - [x] Added OCR fallback so uploaded scanned PDFs can be converted into text chunks and indexed.
+- [x] Added separate local backend and frontend launch controls to the dashboard.
+- [x] Added authenticated local document upload, listing, deletion, and index synchronization.
+- [x] Locked remote dashboard actions until backend deployment testing is complete.
+- [x] Fixed local text-document retrieval and local citation URLs found during the full dashboard regression run.
+- [x] Hardened dashboard upload/delete failure handling and removed the Version Control section.
 
 ## Notes for Codex
 
@@ -66,7 +74,11 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-05 17:27:47 +08:00 - Completed incremental document indexing.
 - 2026-06-05 20:20:53 +08:00 - Completed scanned PDF OCR indexing support.
 - 2026-06-05 21:27:35 +08:00 - Ran all documented tests; 17 passed and 0 failed.
-- 2026-06-05 22:01:25 +08:00 - Prepared the `Sal` branch for release, cleared generated context, and adopted the newer `main` prompt.
+- 2026-06-05 22:45:59 +08:00 - Completed local backend and frontend dashboard launch controls.
+- 2026-06-05 22:45:59 +08:00 - Completed authenticated local document management from the dashboard.
+- 2026-06-05 22:45:59 +08:00 - Locked remote dashboard operations with an explanatory dismissible dialog.
+- 2026-06-05 23:29:17 +08:00 - Ran every LOG.md procedure; fixed local model, text retrieval, and citation issues; all reruns passed.
+- 2026-06-06 00:21:45 +08:00 - Completed dashboard edge tests, fixed failures, and removed dashboard Git controls.
 
 ## Steps and Instructions for Testing
 
@@ -76,3 +88,6 @@ Improve the chatbot's backend architecture and security before expanding fronten
   - Content-aware document chunking
   - Incremental document indexing
   - Scanned PDF OCR indexing
+  - Local dashboard service controls
+  - Local dashboard document management
+  - Remote dashboard operation lock

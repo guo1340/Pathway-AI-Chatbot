@@ -543,7 +543,12 @@ class RagPipeline:
             ]
 
             # Get current pages already retrieved
-            current_pages = [d.metadata.get("page") for d in docs if d.metadata.get("source") == src]
+            current_pages = [
+                page
+                for d in docs
+                if d.metadata.get("source") == src
+                and isinstance((page := d.metadata.get("page")), int)
+            ]
             if not current_pages:
                 continue
 
@@ -818,6 +823,6 @@ def _file_to_url(src: str) -> str:
     """
     base = os.path.basename(src)
     safe_base = quote(base, safe="#?()[]!$&',;=:@")  # allow useful URL chars
-    # api_base = os.getenv("API_BASE", "http://localhost:8000").rstrip("/")
-    api_base = os.getenv("API_BASE", "https://api.chat.pathway.training").rstrip("/")
+    api_base = os.getenv("API_BASE", "http://localhost:8000").rstrip("/")
+    # api_base = os.getenv("API_BASE", "https://api.chat.pathway.training").rstrip("/")
     return f"{api_base}/api/files/{safe_base}"

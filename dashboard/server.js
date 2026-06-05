@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { exec, spawn } = require('child_process');
+const { spawn } = require('child_process');
 const { Client } = require('ssh2');
 const https = require('https');
 const http  = require('http');
@@ -22,6 +22,12 @@ const SSH_USER = 'ubuntu';
 const REMOTE_DOCS = '/home/ubuntu/Pathway-AI-Chatbot/rag-backend/docs';
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const PROMPT_FILE = path.join(PROJECT_ROOT, 'rag-backend', 'prompt.txt');
+const BACKEND_ENV_FILE = path.join(PROJECT_ROOT, 'rag-backend', '.env');
+const LOCAL_DOCS = path.join(PROJECT_ROOT, 'rag-backend', 'docs');
+const LOCAL_BACKEND_URL = 'http://127.0.0.1:8000';
+const LOCAL_FRONTEND_URL = 'http://localhost:5173';
+const REMOTE_API_ENABLED = false;
+const LOCAL_JWT_SECRET = crypto.randomBytes(32).toString('hex');
 
 
 // ── Toggle file definitions ───────────────────────────────────────────────────
@@ -143,55 +149,70 @@ function findUv() {
 const UV_EXE = findUv();
 console.log(`uv → ${UV_EXE}`);
 
-let localProcs = [];
+const localProcs = { backend: null, frontend: null };
 let backendLogs = [];
 
-function startLocalServers() {
-  if (localProcs.length) return;
+function captureBackendOutput(data) {
+  const lines = data.toString().split('\n').map(l => l.trim()).filter(Boolean);
+  lines.forEach(l => {
+    console.log('[backend]', l);
+    backendLogs.push(l);
+  });
+  if (backendLogs.length > 200) backendLogs = backendLogs.slice(-200);
+}
+
+function startLocalBackend() {
+  if (localProcs.backend) return false;
   backendLogs = [];
 
-  // uv.exe can be spawned directly; npm.cmd needs cmd.exe to interpret it
-  const backend = spawn(UV_EXE, ['run', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '8000', '--no-reload'], {
+  const backend = spawn(UV_EXE, ['run', 'uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '8000'], {
     cwd: path.join(PROJECT_ROOT, 'rag-backend'),
     windowsHide: true,
-    env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+    env: {
+      ...process.env,
+      PYTHONIOENCODING: 'utf-8',
+      PATHWAY_RAG_JWT_SECRET: readEnvValue('PATHWAY_RAG_JWT_SECRET') || LOCAL_JWT_SECRET,
+    },
   });
 
+  backend.stdout?.on('data', captureBackendOutput);
+  backend.stderr?.on('data', captureBackendOutput);
+  backend.on('error', (err) => {
+    backendLogs.push(`[error] ${err.message}`);
+    console.error('[backend]', err.message);
+  });
+  backend.on('exit', (code) => {
+    backendLogs.push(`[exited with code ${code}]`);
+    localProcs.backend = null;
+  });
+  localProcs.backend = backend;
+  return true;
+}
+
+function startLocalFrontend() {
+  if (localProcs.frontend) return false;
   const frontend = spawn('cmd', ['/c', 'npm', 'run', 'dev'], {
     cwd: path.join(PROJECT_ROOT, 'webapp'),
     windowsHide: true,
   });
-
-  const capture = (data) => {
-    const lines = data.toString().split('\n').map(l => l.trim()).filter(Boolean);
-    lines.forEach(l => {
-      console.log('[backend]', l);
-      backendLogs.push(l);
-    });
-    if (backendLogs.length > 200) backendLogs = backendLogs.slice(-200);
-  };
-  backend.stdout?.on('data', capture);
-  backend.stderr?.on('data', capture);
-
-  // Must handle error events or Node.js will crash the whole dashboard server
-  backend.on('error',  (err) => { backendLogs.push(`[error] ${err.message}`); console.error('[backend]', err.message); });
-  frontend.on('error', (err) => { backendLogs.push(`[frontend error] ${err.message}`); console.error('[frontend]', err.message); });
-
-  localProcs = [backend, frontend];
-  backend.on('exit',  (code) => {
-    backendLogs.push(`[exited with code ${code}]`);
-    localProcs = localProcs.filter(p => p !== backend);
+  frontend.on('error', (err) => {
+    backendLogs.push(`[frontend error] ${err.message}`);
+    console.error('[frontend]', err.message);
   });
-  frontend.on('exit', () => { localProcs = localProcs.filter(p => p !== frontend); });
+  frontend.on('exit', () => { localProcs.frontend = null; });
+  localProcs.frontend = frontend;
+  return true;
 }
 
 function stopLocalServers() {
-  for (const proc of localProcs) {
+  for (const proc of Object.values(localProcs)) {
+    if (!proc) continue;
     try {
       spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { windowsHide: true });
     } catch {}
   }
-  localProcs = [];
+  localProcs.backend = null;
+  localProcs.frontend = null;
   backendLogs = [];
 }
 
@@ -210,6 +231,44 @@ function generateJWT(secret, caps = ['edit_posts'], ttlSeconds = 300) {
   })).toString('base64url');
   const sig = crypto.createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url');
   return `${header}.${payload}.${sig}`;
+}
+
+function readEnvValue(name) {
+  if (!fs.existsSync(BACKEND_ENV_FILE)) return process.env[name] || '';
+  const line = fs.readFileSync(BACKEND_ENV_FILE, 'utf8')
+    .split(/\r?\n/)
+    .find(entry => entry.trim().startsWith(`${name}=`));
+  if (!line) return process.env[name] || '';
+  return line.slice(line.indexOf('=') + 1).trim().replace(/^(['"])(.*)\1$/, '$2');
+}
+
+function localBackendToken() {
+  const secret = readEnvValue('PATHWAY_RAG_JWT_SECRET') || LOCAL_JWT_SECRET;
+  return generateJWT(secret);
+}
+
+async function callLocalBackend(route, options = {}) {
+  const headers = {
+    ...(options.headers || {}),
+    Authorization: `Bearer ${localBackendToken()}`,
+  };
+  const response = await fetch(`${LOCAL_BACKEND_URL}${route}`, { ...options, headers });
+  const text = await response.text();
+  let body = {};
+  try { body = text ? JSON.parse(text) : {}; } catch { body = { detail: text }; }
+  if (!response.ok) {
+    const error = new Error(body.detail || body.error || `Backend returned HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return body;
+}
+
+function remoteLocked(req, res, next) {
+  if (REMOTE_API_ENABLED) return next();
+  return res.status(423).json({
+    error: 'Remote server actions are locked until the updated backend is tested and approved for deployment.',
+  });
 }
 
 // ── Toggle helpers ────────────────────────────────────────────────────────────
@@ -242,15 +301,6 @@ function applyToggle(targetMode) {
 }
 
 // ── Git helper ────────────────────────────────────────────────────────────────
-function gitExec(command) {
-  return new Promise((resolve, reject) => {
-    exec(command, { cwd: PROJECT_ROOT }, (err, stdout, stderr) => {
-      if (err) reject(new Error(stderr || stdout || err.message));
-      else resolve((stdout + stderr).trim());
-    });
-  });
-}
-
 // ── Multer (temp file storage for uploads) ────────────────────────────────────
 const upload = multer({ dest: os.tmpdir() });
 
@@ -258,90 +308,116 @@ const upload = multer({ dest: os.tmpdir() });
 
 // Backend startup logs (for debugging local mode)
 app.get('/api/local-logs', (req, res) => {
-  res.json({ logs: backendLogs, running: localProcs.length > 0 });
+  res.json({
+    logs: backendLogs,
+    backendRunning: Boolean(localProcs.backend),
+    frontendRunning: Boolean(localProcs.frontend),
+  });
 });
 
 // Ping localhost:8000/api/health — returns {ready: bool}
-function checkLocalBackend() {
+function checkLocalUrl(url) {
   return new Promise((resolve) => {
-    const req = http.get('http://localhost:8000/api/health', { timeout: 2000 }, (res) => {
-      resolve(res.statusCode === 200);
+    const request = http.get(url, { timeout: 2000 }, (response) => {
+      resolve(response.statusCode >= 200 && response.statusCode < 500);
     });
-    req.on('error',   () => resolve(false));
-    req.on('timeout', () => { req.destroy(); resolve(false); });
+    request.on('error', () => resolve(false));
+    request.on('timeout', () => { request.destroy(); resolve(false); });
   });
 }
 
 app.get('/api/local-health', async (req, res) => {
-  if (!localProcs.length) return res.json({ ready: false, running: false });
-  const ready = await checkLocalBackend();
-  res.json({ ready, running: true });
+  const [backendReady, frontendReady] = await Promise.all([
+    checkLocalUrl(`${LOCAL_BACKEND_URL}/api/health`),
+    checkLocalUrl(LOCAL_FRONTEND_URL),
+  ]);
+  res.json({
+    backend: { ready: backendReady, launched: Boolean(localProcs.backend) },
+    frontend: { ready: frontendReady, launched: Boolean(localProcs.frontend) },
+  });
+});
+
+app.post('/api/local/start/backend', (req, res) => {
+  try {
+    const started = startLocalBackend();
+    res.json({ success: true, started, url: LOCAL_BACKEND_URL });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/local/start/frontend', (req, res) => {
+  try {
+    const started = startLocalFrontend();
+    res.json({ success: true, started, url: LOCAL_FRONTEND_URL });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Current mode (live vs local)
 app.get('/api/status', (req, res) => {
-  try {
-    res.json({ mode: detectMode() });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  res.json({ mode: 'local', remoteEnabled: REMOTE_API_ENABLED });
 });
 
 // Toggle mode + start/stop local servers automatically
-app.post('/api/toggle', (req, res) => {
-  try {
-    const current = detectMode();
-    const target = current === 'live' ? 'local' : 'live';
-    applyToggle(target);
-    if (target === 'local') startLocalServers();
-    else stopLocalServers();
-    res.json({ mode: target });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+app.post('/api/toggle', remoteLocked, (req, res) => {
+  res.json({ mode: detectMode() });
 });
 
-// Upload a document to the server via SFTP
+// Upload through the authenticated local backend API.
 app.post('/api/docs/upload', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file provided' });
   const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
   try {
-    await sftpUpload(req.file.path, originalName);
-    fs.unlink(req.file.path, () => {});
-    res.json({ success: true, filename: originalName });
+    const form = new FormData();
+    form.append('file', new Blob([fs.readFileSync(req.file.path)]), originalName);
+    const result = await callLocalBackend('/api/upload', {
+      method: 'POST',
+      body: form,
+    });
+    res.json({ success: true, ...result });
   } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  } finally {
     fs.unlink(req.file.path, () => {});
-    res.status(500).json({ error: e.message });
   }
 });
 
-// List documents on the server
-app.get('/api/docs', async (req, res) => {
+// List documents in the local backend docs folder.
+app.get('/api/docs', (req, res) => {
   try {
-    const output = await sshExec(`ls -la "${REMOTE_DOCS}"`);
-    const files = output.split('\n')
-      .filter(line => /^-/.test(line))
-      .map(line => {
-        const parts = line.split(/\s+/);
-        const name = parts.slice(8).join(' ');
-        const size = parseInt(parts[4]) || 0;
-        return { name, size };
+    fs.mkdirSync(LOCAL_DOCS, { recursive: true });
+    const files = fs.readdirSync(LOCAL_DOCS, { withFileTypes: true })
+      .filter(entry => entry.isFile())
+      .map(entry => {
+        const stat = fs.statSync(path.join(LOCAL_DOCS, entry.name));
+        return { name: entry.name, size: stat.size };
       })
-      .filter(f => f.name);
+      .sort((a, b) => a.name.localeCompare(b.name));
     res.json({ files });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// Delete a document from the server
+// Delete locally, then synchronize the backend index.
 app.delete('/api/docs/:filename', async (req, res) => {
   const filename = req.params.filename;
   if (filename.includes('/') || filename.includes('..') || filename.includes('\\')) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
   try {
-    await sshExec(`rm "${REMOTE_DOCS}/${filename}"`);
+    const filePath = path.join(LOCAL_DOCS, filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+    const original = fs.readFileSync(filePath);
+    fs.unlinkSync(filePath);
+    try {
+      await callLocalBackend('/api/reload', { method: 'POST' });
+    } catch (reloadError) {
+      fs.writeFileSync(filePath, original);
+      throw new Error(`Index reload failed; local file was restored. ${reloadError.message}`);
+    }
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -357,7 +433,7 @@ async function sshReload() {
 }
 
 // Restart pm2 backend on server + reload index via localhost (bypasses nginx)
-app.post('/api/server/restart', async (req, res) => {
+app.post('/api/server/restart', remoteLocked, async (req, res) => {
   try {
     await sshExec('pm2 restart rag-backend --update-env');
     await new Promise(r => setTimeout(r, 3000));
@@ -370,7 +446,7 @@ app.post('/api/server/restart', async (req, res) => {
 
 // Sync prompt to server: SFTP prompt.txt → restart only (no re-index needed,
 // prompt.txt is read fresh on every query)
-app.post('/api/server/sync-prompt', async (req, res) => {
+app.post('/api/server/sync-prompt', remoteLocked, async (req, res) => {
   try {
     await sftpUploadTo(
       PROMPT_FILE,
@@ -400,39 +476,6 @@ app.post('/api/prompt', (req, res) => {
   try {
     fs.writeFileSync(PROMPT_FILE, content, 'utf8');
     res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Git: pull
-app.post('/api/git/pull', async (req, res) => {
-  try {
-    const output = await gitExec('git pull');
-    res.json({ output });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Git: add + commit
-app.post('/api/git/commit', async (req, res) => {
-  const { message } = req.body;
-  if (!message || !message.trim()) return res.status(400).json({ error: 'Commit message is required' });
-  try {
-    await gitExec('git add .');
-    const output = await gitExec(`git commit -m ${JSON.stringify(message.trim())}`);
-    res.json({ output });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Git: push
-app.post('/api/git/push', async (req, res) => {
-  try {
-    const output = await gitExec('git push');
-    res.json({ output });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

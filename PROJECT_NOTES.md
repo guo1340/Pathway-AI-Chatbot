@@ -9,7 +9,7 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 - `webapp/`: Vite + React chat UI used standalone, embedded in WordPress, and hosted as the full-screen Ask AI iframe app.
 - `rag-backend/`: FastAPI RAG API using LangChain, Chroma, and either OpenAI or Ollama.
 - `plugin/`: WordPress plugin that injects the chat widget site-wide or via `[rag_chatbot]`.
-- `dashboard/`: Local Express dashboard for operational tasks: live/local mode toggling, local server start/stop, remote document upload/deletion, prompt editing/sync, backend restart, and git actions.
+- `dashboard/`: Local Express dashboard for launching the backend/frontend, local document management, local prompt editing, service monitoring, and git actions. Remote operations remain present but are locked until deployment testing is complete.
 
 ## Current Git/Workspace Notes
 
@@ -53,7 +53,9 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 - Scanned PDF OCR defaults to `auto`: it uses Tesseract when available and otherwise falls back to the locked RapidOCR ONNX engine.
 - OCR settings are included in PDF index metadata, so existing PDFs are reprocessed once after this feature is deployed and again whenever OCR settings change.
 - `POST /api/reload` synchronizes the vector index and requires JWT auth in `main.py`.
-- Dashboard server has its own remote upload flow through SSH/SFTP to the live EC2 docs folder, then can restart/reload the remote backend.
+- Dashboard local uploads are proxied to authenticated `POST /api/upload`, and local deletions call authenticated `POST /api/reload`.
+- When the backend `.env` has no JWT secret, the dashboard creates an in-memory local secret and passes it only to the backend process it launches.
+- Coworker-specific SSH paths remain unchanged for future deployment work, but all remote routes are currently locked.
 
 ## Important Files
 
@@ -128,12 +130,12 @@ Backend:
 
 Dashboard:
 
-- `GET /api/status`, `POST /api/toggle`: detect/toggle live/local mode.
-- `GET /api/local-health`, `GET /api/local-logs`: local backend status/logs.
-- `GET /api/docs`, `POST /api/docs/upload`, `DELETE /api/docs/:filename`: remote server docs operations.
-- `GET /api/prompt`, `POST /api/prompt`, `POST /api/server/sync-prompt`: prompt editing/sync.
-- `POST /api/server/restart`: remote PM2 backend restart and reload.
-- `POST /api/git/pull`, `POST /api/git/commit`, `POST /api/git/push`: git workflow from dashboard.
+- `GET /api/status`: reports local-only mode and whether remote operations are enabled.
+- `POST /api/local/start/backend`, `POST /api/local/start/frontend`: launch local services independently.
+- `GET /api/local-health`, `GET /api/local-logs`: local backend/frontend status and backend logs.
+- `GET /api/docs`, `POST /api/docs/upload`, `DELETE /api/docs/:filename`: local document operations using backend authentication for indexing.
+- `GET /api/prompt`, `POST /api/prompt`: local prompt editing.
+- `POST /api/toggle`, `POST /api/server/sync-prompt`, `POST /api/server/restart`: return HTTP 423 while remote deployment is locked.
 
 ## Live vs Local Mode
 
@@ -151,19 +153,20 @@ Live defaults found during scan:
 - Remote docs path in dashboard: `/home/ubuntu/Pathway-AI-Chatbot/rag-backend/docs`
 - Remote backend process managed by PM2 name `rag-backend`
 
-Be careful editing these live/local strings because `dashboard/server.js` depends on exact text matches.
+The old exact-string live/local toggle definitions remain for future deployment work, but the dashboard no longer invokes them while remote mode is locked.
 
 ## Backend/RAG Behavior Notes
 
 - `RagPipeline.from_disk()` builds Chroma if missing/empty; otherwise opens persisted index.
 - Supported source files: `.md`, `.txt`, `.html`, `.pdf`.
-- Text PDFs are read directly; image-only scanned PDF pages are rendered with PyMuPDF and recognized with Tesseract.
+- Text PDFs are read directly; image-only scanned PDF pages are rendered with PyMuPDF and recognized with Tesseract or the locked RapidOCR fallback.
 - OCR is configurable with `PDF_OCR_ENABLED`, `PDF_OCR_ENGINE`, `PDF_OCR_MIN_TEXT_CHARS`, `PDF_OCR_DPI`, `PDF_OCR_LANGUAGE`, and optional `TESSERACT_CMD`.
 - Chunking is content-aware and configurable with `CHUNK_MIN_SIZE`, `CHUNK_MAX_SIZE`, and `CHUNK_OVERLAP`; legacy `CHUNK_SIZE` remains the maximum-size fallback.
 - Changing chunk-size settings causes affected files to be re-indexed even when their contents are unchanged.
 - `LLM_PROVIDER=openai` by default; Ollama support exists.
 - OpenAI defaults: `gpt-4o-mini`, `text-embedding-3-small`.
-- Citation URLs are converted to `/api/files/{filename}` and page fragments are preserved where possible.
+- Citation URLs use `API_BASE` and default to `http://localhost:8000/api/files/{filename}` for the current local-only dashboard; page fragments are preserved where possible.
+- Adjacent-page expansion skips documents such as `.txt`, `.md`, and `.html` files when they do not have numeric page metadata.
 - `prompt.txt` is loaded fresh inside `RagPipeline.answer()` for each query.
 - The backend conversation store is in-memory only and is not durable.
 - `App.tsx` also persists visible chat history in `sessionStorage`.
@@ -188,8 +191,11 @@ Be careful editing these live/local strings because `dashboard/server.js` depend
 - `App.tsx` duplicates API helper logic instead of using `webapp/src/api.ts`.
 - `dashboard/server.js` has hard-coded SSH host, user, PEM path, remote paths, and exact text toggle patterns.
 - Dashboard git commands may fail unless Git safe-directory ownership is configured for the current user.
-- Dashboard delete route uses remote `rm`; it validates filename against slashes and `..`, but any destructive dashboard changes need extra caution.
-- `/api/reload` requires JWT auth in backend, but dashboard comments say remote localhost reload bypasses auth. Confirm production behavior before relying on it.
+- Dashboard local deletion removes the local file and calls authenticated backend `/api/reload`; remote deletion remains locked.
+- If local deletion cannot reload the backend index, the dashboard restores the original source file.
+- Uploads accept `.txt`, `.md`, `.html`, and `.pdf`; unsupported types return HTTP 400.
+- Uploads use a temporary file and atomic replacement so oversized same-name uploads preserve the existing document.
+- `/api/upload` and `/api/reload` require JWT auth, and the local dashboard generates a short-lived token using the configured secret or its process-local fallback.
 - Real `.env`, vector store, docs, node_modules, and generated files exist locally; avoid committing secrets or generated state.
 
 ## Verification Guidance
