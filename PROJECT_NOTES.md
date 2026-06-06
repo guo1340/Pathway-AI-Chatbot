@@ -197,6 +197,27 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - Uploads use a temporary file and atomic replacement so oversized same-name uploads preserve the existing document.
 - `/api/upload` and `/api/reload` require JWT auth, and the local dashboard generates a short-lived token using the configured secret or its process-local fallback.
 - Real `.env`, vector store, docs, node_modules, and generated files exist locally; avoid committing secrets or generated state.
+- Production EC2 is deployed from branch `Sal` at commit `f60e63f`, which includes indexing/OCR commit `4a82300`.
+- Production PM2 runs `rag-backend/.venv-release-test/bin/python` with Uvicorn on port 8000.
+- Production `.env` must define `API_BASE=https://api.chat.pathway.training` so citation links remain public.
+- The production root filesystem is only 6.8 GB. After cleanup it had about 1.1 GB free, so storage expansion remains urgent.
+- Existing malformed PDFs can emit `Ignoring wrong pointing object` warnings during parsing; release testing confirmed these warnings do not prevent indexing.
+- The rollback snapshot is under `/home/ubuntu/pathway-backups/20260606-063636`, and the pre-release Git rollback commit is `092f05c`.
+- A byte-identical local copy is stored under the Git-ignored `local-backups/ec2/20260606-063636` directory. All 90 files were SHA-256 verified on 2026-06-06.
+
+## Production Release Status
+
+The backend release was validated and deployed on 2026-06-06.
+
+- Copied-production staging migration passed.
+- First migration took approximately 60 seconds.
+- Unchanged reloads complete in approximately 0.64 seconds.
+- Native PDF ingestion and RapidOCR scanned-PDF ingestion passed.
+- Same-name file replacement removed stale indexed content.
+- Realistic document retrieval returned the correct answer and citation.
+- JWT rejection and authorization behavior passed.
+- Production and public HTTPS health checks returned HTTP 200.
+- Production Chroma was approximately 189 MB after migration.
 
 ## Verification Guidance
 

@@ -187,3 +187,78 @@ Release checks:
 - [x] Dashboard JavaScript parsing passes.
 - [x] Vite production build passes.
 - [x] `git diff --check` passes.
+
+## 2026-06-06 16:56:46 +08:00 - EC2 Release Verification
+
+Environment:
+
+- Branch: `Sal`
+- Release commit: `f60e63f`
+- Included indexing/OCR commit: `4a82300`
+- Rollback commit: `092f05c`
+- Python: 3.12.3
+- Staging API: `127.0.0.1:8001`
+- Production API: `127.0.0.1:8000`
+- Public API: `https://api.chat.pathway.training`
+
+Backup and installation:
+
+- [x] Production documents were backed up.
+- [x] Production Chroma store was backed up.
+- [x] Production `.env`, prompt, rollback commit, and PM2 configuration were preserved.
+- [x] `uv sync --frozen` installed all locked dependencies.
+- [x] PyMuPDF, pytesseract, RapidOCR, ONNX Runtime, and Chroma imported successfully.
+- [x] `main.py` and `rag.py` compiled successfully.
+
+Staging results:
+
+- [x] Health endpoint returned HTTP 200.
+- [x] Missing JWT returned HTTP 401.
+- [x] Invalid JWT returned HTTP 401.
+- [x] Valid JWT authorized reload and upload operations.
+- [x] First copied-index migration returned HTTP 200 in approximately 60.4 seconds.
+- [x] Second unchanged reload returned HTTP 200 in approximately 0.64 seconds.
+- [x] Public chat returned relevant document-backed answers.
+- [x] Authenticated ask returned relevant answers and citations.
+- [x] Citation URLs used `https://api.chat.pathway.training/api/files/`.
+- [x] Native PDF upload stored the exact selectable text in Chroma.
+- [x] Scanned PDF upload stored OCR text with RapidOCR metadata.
+- [x] Same-name document replacement retained only the new content.
+- [x] Unsupported `.exe` upload returned HTTP 400.
+- [x] No partial `.upload-*.tmp` files remained.
+- [x] A realistic mentoring-policy question returned the expected answer and source citation.
+- [x] Disposable staging documents and index entries were removed.
+
+Retrieval note:
+
+- Artificial phrases such as `silver harbor 4821` were confirmed in Chroma but did not always rank in the chatbot's default top results among the larger document corpus.
+- Direct index inspection proved native and OCR ingestion, while the realistic ministry-policy test proved the complete retrieval and answer flow.
+
+Production results:
+
+- [x] PM2 uses `.venv-release-test/bin/python`.
+- [x] PM2 status remained online after cutover.
+- [x] Production authenticated reload returned HTTP 200.
+- [x] Production unchanged reload completed in approximately 0.64 seconds.
+- [x] Public HTTPS health returned HTTP 200.
+- [x] Production Chroma remained available at approximately 189 MB.
+- [x] PM2 logs showed no startup, import, authentication, Chroma, OpenAI, or OCR failures.
+
+Infrastructure observation:
+
+- [x] Disk usage was investigated after release.
+- The root filesystem is 6.8 GB and remains undersized for production growth.
+- The active release environment is approximately 721 MB.
+- VS Code Server is approximately 844 MB.
+- Production Chroma and documents total approximately 249 MB.
+- The retained rollback backup is approximately 232 MB.
+
+Local backup verification:
+
+- [x] EC2 release backup downloaded to a Git-ignored local directory.
+- [x] Remote file count: 90.
+- [x] Local file count: 90.
+- [x] Missing files: 0.
+- [x] Extra files: 0.
+- [x] SHA-256 mismatches: 0.
+- [x] Raw EC2 test transcript preserved locally.

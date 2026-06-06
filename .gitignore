@@ -38,6 +38,7 @@ rag-backend/docs/**/*.md
 
 # Logs
 *.log
+rag-backend/test-log.txt
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -48,6 +49,7 @@ coverage/
 .dist/
 .tmp/
 .sass-cache/
+local-backups/
 
 # Lock files (optional keep uv.lock if desired)
 package-lock.json

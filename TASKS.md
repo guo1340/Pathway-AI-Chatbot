@@ -58,6 +58,9 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Locked remote dashboard actions until backend deployment testing is complete.
 - [x] Fixed local text-document retrieval and local citation URLs found during the full dashboard regression run.
 - [x] Hardened dashboard upload/delete failure handling and removed the Version Control section.
+- [x] Validated the `Sal` backend against a copied production index and deployed it through PM2 on EC2.
+- [x] Verified production incremental reload, scanned PDF OCR, JWT protection, chat retrieval, and public HTTPS health.
+- [x] Downloaded and SHA-256 verified the EC2 release backup and raw test records locally.
 
 ## Notes for Codex
 
@@ -79,6 +82,8 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-05 22:45:59 +08:00 - Locked remote dashboard operations with an explanatory dismissible dialog.
 - 2026-06-05 23:29:17 +08:00 - Ran every LOG.md procedure; fixed local model, text retrieval, and citation issues; all reruns passed.
 - 2026-06-06 00:21:45 +08:00 - Completed dashboard edge tests, fixed failures, and removed dashboard Git controls.
+- 2026-06-06 16:56:46 +08:00 - Completed EC2 staging validation, production PM2 cutover, smoke tests, and disk-usage investigation.
+- 2026-06-06 16:56:46 +08:00 - Stored and verified the production rollback backup and raw test transcript locally.
 
 ## Steps and Instructions for Testing
 

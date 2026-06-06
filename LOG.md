@@ -583,3 +583,56 @@ Expected result:
 - Use test documents for delete and update cases.
 - Do not expose `.env`, API keys, JWT secrets, or document contents in logs or commits.
 - Run production migration during a low-traffic period because the first reload performs one full legacy re-index.
+
+### 2026-06-06 16:56:46 +08:00 - EC2 Staging Validation and Production Release
+
+Validated the `Sal` backend release on EC2 and moved the production PM2 process to the tested Python 3.12 environment.
+
+Release preparation:
+
+- Confirmed EC2 was on `Sal` commit `f60e63f`, which includes indexing/OCR commit `4a82300`.
+- Recorded rollback commit `092f05c`.
+- Backed up the production Chroma store, documents, environment file, prompt, and PM2 configuration.
+- Added production `API_BASE=https://api.chat.pathway.training` so citations do not point to localhost.
+- Installed the locked dependencies into an isolated `.venv-release-test` environment.
+- Copied production documents and Chroma data into `/tmp/pathway-release-test` for staging tests.
+
+Staging verification:
+
+- Health returned HTTP 200 on port 8001.
+- Missing and invalid JWTs were rejected with HTTP 401.
+- The first copied-index migration returned HTTP 200 in about 60 seconds.
+- A second unchanged reload returned HTTP 200 in about 0.64 seconds.
+- Public and authenticated chat endpoints returned relevant answers.
+- Citation URLs used the public HTTPS API.
+- Native PDF text was present in Chroma with correct source metadata.
+- Image-only PDF text was recognized by RapidOCR and stored with `ocr: true` and `ocr_engine: rapidocr`.
+- Updating a same-name text document replaced the old indexed phrase without retaining stale content.
+- Unsupported file uploads returned HTTP 400.
+- A realistic ministry-policy document was retrieved correctly and cited by the chatbot.
+- Staging files and temporary upload files were removed after testing.
+
+Production cutover:
+
+- Stopped the old Python environment and started PM2 with `.venv-release-test`.
+- Saved the updated PM2 process definition.
+- Production authenticated reload returned HTTP 200.
+- The following unchanged reload completed in about 0.64 seconds.
+- Public `https://api.chat.pathway.training/api/health` returned HTTP 200.
+- Production Chroma stabilized at about 189 MB.
+
+Operational findings:
+
+- Existing malformed PDFs emit `Ignoring wrong pointing object` warnings, but indexing completes successfully.
+- The 6.8 GB root filesystem was the main release risk.
+- Removed the unused 424 MB Python environment, APT cache, and disabled Snap revisions.
+- Remaining major storage consumers include the active 721 MB Python environment, 844 MB VS Code Server, production data, rollback backup, and the Ubuntu operating system.
+- Expanding the root volume and reviewing the EC2 instance/support-plan costs remain recommended.
+
+### 2026-06-06 16:56:46 +08:00 - Local Release Backup
+
+- Downloaded the EC2 release backup to the Git-ignored `local-backups/ec2/20260606-063636` directory.
+- Preserved the raw release terminal transcript under `local-backups/tests`.
+- Verified all 90 downloaded files against EC2 using SHA-256.
+- Verified size: 242,201,761 bytes (230.98 MiB).
+- Added `local-backups/` to `.gitignore` because the archive contains the production `.env`, proprietary documents, and Chroma data.
