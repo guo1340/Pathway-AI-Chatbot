@@ -636,3 +636,377 @@ Operational findings:
 - Verified all 90 downloaded files against EC2 using SHA-256.
 - Verified size: 242,201,761 bytes (230.98 MiB).
 - Added `local-backups/` to `.gitignore` because the archive contains the production `.env`, proprietary documents, and Chroma data.
+
+### 2026-06-06 22:59:03 +08:00 - Priority 2 Backend Security
+
+- Added a dedicated dashboard JWT capability requirement to document upload and index reload.
+- Added configurable query-length validation and process-local per-client rate limiting for chat endpoints.
+- Protected document downloads with bearer-token or authenticated citation-query access.
+- Moved dashboard deployment host details to local environment configuration and kept process environment values authoritative.
+- Added configuration validation and documented trusted-proxy handling without adding dependencies.
+- Preserved all previously completed checks in `TEST_LOG.md` and added the new security verification cases as unchecked.
+- Left the production ESM Apps update task open and documented its compatibility, rollback, maintenance, and post-update verification checklist.
+
+Testing status:
+
+- Static syntax and diff checks are run as part of this change.
+- New behavioral security tests are intentionally pending in `TEST_LOG.md` for the next dedicated test session.
+
+### 2026-06-06 23:27:53 +08:00 - Priority 2 Backend Security Test Run
+
+Added reusable isolated test harnesses:
+
+- `rag-backend/tests/test_backend_security.py` replaces the RAG pipeline with a stub and uses a temporary document directory.
+- `dashboard/security.test.js` evaluates dashboard configuration in temporary directories without starting the dashboard listener.
+- `dashboard/package.json` now provides `npm run test:security`.
+
+Backend command:
+
+```powershell
+$env:UV_CACHE_DIR='E:\Pathway\AI Chat\Pathway-AI-Chatbot\.uv-cache'
+$env:UV_PROJECT_ENVIRONMENT='E:\Pathway\AI Chat\Pathway-AI-Chatbot\.uv-security-env'
+uv run --project rag-backend --python 'E:\Pathway\AI Chat\Pathway-AI-Chatbot\.uv-python\cpython-3.12.11-windows-x86_64-none\python.exe' python -m unittest discover -s rag-backend/tests -p 'test_backend_security.py' -v
+```
+
+Backend result:
+
+- 6 test groups passed in 4.573 seconds on the final rerun.
+- Dashboard-only upload/reload authorization passed.
+- Normal WordPress authorization remained valid for `/api/ask` and invalid for index mutation.
+- Query boundary, oversized-query rejection, and invalid startup configuration tests passed.
+- Rate-limit allowance, HTTP 429, `Retry-After`, expiry, disable switch, client separation, and trusted-proxy behavior passed.
+- Protected file bearer/query-token access, expired/insufficient token rejection, and traversal rejection passed.
+
+Dashboard command:
+
+```powershell
+cd dashboard
+npm.cmd run test:security
+```
+
+Dashboard result:
+
+- 5 checks passed.
+- The committed server source contains no public EC2 hostname.
+- Local `.env` loading and process-environment precedence passed.
+- Missing host configuration returned a clear error.
+- Generated dashboard tokens contained both configured capabilities.
+
+Test environment note:
+
+- The existing `rag-backend/.venv` referenced a missing uv-managed Python installation.
+- Python 3.12.11 was installed under the Git-ignored workspace `.uv-python` directory and a Git-ignored `.uv-security-env` was used for the test run.
+- No proprietary documents, Chroma data, OpenAI calls, or production services were used.
+- No application-code fix was needed because all behavioral checks passed.
+- Production ESM Apps updates remain unchecked because they require advisory review, live-server access, a maintenance window, rollback confirmation, and explicit approval.
+
+### 2026-06-07 10:50:38 +08:00 - Final Local Security Release Gate
+
+Reran the current local release checks before moving to public HTTPS deployment testing.
+
+Results:
+
+- All 6 backend security test groups passed in 4.850 seconds.
+- All 5 dashboard security configuration checks passed.
+- Python and dashboard JavaScript syntax checks passed.
+- The frontend TypeScript/Vite production build passed.
+- `git diff --check` passed.
+- Confirmed by source review that authenticated citation links preserve PDF page fragments and that active local dashboard document changes use authenticated backend calls.
+- No application-code changes were required.
+
+Online-only follow-up:
+
+1. Test an authenticated WordPress citation through public HTTPS and confirm the PDF opens at the cited page.
+2. Confirm the product decision for public-chat citations, which cannot open protected files without a token.
+3. Test client rate-limit buckets through Nginx and verify whether `CHAT_TRUST_PROXY` should remain disabled.
+4. Confirm PM2 uses one backend process because rate-limit state is process-local.
+5. Verify approved and unapproved CORS origins.
+6. Repeat health, authentication, reload, query limit, rate limit, file access, chat, and citation smoke tests over the public API.
+7. Keep legacy remote dashboard controls locked until their SSH reload path is replaced or authenticated.
+
+Expected result:
+
+- Public HTTPS matches the locally verified security behavior.
+- Nginx supplies trustworthy client identity without exposing port 8000 directly.
+- Protected citations work for authenticated WordPress users.
+- Disabled legacy dashboard deployment routes remain unreachable.
+
+### 2026-06-07 10:57:33 +08:00 - Pre-EC2 Unchecked Test Run
+
+Ran every remaining release check that can be reproduced without EC2, Nginx, PM2, or the live WordPress authentication plugin.
+
+Completed:
+
+- Added production-origin CORS allow/reject coverage.
+- Added public and authenticated citation-access coverage.
+- Added inline PDF and `#page=N` citation coverage.
+- Added a dashboard remote-lock check proving HTTP 423 is returned before protected action logic runs.
+- Confirmed WordPress Ask AI PHP syntax and iframe token wiring.
+- Reran the frontend build and all Python, JavaScript, and PHP syntax checks.
+
+Failure and fix:
+
+- The new citation test found that `file://...pdf#page=N` could encode the page fragment into the filename and return HTTP 404.
+- Updated backend citation normalization to split the fragment before quoting the filename, then append it to the normalized URL.
+- The final backend suite passed all 7 groups in 4.306 seconds.
+- The dashboard suite passed all 6 checks.
+
+Remaining EC2-only tests:
+
+1. Verify Nginx forwarding behavior and confirm port 8000 is not publicly reachable.
+2. Confirm the PM2 backend process count and runtime command.
+3. Verify the deployed WordPress plugin mints a JWT accepted by `/api/ask`.
+4. Open a protected PDF citation through the deployed WordPress page.
+5. Verify production CORS and all public HTTPS smoke tests.
+6. Confirm the deployed backend rejects tokenless chat requests; public chat access was disabled locally on 2026-06-07.
+
+Expected result:
+
+- The deployment reproduces the locally verified authorization, CORS, rate-limit, and citation behavior.
+- The authenticated PDF opens at the cited page.
+- Public chat behavior matches the chosen access policy.
+
+### 2026-06-07 11:21:57 +08:00 - Backend WordPress Authentication Boundary
+
+Required the normal WordPress JWT capability on `/api/chat` in addition to `/api/ask`.
+
+Security behavior:
+
+- Missing or malformed tokens return HTTP 401.
+- Valid tokens without `JWT_REQUIRED_CAP` return HTTP 403.
+- Rejected requests do not reach retrieval or the LLM.
+- Valid WordPress tokens continue to receive answers and authenticated citations.
+
+Verification:
+
+- All 8 backend security test groups passed in 4.890 seconds.
+- Query length, rate limiting, CORS, PDF citations, file protection, dashboard authorization, and invalid configuration checks remained green.
+- Frontend production build passed.
+- Python and PHP syntax checks passed.
+- `git diff --check` passed.
+
+Follow-up tasks:
+
+- Add the user-facing redirect from the hosted frontend to the Pathway login/access page.
+- Add persistent daily per-user limits after the WordPress JWT supplies a stable user identifier.
+
+Expected result:
+
+- Navigating directly to `chat.pathway.training` without a valid WordPress JWT may load the UI temporarily, but no backend answer can be generated.
+- Bypassing or modifying frontend code does not bypass backend authentication.
+
+### 2026-06-07 12:25:42 +08:00 - Single Chat Endpoint and Token Ceilings
+
+Consolidated chatbot traffic onto authenticated `/api/ask` and removed `/api/chat`.
+
+Backend changes:
+
+- Added `CHAT_INPUT_TOKEN_LIMIT` with a default of 2,000 estimated tokens.
+- Estimated the current question plus the six recent messages before retrieval.
+- Returned HTTP 422 without calling RAG when the estimate exceeds the limit.
+- Added `LLM_MAX_OUTPUT_TOKENS` with a default of 1,200.
+- Passed the response ceiling to OpenAI and Ollama using their supported settings.
+
+Frontend changes:
+
+- Removed the tokenless `/api/chat` fallback.
+- Always sends a WordPress bearer JWT to `/api/ask`.
+- Displays the estimated input size and maximum response budget.
+- Disables Send when there is no token or the estimated input is over the limit.
+- Added matching optional Vite environment settings.
+
+Testing:
+
+- All 9 backend security groups passed in 5.591 seconds on the final rerun.
+- All 6 dashboard security checks passed.
+- OpenAI and Ollama constructors retained the configured 1,200-token output cap.
+- Frontend production build passed.
+- Python compilation and `git diff --check` passed.
+- The first backend run exposed an indentation error in the edited limiter block; it was corrected before the final passing run.
+- Automated visual inspection was unavailable because the in-app browser could not start; the local preview remains available at `http://127.0.0.1:5173/`.
+
+Remaining daily-limit work:
+
+1. Confirm which stable user identifier the deployed WordPress JWT includes.
+2. Choose durable shared quota storage.
+3. Record actual or conservatively estimated usage by user and UTC day.
+4. Reject requests before model execution when the remaining daily budget is insufficient.
+
+Expected result:
+
+- Only authenticated `/api/ask` requests reach RAG.
+- Browser estimation provides immediate feedback, while backend enforcement cannot be bypassed.
+- Model output is bounded even when a valid request produces a long answer.
+
+### 2026-06-07 12:54:33 +08:00 - Remaining User Token Response
+
+Added process-local daily token accounting to `/api/ask` and included `remaining_tokens` in every successful answer.
+
+Behavior:
+
+- Identifies users from configurable JWT claims, defaulting to `sub`, `user_id`, then `id`.
+- Reserves estimated input plus maximum output before model execution.
+- Rejects insufficient balances with HTTP 429 before retrieval or LLM work.
+- Settles the reservation using estimated user-visible input and returned-answer tokens.
+- Keeps separate balances per user and UTC date.
+- Releases reservations when model execution or later response processing fails.
+
+Configuration:
+
+```env
+CHAT_DAILY_TOKEN_LIMIT=100000
+JWT_USER_ID_CLAIMS=sub,user_id,id
+```
+
+Testing:
+
+- All 11 backend test groups passed in 8.646 seconds on the final rerun.
+- All 6 dashboard security checks passed.
+- Tests covered balance decrement, user isolation, missing identity, exhausted balance, failed-request rollback, UTC reset, and invalid configuration.
+- Frontend production build passed after stopping the active Vite preview process.
+- Syntax and diff checks passed.
+
+Important limitation:
+
+- The balance tracks estimated user-visible question/history and answer tokens.
+- It is not exact provider billing usage because hidden prompt and retrieved-context tokens are not currently reported through the pipeline contract.
+- Storage remains process-local, so balances reset on restart and are not shared across workers.
+
+Frontend follow-up:
+
+- Display `remaining_tokens` after successful answers.
+- Handle quota-exhausted HTTP 429 responses with a clear user-facing state.
+
+Expected result:
+
+- Each successful `/api/ask` response exposes the user's remaining daily balance.
+- Requests that cannot fit within the remaining budget never reach RAG or the model.
+
+### 2026-06-07 13:12:05 +08:00 - Durable Quota and npm Security Completion
+
+Completed the remaining repository-side Priority 2 backend security work.
+
+Durable quota storage:
+
+- Replaced process-local quota state with SQLite at `TOKEN_USAGE_DB`.
+- Enabled WAL mode and atomic immediate transactions.
+- Preserved balances across backend restarts and shared them across workers on the same server.
+- Stored HMAC-derived user keys instead of raw WordPress identifiers.
+- Added automatic cleanup for rows older than seven days.
+- Ignored the generated `rag-backend/data` directory.
+
+Concurrency and persistence tests:
+
+- Reinitialized the database and confirmed the previous balance remained.
+- Ran three concurrent reservations against a six-token balance.
+- Exactly two reservations succeeded and one received HTTP 429.
+- Confirmed the stored total never exceeded the configured limit.
+
+Webapp npm dependency security:
+
+- Reproduced advisories affecting Vite, Rollup, Picomatch, and PostCSS.
+- Applied npm's non-breaking security fixes.
+- Locked Vite 6.4.3, Rollup 4.61.1, Picomatch 4.0.4, and PostCSS 8.5.15.
+- Allowed only `webapp/package-lock.json` through the repository lockfile ignore rule.
+- Final npm audits reported zero vulnerabilities for webapp, dashboard, and backend Node packages.
+
+Verification:
+
+- All 12 backend security groups passed in 9.955 seconds.
+- All 6 dashboard checks passed.
+- Vite 6.4.3 production build passed.
+- Python, JavaScript, PHP, and diff checks passed.
+
+Remaining EC2 procedure:
+
+1. Back up the current release and confirm disk space.
+2. Pull the reviewed commit.
+3. Identify, simulate, and apply the three Ubuntu ESM Apps package updates.
+4. Run `npm ci` in `webapp` when deploying the frontend lockfile.
+5. Confirm the installed package versions and zero-vulnerability npm audit.
+6. Verify the WordPress JWT identity claim and SQLite quota persistence.
+7. Run staging and public HTTPS smoke tests before production cutover.
+
+Expected result:
+
+- Priority 2 repository changes are complete.
+- The only remaining Priority 2 checkbox is the three Ubuntu ESM Apps updates and release verification on EC2.
+
+### 2026-06-07 13:28:47 +08:00 - Server-Side Conversation Continuity
+
+Completed the Priority 4 backend conversation-context task.
+
+Changes:
+
+- Keyed process-local conversation state by the HMAC-derived authenticated user key and conversation ID.
+- Added the latest prior user message as an explicit active topic for follow-up prompts.
+- Reused recent successful server turns when frontend history is missing.
+- Kept frontend-provided history as the preferred context when available.
+- Counted the complete contextual prompt against input and daily token limits.
+- Stored only successful turns and bounded both messages per conversation and total conversations.
+- Added `CHAT_SERVER_HISTORY_MESSAGES` and `CHAT_MAX_SERVER_CONVERSATIONS`.
+
+Verification performed:
+
+- Backend syntax compilation passed.
+- All 13 backend regression groups passed in 11.812 seconds on the final rerun.
+- A same-user vague follow-up received its prior topic and assistant response.
+- A different authenticated user could not read context by reusing the same conversation ID.
+- Message trimming and oldest-conversation eviction passed.
+- Invalid context-limit configuration failed startup.
+
+### 2026-06-07 13:28:47 +08:00 - Production Storage Capacity Plan
+
+Completed the Priority 4 backend storage assessment and planning task.
+
+Decision:
+
+- Deleting normal source documents or the active Chroma index would remove required production data and is not a sustainable capacity strategy.
+- Repeated cleanup of test environments, package caches, and old backups is useful maintenance but cannot absorb long-term document/index growth.
+- The simplest immediate option is expanding the root EBS volume to at least 20 GB.
+- The preferred isolation option is attaching a dedicated expandable EBS data volume and configuring `DOCS_DIR`, `CHROMA_DIR`, and optionally `TOKEN_USAGE_DB` to use it.
+- S3 source storage plus a managed vector database remains a future scaling option, not a small pre-release change.
+
+Verification before deployment:
+
+1. Run `df -h /` and `df -i /`.
+2. Run `du -sh ~/Pathway-AI-Chatbot/rag-backend/docs ~/Pathway-AI-Chatbot/rag-backend/chroma_store ~/Pathway-AI-Chatbot/rag-backend/data 2>/dev/null`.
+3. If expanding the root volume, confirm the new device and filesystem size with `lsblk` and `df -h /`.
+4. If attaching a data volume, confirm it is mounted persistently, update the three paths in `.env`, restart staging, and verify health, ask, upload, reload, and quota persistence.
+
+Optimal result:
+
+- The production filesystem has at least 20% free space and at least 2 GB immediately available before indexing more documents.
+- `docs`, `chroma_store`, and the quota database remain readable and writable after a restart.
+- Uploading and reloading a test document increases only the expected data paths and does not fill the root filesystem.
+
+### 2026-06-07 13:42:14 +08:00 - Final Local Pre-Push Release Gate
+
+Ran the complete locally available release gate before committing the accumulated `Sal` changes.
+
+Failed-first result and fix:
+
+- The Vite production compilation succeeded, but `npm run build` returned a failure on Windows because the package script used the Unix-only `cp` command.
+- Replaced the copy command with `webapp/scripts/copy-plugin-dist.mjs`, using only Node built-in filesystem APIs.
+- The build now compiles the webapp and copies generated files into `plugin/dist` on Windows and Linux without adding a dependency.
+
+Final verification:
+
+- All 13 backend regression groups passed.
+- All 6 dashboard security checks passed.
+- The Vite 6.4.3 production build and plugin asset copy passed.
+- Webapp, dashboard, and backend Node dependency audits each reported zero vulnerabilities.
+- Backend Python and dashboard JavaScript syntax checks passed.
+- WordPress plugin and Ask AI page PHP syntax checks passed.
+- `git diff --check` passed.
+
+Remaining production-only work:
+
+- Expand or attach EC2 storage before substantial document growth.
+- Apply and verify the three reviewed Ubuntu ESM Apps updates.
+- Run the documented EC2 staging, WordPress JWT, Nginx, PM2, quota-persistence, and public HTTPS smoke tests.
+
+Optimal result:
+
+- The reviewed commit can be pushed to `Sal` with no remaining locally executable test failures.
+- Only infrastructure and live integration checks remain for deployment.

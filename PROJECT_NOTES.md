@@ -33,16 +33,17 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 
 ### Public Chat
 
-1. React UI sends unauthenticated requests to `POST /api/chat`.
-2. Backend stores simple in-memory conversation turns in `CONV`.
-3. `RagPipeline.answer()` retrieves context from Chroma, invokes the LLM, prepares citations, and returns `{ answer, citations, conversation_id }`.
+1. React UI sends all chatbot requests to authenticated `POST /api/ask`.
+2. Backend loads bounded process-local context keyed by both the authenticated user and conversation ID, then includes the prior active topic and recent turns in follow-up prompts.
+3. `RagPipeline.answer()` retrieves context from Chroma, invokes the LLM, prepares citations, and returns `{ answer, citations, conversation_id, remaining_tokens }`.
 
 ### Authenticated Ask AI
 
 1. WordPress page template `webapp/page-ask-ai.php` requires a logged-in user with `edit_posts`.
 2. It calls `pathway_rag_mint_current_user_token(600)` and embeds the hosted chat app in an iframe with `apiBase`, `token`, `exp`, `source`, and `title` query params.
 3. React detects the token and uses `POST /api/ask`.
-4. Backend validates an HS256 JWT using `PATHWAY_RAG_JWT_SECRET` and required capability from `JWT_REQUIRED_CAP` (default `edit_posts`).
+4. Backend validates an HS256 JWT on `/api/ask` using `PATHWAY_RAG_JWT_SECRET` and the required capability from `JWT_REQUIRED_CAP` (default `edit_posts`).
+5. Dashboard upload and reload additionally require `JWT_DASHBOARD_CAP` (default `manage_rag`), so a normal WordPress token cannot mutate the document index.
 
 ### File Upload / Reload
 
@@ -52,7 +53,7 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 - PDF loading uses embedded text first and applies OCR only to pages below `PDF_OCR_MIN_TEXT_CHARS`.
 - Scanned PDF OCR defaults to `auto`: it uses Tesseract when available and otherwise falls back to the locked RapidOCR ONNX engine.
 - OCR settings are included in PDF index metadata, so existing PDFs are reprocessed once after this feature is deployed and again whenever OCR settings change.
-- `POST /api/reload` synchronizes the vector index and requires JWT auth in `main.py`.
+- `POST /api/upload` and `POST /api/reload` require a JWT containing both `JWT_REQUIRED_CAP` and `JWT_DASHBOARD_CAP`.
 - Dashboard local uploads are proxied to authenticated `POST /api/upload`, and local deletions call authenticated `POST /api/reload`.
 - When the backend `.env` has no JWT secret, the dashboard creates an in-memory local secret and passes it only to the backend process it launches.
 - Coworker-specific SSH paths remain unchanged for future deployment work, but all remote routes are currently locked.
@@ -66,7 +67,7 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 - `webapp/src/Widget.tsx`: Floating launcher/popup wrapper; posts iframe resize messages to parent and supports vertical dragging.
 - `webapp/src/main.tsx`: Mounts React on `#rag-chatbot-root`; currently defaults to live API `https://api.chat.pathway.training`.
 - `webapp/src/styles.css`: Main widget/fullscreen styles. Uses Pathway teal (`#609693`) and chat bubble styling.
-- `webapp/src/api.ts`: Older/minimal API helper for `/api/chat`; `App.tsx` currently uses its own inline `askRag`.
+- `webapp/src/api.ts`: Older/minimal authenticated helper for `/api/ask`; `App.tsx` currently uses its own inline `askRag`.
 - `webapp/index.html`: Standalone Vite test page; currently configured for live API by default.
 - `webapp/page-ask-ai.php`: WordPress page template for authenticated full-screen Ask AI iframe.
 - `webapp/vite.config.ts`: Builds fixed asset names into `webapp/dist/assets/main.js` and `styles.css`; dev server uses strict port `5173`.
@@ -122,11 +123,10 @@ or run `dashboard/start.bat` on Windows.
 Backend:
 
 - `GET /api/health`: health check.
-- `POST /api/chat`: public chat endpoint.
 - `POST /api/ask`: authenticated chat endpoint with history support.
-- `GET /api/files/{name}`: serves files from `DOCS_DIR`.
-- `POST /api/upload`: authenticated upload and re-index.
-- `POST /api/reload`: authenticated index reload.
+- `GET /api/files/{name}`: authenticated file access using a bearer token or citation `token` query parameter.
+- `POST /api/upload`: dashboard-authorized upload and re-index.
+- `POST /api/reload`: dashboard-authorized index reload.
 
 Dashboard:
 
@@ -153,7 +153,7 @@ Live defaults found during scan:
 - Remote docs path in dashboard: `/home/ubuntu/Pathway-AI-Chatbot/rag-backend/docs`
 - Remote backend process managed by PM2 name `rag-backend`
 
-The old exact-string live/local toggle definitions remain for future deployment work, but the dashboard no longer invokes them while remote mode is locked.
+The old exact-string live/local toggle definitions remain for future deployment work, but the dashboard no longer invokes them while remote mode is locked. Dashboard SSH deployment values are loaded from `dashboard/.env` or process environment; the public host is not stored in source.
 
 ## Backend/RAG Behavior Notes
 
@@ -163,12 +163,16 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - OCR is configurable with `PDF_OCR_ENABLED`, `PDF_OCR_ENGINE`, `PDF_OCR_MIN_TEXT_CHARS`, `PDF_OCR_DPI`, `PDF_OCR_LANGUAGE`, and optional `TESSERACT_CMD`.
 - Chunking is content-aware and configurable with `CHUNK_MIN_SIZE`, `CHUNK_MAX_SIZE`, and `CHUNK_OVERLAP`; legacy `CHUNK_SIZE` remains the maximum-size fallback.
 - Changing chunk-size settings causes affected files to be re-indexed even when their contents are unchanged.
+- `CHAT_QUERY_MAX_LENGTH` rejects oversized `/api/ask` requests before retrieval.
+- `CHAT_RATE_LIMIT_REQUESTS` and `CHAT_RATE_LIMIT_WINDOW_SECONDS` provide process-local per-client limits; setting requests to `0` disables the limiter.
+- `CHAT_TRUST_PROXY` is disabled by default. Enable it only behind a trusted proxy that replaces `X-Forwarded-For`.
 - `LLM_PROVIDER=openai` by default; Ollama support exists.
 - OpenAI defaults: `gpt-4o-mini`, `text-embedding-3-small`.
 - Citation URLs use `API_BASE` and default to `http://localhost:8000/api/files/{filename}` for the current local-only dashboard; page fragments are preserved where possible.
 - Adjacent-page expansion skips documents such as `.txt`, `.md`, and `.html` files when they do not have numeric page metadata.
 - `prompt.txt` is loaded fresh inside `RagPipeline.answer()` for each query.
-- The backend conversation store is in-memory only and is not durable.
+- The backend conversation store is process-local and not durable, but it is isolated by authenticated user plus conversation ID and bounded by `CHAT_SERVER_HISTORY_MESSAGES` and `CHAT_MAX_SERVER_CONVERSATIONS`.
+- Successful server turns are used when frontend history is absent. The latest prior user message is supplied as the active topic, and all added context counts toward input and daily token limits.
 - `App.tsx` also persists visible chat history in `sessionStorage`.
 
 ## UI/Design Notes
@@ -189,21 +193,42 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - `rag-backend/package.json` is empty even though `package-lock.json` and `node_modules` exist.
 - `rag-backend/README.md` is empty; top-level `README.md` has the useful setup docs.
 - `App.tsx` duplicates API helper logic instead of using `webapp/src/api.ts`.
-- `dashboard/server.js` has hard-coded SSH host, user, PEM path, remote paths, and exact text toggle patterns.
+- Dashboard deployment details are local configuration, but the remote SSH routes and exact text toggle patterns remain disabled legacy code pending deployment approval.
 - Dashboard git commands may fail unless Git safe-directory ownership is configured for the current user.
 - Dashboard local deletion removes the local file and calls authenticated backend `/api/reload`; remote deletion remains locked.
 - If local deletion cannot reload the backend index, the dashboard restores the original source file.
 - Uploads accept `.txt`, `.md`, `.html`, and `.pdf`; unsupported types return HTTP 400.
 - Uploads use a temporary file and atomic replacement so oversized same-name uploads preserve the existing document.
-- `/api/upload` and `/api/reload` require JWT auth, and the local dashboard generates a short-lived token using the configured secret or its process-local fallback.
+- `/api/upload` and `/api/reload` require both normal and dashboard JWT capabilities, and the local dashboard generates a short-lived token using the configured secret or its process-local fallback.
+- `/api/ask` is the only chatbot endpoint and requires a valid WordPress JWT containing `JWT_REQUIRED_CAP`; `/api/chat` returns HTTP 404.
+- `CHAT_INPUT_TOKEN_LIMIT` rejects an estimated question-plus-recent-history input before retrieval or LLM execution.
+- `LLM_MAX_OUTPUT_TOKENS` caps response generation for OpenAI (`max_tokens`) and Ollama (`num_predict`).
+- `CHAT_DAILY_TOKEN_LIMIT` provides a durable daily budget per stable JWT identity.
+- `JWT_USER_ID_CLAIMS` defines the ordered JWT claims used to identify the quota owner; the first non-empty value is used.
+- `TOKEN_USAGE_DB` defaults to `./data/token_usage.sqlite3`; SQLite WAL mode and immediate transactions provide atomic reservations across workers on one server.
+- JWT user identifiers are HMAC-SHA256 keyed with the backend JWT secret before storage, so raw WordPress IDs are not written to the quota database.
+- `/api/ask` reserves estimated input plus maximum output before model execution, settles estimated input plus returned-answer usage afterward, and returns `remaining_tokens`.
+- Failed requests release their reservation, and quota buckets reset by UTC date.
+- The daily balance measures estimated user-visible tokens, not exact provider billing tokens; hidden system instructions and retrieved RAG context are not currently included.
+- The webapp displays the matching estimated input budget and disables Send when the estimate exceeds its configured limit.
+- Citation normalization preserves `#page=N` after the encoded filename, including fallback `file://` and raw-filename citations.
+- The rate limiter is process-local, so each worker has a separate request bucket; a shared store is still required before scaling to multiple workers.
+- The request-rate limiter remains short-window and IP-based; the daily token quota is separately keyed by JWT user identity.
+- Daily token accounting survives restarts and is shared across workers that use the same SQLite path. A network database would still be required if the backend is later spread across multiple servers.
+- The repository does not include the WordPress token issuer, so the deployed token must be checked for one configured stable identity claim before release.
+- The webapp npm toolchain is locked to audited versions including Vite 6.4.3, Rollup 4.61.1, Picomatch 4.0.4, and PostCSS 8.5.15.
+- The separate three pending Ubuntu ESM Apps operating-system updates have not been applied on EC2.
 - Real `.env`, vector store, docs, node_modules, and generated files exist locally; avoid committing secrets or generated state.
 - Production EC2 is deployed from branch `Sal` at commit `f60e63f`, which includes indexing/OCR commit `4a82300`.
 - Production PM2 runs `rag-backend/.venv-release-test/bin/python` with Uvicorn on port 8000.
 - Production `.env` must define `API_BASE=https://api.chat.pathway.training` so citation links remain public.
-- The production root filesystem is only 6.8 GB. After cleanup it had about 1.1 GB free, so storage expansion remains urgent.
+- The production root filesystem is only 6.8 GB. Cleanup recovered temporary test space but cannot provide enough headroom for 500+ source documents and a growing Chroma index.
+- Before significant document growth, expand the root EBS volume to at least 20 GB. A cleaner alternative is a dedicated expandable EBS data volume with `DOCS_DIR`, `CHROMA_DIR`, and optionally `TOKEN_USAGE_DB` pointed at mounted paths.
+- Moving source documents to object storage or replacing Chroma with a managed vector database can reduce local disk use later, but both require broader application and operational changes and are not the preferred immediate fix.
 - Existing malformed PDFs can emit `Ignoring wrong pointing object` warnings during parsing; release testing confirmed these warnings do not prevent indexing.
 - The rollback snapshot is under `/home/ubuntu/pathway-backups/20260606-063636`, and the pre-release Git rollback commit is `092f05c`.
 - A byte-identical local copy is stored under the Git-ignored `local-backups/ec2/20260606-063636` directory. All 90 files were SHA-256 verified on 2026-06-06.
+- `webapp/page-ask-ai.php` consumes `pathway_rag_mint_current_user_token()`, but the WordPress plugin that defines that function is managed outside this repository and must be verified in the deployed WordPress environment.
 
 ## Production Release Status
 
@@ -229,12 +254,14 @@ When changing frontend:
 When changing backend:
 
 - Prefer a lightweight import/syntax check first.
+- Run `uv run --project rag-backend python -m unittest discover -s rag-backend/tests -p "test_backend_security.py" -v` for the isolated backend security suite.
 - Run the FastAPI server if env/secrets and vector index are available.
 - Be aware that importing `main.py` initializes `RagPipeline.from_disk()` and may require embeddings/provider credentials.
 
 When changing dashboard:
 
 - Run `cd dashboard && npm start` if Node dependencies exist.
+- Run `cd dashboard && npm run test:security` for deployment configuration and dashboard-token checks.
 - Test local-only routes before remote SSH operations.
 - Remote docs/prompt/server actions require the PEM path and network access.
 

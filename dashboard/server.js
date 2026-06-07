@@ -9,6 +9,20 @@ const http  = require('http');
 const os = require('os');
 const crypto = require('crypto');
 
+function loadLocalEnv(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  for (const rawLine of fs.readFileSync(filePath, 'utf8').split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#') || !line.includes('=')) continue;
+    const separator = line.indexOf('=');
+    const name = line.slice(0, separator).trim();
+    const value = line.slice(separator + 1).trim().replace(/^(['"])(.*)\1$/, '$2');
+    if (!(name in process.env)) process.env[name] = value;
+  }
+}
+
+loadLocalEnv(path.join(__dirname, '.env'));
+
 const app = express();
 const PORT = 3131;
 
@@ -16,10 +30,11 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const PEM_KEY_PATH = 'D:/AI Chat/Pathway-Backend-Key.pem';
-const SSH_HOST = 'ec2-3-14-127-116.us-east-2.compute.amazonaws.com';
-const SSH_USER = 'ubuntu';
-const REMOTE_DOCS = '/home/ubuntu/Pathway-AI-Chatbot/rag-backend/docs';
+const PEM_KEY_PATH = process.env.PATHWAY_SSH_KEY_PATH || 'D:/AI Chat/Pathway-Backend-Key.pem';
+const SSH_HOST = process.env.PATHWAY_SSH_HOST || '';
+const SSH_USER = process.env.PATHWAY_SSH_USER || 'ubuntu';
+const REMOTE_ROOT = process.env.PATHWAY_REMOTE_ROOT || '/home/ubuntu/Pathway-AI-Chatbot';
+const REMOTE_DOCS = `${REMOTE_ROOT}/rag-backend/docs`;
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const PROMPT_FILE = path.join(PROJECT_ROOT, 'rag-backend', 'prompt.txt');
 const BACKEND_ENV_FILE = path.join(PROJECT_ROOT, 'rag-backend', '.env');
@@ -64,6 +79,9 @@ function getPrivateKey() {
 }
 
 function createSSHClient(retries = 3, delayMs = 2000) {
+  if (!SSH_HOST) {
+    return Promise.reject(new Error('PATHWAY_SSH_HOST is not configured'));
+  }
   return new Promise((resolve, reject) => {
     const attempt = (remaining) => {
       const conn = new Client();
@@ -244,7 +262,9 @@ function readEnvValue(name) {
 
 function localBackendToken() {
   const secret = readEnvValue('PATHWAY_RAG_JWT_SECRET') || LOCAL_JWT_SECRET;
-  return generateJWT(secret);
+  const requiredCap = readEnvValue('JWT_REQUIRED_CAP') || 'edit_posts';
+  const dashboardCap = readEnvValue('JWT_DASHBOARD_CAP') || 'manage_rag';
+  return generateJWT(secret, [...new Set([requiredCap, dashboardCap].filter(Boolean))]);
 }
 
 async function callLocalBackend(route, options = {}) {
@@ -450,7 +470,7 @@ app.post('/api/server/sync-prompt', remoteLocked, async (req, res) => {
   try {
     await sftpUploadTo(
       PROMPT_FILE,
-      '/home/ubuntu/Pathway-AI-Chatbot/rag-backend/prompt.txt'
+      `${REMOTE_ROOT}/rag-backend/prompt.txt`
     );
     await sshExec('pm2 restart rag-backend --update-env');
     res.json({ success: true, message: 'Prompt synced — bot will use it on the next query.' });

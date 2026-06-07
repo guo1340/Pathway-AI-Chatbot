@@ -4,7 +4,7 @@ import { GiNuclearBomb } from "react-icons/gi";
 // --- Inline API call (replaces need for api.ts) ---
 async function askRag(
   apiBase: string,
-  token: string | null,
+  token: string,
   body: {
     query: string
     source?: string
@@ -12,14 +12,12 @@ async function askRag(
     history?: Msg[]   // full message history
   }
 ): Promise<any> {
-  // Authenticated WordPress users hit /api/ask; public users hit /api/chat
-  const endpoint = token ? `${apiBase}/api/ask` : `${apiBase}/api/chat`
-  const headers: HeadersInit = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`
-
-  const res = await fetch(endpoint, {
+  const res = await fetch(`${apiBase.replace(/\/$/, '')}/api/ask`, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
     body: JSON.stringify(body),
   })
   if (!res.ok) {
@@ -31,6 +29,16 @@ async function askRag(
 // --- Types ---
 type Citation = { title?: string; url?: string }
 type Msg = { who: 'you' | 'ai'; text: string; citations?: Citation[]; time?: string }
+
+function estimateTokens(text: string) {
+  if (!text) return 0
+  return Math.max(1, Math.ceil(new TextEncoder().encode(text).length / 4))
+}
+
+function positiveNumber(value: unknown, fallback: number) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
 
 // --- Main Component ---
 export default function App({
@@ -70,6 +78,23 @@ export default function App({
   const authToken: string | null = injectedToken ?? null
 
   const authReady = true
+  const inputTokenLimit = positiveNumber(
+    cfg.inputTokenLimit || import.meta.env.VITE_CHAT_INPUT_TOKEN_LIMIT,
+    2000
+  )
+  const maxOutputTokens = positiveNumber(
+    cfg.maxOutputTokens || import.meta.env.VITE_LLM_MAX_OUTPUT_TOKENS,
+    1200
+  )
+  const recentHistory = msgs.slice(-6)
+  const historyText = recentHistory
+    .map((m) => `${m.who === 'you' ? 'User' : 'Assistant'}: ${m.text}`)
+    .join('\n')
+  const requestText = historyText.trim()
+    ? `${historyText}\n\nUser: ${q.trim()}`
+    : q.trim()
+  const estimatedInputTokens = estimateTokens(requestText)
+  const exceedsInputTokenLimit = estimatedInputTokens > inputTokenLimit
 
 
   // 🧠 Load conversation from sessionStorage on mount
@@ -177,10 +202,10 @@ export default function App({
   // ---- send message ----
   async function send() {
 
-    if (!authReady) return
+    if (!authReady || !authToken) return
 
     const query = q.trim()
-    if (!query || busy) return
+    if (!query || busy || exceedsInputTokenLimit) return
     setQ('')
     if (inputRef.current) inputRef.current.style.height = 'auto'
 
@@ -370,34 +395,41 @@ export default function App({
         </div>
       </div>
       <div className='question-container'>
-        <div className="rcb-row">
-          <textarea
-            ref={inputRef}
-            id="message"
-            placeholder="Type a message..."
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value)
-              e.target.style.height = 'auto'
-              e.target.style.height = `${e.target.scrollHeight}px`
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                send()
-              }
-            }}
-            rows={1}
-            className="chat-input"
-          />
-          <button
-            className={busy ? '' : 'send-button'}
-            onClick={send}
-            disabled={busy}
-            style={busy ? { minWidth: `${longestText.length + 2}ch`, textAlign: 'center' } : {}}
-          >
-            {busy ? `Thinking${thinkingDots}` : 'Send'}
-          </button>
+        <div className="composer">
+          <div className="token-estimate" data-over-limit={exceedsInputTokenLimit}>
+            ~{estimatedInputTokens.toLocaleString()} / {inputTokenLimit.toLocaleString()} input tokens
+            {' · '}
+            {maxOutputTokens.toLocaleString()} max response
+          </div>
+          <div className="rcb-row">
+            <textarea
+              ref={inputRef}
+              id="message"
+              placeholder="Type a message..."
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value)
+                e.target.style.height = 'auto'
+                e.target.style.height = `${e.target.scrollHeight}px`
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  send()
+                }
+              }}
+              rows={1}
+              className="chat-input"
+            />
+            <button
+              className={busy ? '' : 'send-button'}
+              onClick={send}
+              disabled={busy || !authToken || exceedsInputTokenLimit}
+              style={busy ? { minWidth: `${longestText.length + 2}ch`, textAlign: 'center' } : {}}
+            >
+              {busy ? `Thinking${thinkingDots}` : 'Send'}
+            </button>
+          </div>
         </div>
       </div>
 

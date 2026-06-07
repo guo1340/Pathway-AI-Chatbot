@@ -31,6 +31,7 @@ PDF_OCR_LANGUAGE = os.getenv("PDF_OCR_LANGUAGE", "eng")
 TESSERACT_CMD = os.getenv("TESSERACT_CMD", "").strip()
 TOP_K = int(os.getenv("TOP_K", "4"))
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.2"))
+LLM_MAX_OUTPUT_TOKENS = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "1200"))
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
 
 if CHUNK_MIN_SIZE < 1 or CHUNK_MIN_SIZE > CHUNK_MAX_SIZE:
@@ -43,6 +44,8 @@ if PDF_OCR_DPI < 72:
     raise ValueError("PDF_OCR_DPI must be at least 72")
 if PDF_OCR_ENGINE not in {"auto", "tesseract", "rapidocr"}:
     raise ValueError("PDF_OCR_ENGINE must be auto, tesseract, or rapidocr")
+if LLM_MAX_OUTPUT_TOKENS < 1:
+    raise ValueError("LLM_MAX_OUTPUT_TOKENS must be at least 1")
 
 # OpenAI defaults
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -343,8 +346,16 @@ def _build_embeddings():
 
 def _build_llm():
     if LLM_PROVIDER == "ollama":
-        return ChatOllama(model=OLLAMA_MODEL, temperature=TEMPERATURE)
-    return ChatOpenAI(model=OPENAI_MODEL, temperature=TEMPERATURE)
+        return ChatOllama(
+            model=OLLAMA_MODEL,
+            temperature=TEMPERATURE,
+            num_predict=LLM_MAX_OUTPUT_TOKENS,
+        )
+    return ChatOpenAI(
+        model=OPENAI_MODEL,
+        temperature=TEMPERATURE,
+        max_tokens=LLM_MAX_OUTPUT_TOKENS,
+    )
 
 @dataclass
 class RagPipeline:

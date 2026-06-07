@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && cp -r dist/* ../plugin/dist/",
+    "build": "vite build && node scripts/copy-plugin-dist.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -11,25 +11,34 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## Priority 2: Backend Security
 
-- [ ] Secure `/api/upload` and `/api/reload` with dashboard-only authentication. Coordinate branch consolidation with the other developer before implementation.
-- [ ] Add rate limiting to `/api/chat` and `/api/ask` to prevent automated abuse and uncontrolled OpenAI costs.
-- [ ] Add a maximum chat-query length and reject oversized requests before they reach retrieval or the LLM.
-- [ ] Protect `/api/files/{name}` so proprietary documents cannot be downloaded by guessing filenames while keeping authenticated citation links usable.
-- [ ] Remove the public EC2 hostname from `dashboard/server.js` and load deployment details from environment variables or local configuration.
-- [ ] Apply the three pending ESM Apps security updates on the production server after checking compatibility and creating a rollback plan.
+- [x] Remove `/api/chat` and keep `/api/ask` as the only authenticated chatbot endpoint.
+- [x] Require a JWT with both the normal backend capability and the dashboard-only capability for `/api/upload` and `/api/reload`.
+- [x] Add configurable, process-local rate limiting to authenticated `/api/ask` to limit automated abuse and uncontrolled OpenAI costs.
+- [x] Reject oversized chat queries before retrieval or LLM processing.
+- [x] Require authenticated header or citation-query JWT access for `/api/files/{name}`.
+- [x] Load dashboard deployment details from local environment configuration instead of committing the public EC2 hostname.
+- [ ] Apply the three pending Ubuntu ESM Apps security updates on the production server after checking compatibility and creating a rollback plan.
+- [x] Review, update, and lock the webapp npm toolchain; local npm audits now report zero vulnerabilities.
+- [x] Enforce a configurable estimated input-token ceiling before retrieval or LLM execution.
+- [x] Cap model response generation for both OpenAI and Ollama providers.
+- [x] Add process-local per-user daily token accounting and return `remaining_tokens` after each successful `/api/ask` response.
+- [x] Move per-user daily token accounting to durable SQLite storage so balances survive restarts and remain atomic across multiple workers on one server.
 
 ## Priority 3: Frontend Security
 
 - [ ] Restore login-based access control for `chat.pathway.training`. First confirm with the other developer that WordPress token injection works for subscriber accounts so legitimate users are not locked out.
+- [ ] Redirect tokenless, expired-token, and incompatible-role visitors from `chat.pathway.training` to the Pathway WordPress login/access page instead of showing a backend authorization error.
 
 ## Priority 4: Backend
 
-- [ ] Add server-side conversation state or conversation summarization that tracks the active topic and includes it in later prompts, allowing vague follow-ups such as "give me its history" to resolve correctly.
-- [ ] Reduce production disk usage and plan storage capacity for 500+ documents and the growing Chroma database. The server currently has about 6.71 GB total storage and was reported as 76% full.
+- [x] Add bounded, user-isolated server-side conversation state that includes the prior active topic in later prompts, allowing vague follow-ups such as "give me its history" to resolve correctly.
+- [x] Complete the production storage assessment and capacity plan for 500+ documents. Cleanup cannot provide enough long-term headroom; expand the root EBS volume to at least 20 GB or attach a dedicated expandable data volume for `docs`, `chroma_store`, and optionally the quota database before further document growth.
 
 ## Priority 5: Frontend
 
-- No frontend feature tasks are currently listed.
+- [x] Always use authenticated `/api/ask`; remove the frontend fallback to `/api/chat`.
+- [x] Estimate question plus recent-history input tokens before sending, display the estimate, and disable requests over the configured backend-aligned limit.
+- [ ] Display the backend-provided `remaining_tokens` balance after each successful answer and handle exhausted-balance errors.
 
 ## Priority 6: Dashboard
 
@@ -46,7 +55,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## In Progress
 
-- Current task: None. Priority 1 backend structure work is complete.
+- Current task: Apply the three pending Ubuntu ESM Apps updates and complete the final Priority 2 EC2 smoke tests.
 
 ## Done
 
@@ -61,6 +70,17 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Validated the `Sal` backend against a copied production index and deployed it through PM2 on EC2.
 - [x] Verified production incremental reload, scanned PDF OCR, JWT protection, chat retrieval, and public HTTPS health.
 - [x] Downloaded and SHA-256 verified the EC2 release backup and raw test records locally.
+- [x] Added dedicated dashboard authorization for document upload and index reload.
+- [x] Added configurable backend query limits and per-client chat rate limiting.
+- [x] Protected backend document downloads while preserving authenticated citation URLs.
+- [x] Moved dashboard deployment host configuration out of source control.
+- [x] Ran and documented the complete local Priority 2 backend security verification suite.
+- [x] Expanded the pre-EC2 release suite with CORS, citation-fragment, public citation, and dashboard remote-lock coverage.
+- [x] Fixed file citation normalization so `#page=N` remains a URL fragment instead of becoming part of the filename.
+- [x] Removed `/api/chat`, moved all frontend requests to authenticated `/api/ask`, and added frontend/backend per-request token ceilings.
+- [x] Added per-user daily token reservations, accounting, and `remaining_tokens` to authenticated answer responses.
+- [x] Persisted daily quota usage in SQLite with atomic cross-worker reservations and anonymized user keys.
+- [x] Updated and locked the webapp toolchain to versions with zero reported npm vulnerabilities.
 
 ## Notes for Codex
 
@@ -84,11 +104,23 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-06 00:21:45 +08:00 - Completed dashboard edge tests, fixed failures, and removed dashboard Git controls.
 - 2026-06-06 16:56:46 +08:00 - Completed EC2 staging validation, production PM2 cutover, smoke tests, and disk-usage investigation.
 - 2026-06-06 16:56:46 +08:00 - Stored and verified the production rollback backup and raw test transcript locally.
+- 2026-06-06 22:59:03 +08:00 - Completed the local Priority 2 backend security code changes; production ESM updates remain pending.
+- 2026-06-06 23:27:53 +08:00 - Ran all local Priority 2 security tests; 6 backend groups and 5 dashboard checks passed.
+- 2026-06-07 10:50:38 +08:00 - Reran the final local security release gate; all executable checks passed and online-only Nginx, WordPress, CORS, PM2, and public HTTPS checks were documented.
+- 2026-06-07 10:57:33 +08:00 - Ran all remaining pre-EC2 tests; fixed PDF citation fragment normalization; 7 backend groups and 6 dashboard checks passed.
+- 2026-06-07 11:21:57 +08:00 - Required WordPress JWT authentication on `/api/chat`; all 8 backend security groups and the frontend build passed.
+- 2026-06-07 12:25:42 +08:00 - Removed `/api/chat`, added frontend token estimation plus backend input/output token caps, and passed 9 backend groups and 6 dashboard checks.
+- 2026-06-07 12:54:33 +08:00 - Added per-user daily token accounting and `remaining_tokens` responses; all 11 backend groups and 6 dashboard checks passed.
+- 2026-06-07 13:12:05 +08:00 - Added durable SQLite quota storage, locked the webapp npm security updates, and passed 12 backend groups with zero npm advisories.
+- 2026-06-07 13:28:47 +08:00 - Added bounded, user-isolated server conversation context and passed all 13 backend regression groups.
+- 2026-06-07 13:28:47 +08:00 - Completed the backend storage assessment; documented root-volume expansion and a dedicated EBS data volume as the practical capacity options.
+- 2026-06-07 13:42:14 +08:00 - Completed the final local pre-push release gate; fixed the Windows webapp build copy step and passed backend, dashboard, frontend, PHP, npm audit, syntax, and diff checks.
 
 ## Steps and Instructions for Testing
 
 - Detailed test procedures and expected results: [`LOG.md`](LOG.md#steps-and-instructions-for-testing)
 - Executed test results: [`TEST_LOG.md`](TEST_LOG.md)
+- Priority 2 security results and the pending production ESM maintenance checklist: [`TEST_LOG.md`](TEST_LOG.md#priority-2-backend-security-verification)
 - Priority 1 backend structure tests are documented under:
   - Content-aware document chunking
   - Incremental document indexing

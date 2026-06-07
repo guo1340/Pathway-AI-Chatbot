@@ -8,7 +8,7 @@ A lightweight Retrieval‑Augmented Generation chatbot for WordPress:
 
 ## Repository Layout
 
-- `rag-backend/`: FastAPI app exposing `/api/chat`
+- `rag-backend/`: FastAPI app exposing authenticated `/api/ask`
 - `webapp/`: React widget; build outputs to `plugin/dist/`
 - `plugin/`: WordPress plugin (`rag-chatbot.php`) that injects the widget
 
@@ -63,7 +63,7 @@ Defaults:
 Endpoints:
 
 - `GET /api/health` → `{ "status": "ok" }`
-- `POST /api/chat` → `{ answer, citations, conversation_id }`
+- `POST /api/ask` with a WordPress bearer JWT → `{ answer, citations, conversation_id, remaining_tokens }`
 
 Document indexing/RAG logic is in `rag-backend/rag.py` via `RagPipeline`.
 
