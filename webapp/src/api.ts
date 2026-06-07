@@ -6,18 +6,25 @@ export type ChatChunk = {
 
 export async function askRag(
   apiBase: string,
+  token: string,
   payload: {
     query: string
     source?: string
     conversation_id?: string
   }
-): Promise<{ answer: string; citations?: { title?: string; url?: string }[]; conversation_id: string }> {
+): Promise<{
+  answer: string
+  citations?: { title?: string; url?: string }[]
+  conversation_id: string
+  remaining_tokens: number
+}> {
 
-  // Minimal fetch to your RAG backend; adapt to your stack.
-  // Expected backend route: POST /api/chat
-  const res = await fetch(`${apiBase.replace(/\/$/, '')}/api/chat`, {
+  const res = await fetch(`${apiBase.replace(/\/$/, '')}/api/ask`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
     body: JSON.stringify(payload)
   })
 

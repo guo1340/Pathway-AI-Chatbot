@@ -18,16 +18,31 @@ wp_get_current_user();
 
 // Not logged in → redirect
 if (!is_user_logged_in()) {
-    wp_redirect(wp_login_url(get_permalink()));
+    $login_url = wp_login_url(get_permalink());
+
+    // Add a short message that your login page can show
+    $login_url = add_query_arg([
+        'rag_notice' => '1',
+        'rag_msg' => rawurlencode('Please log in to access Ask AI. This page is restricted to contributors.'),
+    ], $login_url);
+
+    wp_safe_redirect($login_url);
     exit;
 }
 
+
 // Must be contributor+
 if (!current_user_can('edit_posts')) {
-    // If you prefer: show 403 instead of redirect
-    wp_redirect(wp_login_url(get_permalink()));
+    $login_url = wp_login_url(get_permalink());
+    $login_url = add_query_arg([
+        'rag_notice' => '1',
+        'rag_msg' => rawurlencode('Your account does not have access to Ask AI. Please log in with a contributor account.'),
+    ], $login_url);
+
+    wp_safe_redirect($login_url);
     exit;
 }
+
 
 // Mint token (10 minutes)
 $mint = pathway_rag_mint_current_user_token(600);
@@ -59,6 +74,9 @@ $iframe_url = add_query_arg([
     'apiBase' => $api_base,
     'token' => $token,
     'exp' => $exp,
+    'requireAuth' => '1',
+    'requiredCap' => 'edit_posts',
+    'accessUrl' => get_permalink(),
     'source' => $source,
     'title' => $title,
 ], $iframe_base);

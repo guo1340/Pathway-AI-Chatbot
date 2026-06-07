@@ -4,7 +4,8 @@
   "description": "Local management dashboard for Pathway AI Chatbot",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test:security": "node security.test.js"
   },
   "dependencies": {
     "express": "^4.18.2",

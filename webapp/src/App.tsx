@@ -1,10 +1,22 @@
 import React from 'react'
 import { GiNuclearBomb } from "react-icons/gi";
 
+class RagApiError extends Error {
+  status: number
+  remainingTokens?: number
+
+  constructor(message: string, status: number, remainingTokens?: number) {
+    super(message)
+    this.name = 'RagApiError'
+    this.status = status
+    this.remainingTokens = remainingTokens
+  }
+}
+
 // --- Inline API call (replaces need for api.ts) ---
 async function askRag(
   apiBase: string,
-  token: string | null,
+  token: string,
   body: {
     query: string
     source?: string
@@ -12,18 +24,32 @@ async function askRag(
     history?: Msg[]   // full message history
   }
 ): Promise<any> {
-  // Authenticated WordPress users hit /api/ask; public users hit /api/chat
-  const endpoint = token ? `${apiBase}/api/ask` : `${apiBase}/api/chat`
-  const headers: HeadersInit = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`
-
-  const res = await fetch(endpoint, {
+  const res = await fetch(`${apiBase.replace(/\/$/, '')}/api/ask`, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
     body: JSON.stringify(body),
   })
   if (!res.ok) {
-    throw new Error(`Server error: ${res.status}`)
+    let payload: any = null
+    try {
+      payload = await res.json()
+    } catch {
+      /* fall back to the HTTP status */
+    }
+    const detail = payload?.detail
+    const message =
+      (typeof detail === 'string' && detail) ||
+      (typeof detail?.message === 'string' && detail.message) ||
+      `Server error: ${res.status}`
+    const remainingTokens = Number(detail?.remaining_tokens)
+    throw new RagApiError(
+      message,
+      res.status,
+      Number.isFinite(remainingTokens) ? remainingTokens : undefined
+    )
   }
   return await res.json()
 }
@@ -31,6 +57,51 @@ async function askRag(
 // --- Types ---
 type Citation = { title?: string; url?: string }
 type Msg = { who: 'you' | 'ai'; text: string; citations?: Citation[]; time?: string }
+
+function estimateTokens(text: string) {
+  if (!text) return 0
+  return Math.max(1, Math.ceil(new TextEncoder().encode(text).length / 4))
+}
+
+function positiveNumber(value: unknown, fallback: number) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function enabled(value: unknown) {
+  return value === true || value === 1 || value === '1' || value === 'true'
+}
+
+function readJwtPayload(token?: string) {
+  if (!token) return null
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return null
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+    return JSON.parse(atob(padded))
+  } catch {
+    return null
+  }
+}
+
+function trustedAccessUrl(value: unknown) {
+  const fallback = 'https://pathway.training/ask-ai/'
+  if (typeof value !== 'string' || !value) return fallback
+  try {
+    const url = new URL(value, fallback)
+    const isPathway =
+      url.hostname === 'pathway.training' ||
+      url.hostname.endsWith('.pathway.training')
+    const isLocal =
+      url.hostname === 'localhost' ||
+      url.hostname === '127.0.0.1'
+    const allowed = (url.protocol === 'https:' && isPathway) || isLocal
+    return allowed ? url.toString() : fallback
+  } catch {
+    return fallback
+  }
+}
 
 // --- Main Component ---
 export default function App({
@@ -48,29 +119,104 @@ export default function App({
   const [thinkingDots, setThinkingDots] = React.useState('');
   const longestText = 'Thinking...';
   const [convId, setConvId] = React.useState<string | undefined>(undefined)
+  const [remainingTokens, setRemainingTokens] = React.useState<number | null>(null)
+  const [quotaMessage, setQuotaMessage] = React.useState('')
+  const [localAuth, setLocalAuth] = React.useState<{
+    apiBase: string
+    token: string
+  } | null>(null)
   const logRef = React.useRef<HTMLDivElement | null>(null)
   const inputRef = React.useRef<HTMLTextAreaElement | null>(null)
   const cfg = (window as any).RAG_CHATBOT_CONFIG || {}
 
   const qs = new URLSearchParams(window.location.search)
   const tokenFromUrl = qs.get("token") || undefined
+  const expFromUrl = qs.get("exp") || undefined
   const apiBaseFromUrl = qs.get("apiBase") || undefined
 
   const injectedToken =
     (cfg.token as string | undefined) ||
     tokenFromUrl ||
+    localAuth?.token ||
     undefined
 
   // Prefer URL apiBase (iframe), then WP injected, then prop
   const effectiveApiBase =
     apiBaseFromUrl ||
+    localAuth?.apiBase ||
     (cfg.apiBase as string | undefined) ||
     apiBase
 
   const authToken: string | null = injectedToken ?? null
 
-  const authReady = true
+  const requireAuth =
+    enabled(qs.get('requireAuth')) ||
+    enabled(cfg.requireAuth) ||
+    window.location.hostname === 'chat.pathway.training'
+  const accessUrl = trustedAccessUrl(
+    qs.get('accessUrl') ||
+    cfg.accessUrl ||
+    import.meta.env.VITE_RAG_ACCESS_URL
+  )
+  const requiredCap =
+    qs.get('requiredCap') ||
+    cfg.requiredCap ||
+    'edit_posts'
+  const tokenPayload = readJwtPayload(authToken || undefined)
+  const tokenExpiry = Number(tokenPayload?.exp || expFromUrl || 0)
+  const tokenCaps = Array.isArray(tokenPayload?.cap) ? tokenPayload.cap : []
+  const authInvalid = requireAuth && (
+    !authToken ||
+    !tokenPayload ||
+    tokenExpiry <= Math.floor(Date.now() / 1000) ||
+    (requiredCap && !tokenCaps.includes(requiredCap))
+  )
+  const authReady = !authInvalid
+  const inputTokenLimit = positiveNumber(
+    cfg.inputTokenLimit || import.meta.env.VITE_CHAT_INPUT_TOKEN_LIMIT,
+    2000
+  )
+  const maxOutputTokens = positiveNumber(
+    cfg.maxOutputTokens || import.meta.env.VITE_LLM_MAX_OUTPUT_TOKENS,
+    1200
+  )
+  const recentHistory = msgs.slice(-6)
+  const historyText = recentHistory
+    .map((m) => `${m.who === 'you' ? 'User' : 'Assistant'}: ${m.text}`)
+    .join('\n')
+  const requestText = historyText.trim()
+    ? `${historyText}\n\nUser: ${q.trim()}`
+    : q.trim()
+  const estimatedInputTokens = estimateTokens(requestText)
+  const exceedsInputTokenLimit = estimatedInputTokens > inputTokenLimit
+  const estimatedReservation = estimatedInputTokens + maxOutputTokens
+  const exceedsRemainingBalance =
+    remainingTokens !== null && estimatedReservation > remainingTokens
 
+  React.useEffect(() => {
+    const isLocal =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1'
+    if (!isLocal || tokenFromUrl || cfg.token) return
+
+    fetch('/__rag-dev-config', { cache: 'no-store' })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Local auth returned ${response.status}`)
+        return response.json()
+      })
+      .then((config) => {
+        if (config?.apiBase && config?.token) setLocalAuth(config)
+      })
+      .catch(() => {
+        setQuotaMessage(
+          'Local authentication is unavailable. Start the frontend with Vite and configure the backend .env.'
+        )
+      })
+  }, [cfg.token, tokenFromUrl])
+
+  React.useEffect(() => {
+    if (authInvalid) window.location.replace(accessUrl)
+  }, [accessUrl, authInvalid])
 
   // 🧠 Load conversation from sessionStorage on mount
   React.useEffect(() => {
@@ -177,11 +323,12 @@ export default function App({
   // ---- send message ----
   async function send() {
 
-    if (!authReady) return
+    if (!authReady || !authToken) return
 
     const query = q.trim()
-    if (!query || busy) return
+    if (!query || busy || exceedsInputTokenLimit || exceedsRemainingBalance) return
     setQ('')
+    setQuotaMessage('')
     if (inputRef.current) inputRef.current.style.height = 'auto'
 
     const newUserMsg: Msg = {
@@ -201,6 +348,10 @@ export default function App({
       })
 
       setConvId(data.conversation_id)
+      const nextRemainingTokens = Number(data.remaining_tokens)
+      if (Number.isFinite(nextRemainingTokens)) {
+        setRemainingTokens(Math.max(0, nextRemainingTokens))
+      }
       const answer = data.answer || ''
       const citations: Citation[] | undefined = data.citations
 
@@ -234,11 +385,27 @@ export default function App({
         setTimeout(step, 16)
       })
     } catch (e: any) {
+      if (e instanceof RagApiError && (e.status === 401 || e.status === 403) && requireAuth) {
+        setBusy(false)
+        window.location.replace(accessUrl)
+        return
+      }
+      if (e instanceof RagApiError && e.status === 429 && e.remainingTokens !== undefined) {
+        setRemainingTokens(Math.max(0, e.remainingTokens))
+        setQuotaMessage(
+          e.remainingTokens === 0
+            ? 'Your daily AI token balance is exhausted. Please try again after the daily reset.'
+            : `This request needs more tokens than your remaining daily balance of ${e.remainingTokens.toLocaleString()}.`
+        )
+      }
       setMsgs((m) => [
         ...m,
         {
           who: 'ai',
-          text: `Error: ${e.message}`,
+          text:
+            e instanceof RagApiError && e.status === 429 && e.remainingTokens !== undefined
+              ? 'Your daily AI token balance cannot cover this request.'
+              : `Error: ${e.message}`,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ])
@@ -270,6 +437,8 @@ export default function App({
   }
 
   // ---- render ----
+  if (!authReady) return null
+
   return (
     <div className="rcb-card" role="complementary" aria-label="RAG Chatbot">
       <div className="rcb-head">
@@ -370,34 +539,60 @@ export default function App({
         </div>
       </div>
       <div className='question-container'>
-        <div className="rcb-row">
-          <textarea
-            ref={inputRef}
-            id="message"
-            placeholder="Type a message..."
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value)
-              e.target.style.height = 'auto'
-              e.target.style.height = `${e.target.scrollHeight}px`
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                send()
-              }
-            }}
-            rows={1}
-            className="chat-input"
-          />
-          <button
-            className={busy ? '' : 'send-button'}
-            onClick={send}
-            disabled={busy}
-            style={busy ? { minWidth: `${longestText.length + 2}ch`, textAlign: 'center' } : {}}
+        <div className="composer">
+          <div
+            className="token-estimate"
+            data-over-limit={exceedsInputTokenLimit || exceedsRemainingBalance}
           >
-            {busy ? `Thinking${thinkingDots}` : 'Send'}
-          </button>
+            ~{estimatedInputTokens.toLocaleString()} / {inputTokenLimit.toLocaleString()} input tokens
+            {' · '}
+            {maxOutputTokens.toLocaleString()} max response
+            {remainingTokens !== null && (
+              <>
+                {' / '}
+                {remainingTokens.toLocaleString()} daily tokens remaining
+              </>
+            )}
+          </div>
+          {quotaMessage && (
+            <div className="quota-alert" role="alert">
+              {quotaMessage}
+            </div>
+          )}
+          <div className="rcb-row">
+            <textarea
+              ref={inputRef}
+              id="message"
+              placeholder="Type a message..."
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value)
+                e.target.style.height = 'auto'
+                e.target.style.height = `${e.target.scrollHeight}px`
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  send()
+                }
+              }}
+              rows={1}
+              className="chat-input"
+            />
+            <button
+              className={busy ? '' : 'send-button'}
+              onClick={send}
+              disabled={
+                busy ||
+                !authToken ||
+                exceedsInputTokenLimit ||
+                exceedsRemainingBalance
+              }
+              style={busy ? { minWidth: `${longestText.length + 2}ch`, textAlign: 'center' } : {}}
+            >
+              {busy ? `Thinking${thinkingDots}` : 'Send'}
+            </button>
+          </div>
         </div>
       </div>
 

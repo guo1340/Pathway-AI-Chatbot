@@ -26,6 +26,7 @@ venv/
 
 # RAG storage / indexes
 rag-backend/chroma_store/
+rag-backend/data/
 rag-backend/docs/**/*.pdf
 rag-backend/docs/**/*.html
 rag-backend/docs/**/*.txt
@@ -38,6 +39,7 @@ rag-backend/docs/**/*.md
 
 # Logs
 *.log
+rag-backend/test-log.txt
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -48,8 +50,10 @@ coverage/
 .dist/
 .tmp/
 .sass-cache/
+local-backups/
 
 # Lock files (optional keep uv.lock if desired)
 package-lock.json
+!webapp/package-lock.json
 pnpm-lock.yaml
 yarn.lock

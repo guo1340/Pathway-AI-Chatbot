@@ -319,6 +319,30 @@ body {
   justify-content: center;
 }
 
+.composer {
+  width: min(100%, 900px);
+}
+
+.token-estimate {
+  padding: 0 5rem;
+  color: #555;
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+.token-estimate[data-over-limit="true"] {
+  color: #a12622;
+  font-weight: 600;
+}
+
+.quota-alert {
+  padding: .4rem 5rem 0;
+  color: #a12622;
+  font-size: .82rem;
+  font-weight: 600;
+  text-align: right;
+}
+
 .rcb-row {
   display: flex;
   gap: .5rem;
@@ -431,6 +455,28 @@ body {
 
 .send-button:hover {
   cursor: pointer;
+}
+
+@media (max-width: 960px) {
+  .composer {
+    width: 100%;
+  }
+
+  .token-estimate {
+    padding: 0 .75rem;
+  }
+
+  .quota-alert {
+    padding: .4rem .75rem 0;
+  }
+
+  .rcb-row {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    padding: .75rem .75rem 1rem;
+  }
 }
 
 .message-container {

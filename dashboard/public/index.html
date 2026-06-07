@@ -28,9 +28,10 @@
     header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
     header span { font-size: 0.85rem; color: var(--muted); margin-left: 4px; }
 
-    main { max-width: 860px; margin: 0 auto; padding: 28px 24px; display: grid; gap: 20px; }
+    main { width: 100%; max-width: 860px; min-width: 0; margin: 0 auto; padding: 28px 24px; display: grid; gap: 20px; }
 
     .card {
+      min-width: 0;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 14px;
@@ -47,13 +48,21 @@
 
     /* ── Mode Toggle ── */
     .mode-row { display: flex; align-items: center; justify-content: space-between; }
-    .mode-info { display: flex; align-items: center; gap: 10px; }
+    .mode-info { min-width: 0; display: flex; align-items: center; gap: 10px; }
     .dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
     .dot-live  { background: var(--success); box-shadow: 0 0 10px var(--success); }
     .dot-local { background: var(--warning); box-shadow: 0 0 10px var(--warning); }
     .dot-unknown { background: var(--muted); }
     .mode-text { font-size: 1.05rem; font-weight: 600; }
     .mode-sub  { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+    .service-grid { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+    .service-row {
+      min-width: 0;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
+    }
+    .service-link { color: var(--accent); font-size: 0.8rem; text-decoration: none; }
+    .service-link.disabled { color: var(--muted); pointer-events: none; }
 
     /* ── Buttons ── */
     button {
@@ -82,7 +91,7 @@
     }
     .dropzone-icon { font-size: 2rem; margin-bottom: 8px; }
     .dropzone strong { display: block; margin-bottom: 4px; }
-    .dropzone p { font-size: 0.8rem; color: var(--muted); }
+    .dropzone p { font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
     .dropzone input { display: none; }
 
     /* ── Progress ── */
@@ -92,8 +101,9 @@
     .progress-label { font-size: 0.78rem; color: var(--muted); margin-top: 6px; }
 
     /* ── Doc List ── */
-    .doc-list { display: flex; flex-direction: column; gap: 7px; margin-top: 16px; }
+    .doc-list { min-width: 0; display: flex; flex-direction: column; gap: 7px; margin-top: 16px; }
     .doc-item {
+      min-width: 0;
       display: flex; align-items: center; justify-content: space-between;
       padding: 10px 14px; background: var(--bg);
       border: 1px solid var(--border); border-radius: 9px;
@@ -103,17 +113,6 @@
     .doc-size { font-size: 0.75rem; color: var(--muted); flex-shrink: 0; margin-left: 6px; }
     .doc-list-empty { color: var(--muted); text-align: center; padding: 20px 0; font-size: 0.875rem; }
     .doc-list-footer { display: flex; justify-content: flex-end; margin-top: 12px; }
-
-    /* ── Git ── */
-    .git-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
-    .commit-row { display: flex; gap: 10px; margin-top: 12px; }
-    input[type="text"] {
-      flex: 1; background: var(--bg); border: 1px solid var(--border);
-      border-radius: 9px; color: var(--text); font-size: 0.875rem;
-      padding: 10px 14px; outline: none;
-    }
-    input[type="text"]:focus { border-color: var(--accent); }
-    input[type="text"]::placeholder { color: var(--muted); }
 
     /* ── Log output ── */
     .log {
@@ -144,6 +143,35 @@
     #toast.show   { transform: translateY(0); opacity: 1; }
     #toast.ok     { border-color: var(--success); }
     #toast.err    { border-color: var(--danger); }
+
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 1000; display: none;
+      align-items: center; justify-content: center; padding: 24px;
+      background: rgba(5, 7, 12, 0.78);
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal {
+      width: min(460px, 100%); background: var(--surface);
+      border: 1px solid var(--border); border-radius: 12px; padding: 22px;
+      box-shadow: 0 24px 70px rgba(0,0,0,0.45);
+    }
+    .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .modal-head h2 { font-size: 1.05rem; }
+    .modal-close {
+      width: 34px; height: 34px; padding: 0; justify-content: center;
+      background: transparent; color: var(--muted); font-size: 1.25rem;
+    }
+    .modal p { color: var(--muted); font-size: 0.9rem; line-height: 1.55; margin: 14px 0 20px; }
+    .modal-actions { display: flex; justify-content: flex-end; }
+
+    @media (max-width: 680px) {
+      .service-grid { grid-template-columns: 1fr; }
+      .service-row { align-items: flex-start; flex-direction: column; }
+      header { padding: 16px 20px; }
+      main { padding: 20px 14px; }
+      .card { padding: 20px 16px; }
+      .dropzone { padding: 30px 12px; }
+    }
   </style>
 </head>
 <body>
@@ -159,24 +187,36 @@
 
 <main>
 
-  <!-- ── Server Mode ── -->
+  <!-- Local services -->
   <div class="card">
-    <div class="card-title">Server Mode</div>
-    <div class="mode-row">
-      <div class="mode-info">
-        <div class="dot dot-unknown" id="modeDot"></div>
-        <div>
-          <div class="mode-text" id="modeLabel">Loading…</div>
-          <div class="mode-sub" id="modeSub"></div>
-          <a id="localLink" href="http://localhost:5173" target="_blank"
-            style="display:none;font-size:0.8rem;color:var(--muted);margin-top:4px;text-decoration:none;pointer-events:none">
-            → Open local bot at localhost:5173
-          </a>
+    <div class="card-title">Local Development</div>
+    <div class="service-grid">
+      <div class="service-row">
+        <div class="mode-info">
+          <div class="dot dot-unknown" id="backendDot"></div>
+          <div>
+            <div class="mode-text" id="backendLabel">Backend stopped</div>
+            <a class="service-link disabled" id="backendLink" href="http://127.0.0.1:8000/api/health" target="_blank">
+              Open backend health
+            </a>
+          </div>
         </div>
+        <button class="btn-primary" id="startBackendBtn" onclick="startService('backend')">Launch Backend</button>
       </div>
-      <button class="btn-primary btn-lg" id="toggleBtn" onclick="toggleMode()">Switch Mode</button>
+      <div class="service-row">
+        <div class="mode-info">
+          <div class="dot dot-unknown" id="frontendDot"></div>
+          <div>
+            <div class="mode-text" id="frontendLabel">Frontend stopped</div>
+            <a class="service-link disabled" id="frontendLink" href="http://localhost:5173" target="_blank">
+              Open local chatbot
+            </a>
+          </div>
+        </div>
+        <button class="btn-primary" id="startFrontendBtn" onclick="startService('frontend')">Launch Frontend</button>
+      </div>
     </div>
-    <div id="backendLogWrap" class="hidden">
+    <div id="backendLogWrap">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
         <span style="font-size:0.75rem;color:var(--muted)">Local backend output</span>
         <button class="btn-ghost" style="padding:4px 10px;font-size:0.75rem" onclick="loadBackendLogs()">↻</button>
@@ -187,7 +227,7 @@
 
   <!-- ── Documents ── -->
   <div class="card">
-    <div class="card-title">Bot Documents — server rag-backend/docs</div>
+    <div class="card-title">Local Bot Documents - rag-backend/docs</div>
 
     <div class="dropzone" id="dropzone"
       onclick="document.getElementById('fileInput').click()"
@@ -196,8 +236,8 @@
       ondrop="onDrop(event)">
       <div class="dropzone-icon">📂</div>
       <strong>Drop files here or click to browse</strong>
-      <p>Files go directly to the server's docs folder</p>
-      <input type="file" id="fileInput" multiple onchange="uploadFiles(this.files)" />
+      <p>Files are uploaded to the local backend and indexed incrementally</p>
+      <input type="file" id="fileInput" accept=".txt,.md,.html,.pdf" multiple onchange="uploadFiles(this.files)" />
     </div>
 
     <div class="progress-wrap hidden" id="progressWrap">
@@ -206,7 +246,7 @@
     </div>
 
     <div class="doc-list" id="docList">
-      <div class="doc-list-empty">Connecting to server…</div>
+      <div class="doc-list-empty">Loading local documents…</div>
     </div>
 
     <div class="doc-list-footer">
@@ -236,40 +276,42 @@
       </div>
     </div>
     <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:0.78rem;color:var(--muted)">After saving &amp; pushing via Git, sync the new prompt to the live server:</span>
-      <button class="btn-success" id="syncPromptBtn" onclick="syncPrompt()">↑ Sync Prompt to Server</button>
+      <span style="font-size:0.78rem;color:var(--muted)">Remote prompt sync is locked until deployment testing is complete.</span>
+      <button class="btn-ghost" id="syncPromptBtn" onclick="showRemoteNotice()">Remote Sync Locked</button>
     </div>
   </div>
 
-  <!-- ── Server Controls ── -->
+  <!-- Remote controls -->
   <div class="card">
-    <div class="card-title">Server Controls</div>
+    <div class="card-title">Remote Server Controls</div>
     <div>
-      <button class="btn-success" id="restartBtn" onclick="restartBackend()">
-        ⟳ Restart Backend &amp; Reload Bot
+      <button class="btn-ghost" id="restartBtn" onclick="showRemoteNotice()">
+        Remote Restart Locked
       </button>
     </div>
     <div class="log hidden" id="serverLog"></div>
   </div>
 
-  <!-- ── Git ── -->
-  <div class="card">
-    <div class="card-title">Git Workflow</div>
-    <div class="git-buttons">
-      <button class="btn-ghost" id="pullBtn" onclick="gitPull()">↓ Pull</button>
-      <button class="btn-primary" id="pushBtn" onclick="gitPush()">↑ Push</button>
-    </div>
-    <div class="commit-row">
-      <input type="text" id="commitMsg" placeholder="Commit message…"
-        onkeydown="if(event.key==='Enter') gitCommit()" />
-      <button class="btn-ghost" id="commitBtn" onclick="gitCommit()">Commit</button>
-    </div>
-    <div class="log hidden" id="gitLog"></div>
-  </div>
-
 </main>
 
 <div id="toast"></div>
+
+<div class="modal-backdrop" id="remoteModal" role="presentation" onclick="onRemoteBackdrop(event)">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="remoteModalTitle">
+    <div class="modal-head">
+      <h2 id="remoteModalTitle">Remote server actions are unavailable</h2>
+      <button class="modal-close" type="button" aria-label="Close dialog" onclick="hideRemoteNotice()">x</button>
+    </div>
+    <p>
+      Uploading files, syncing prompts, restarting services, and switching this dashboard to the remote server are locked.
+      The updated backend and indexing workflow still need deployment testing before the dashboard can safely change live data.
+      Local backend, frontend, document, and prompt workflows remain available.
+    </p>
+    <div class="modal-actions">
+      <button class="btn-primary" type="button" onclick="hideRemoteNotice()">Understood</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -301,67 +343,56 @@ function setLoading(btn, yes, label = '') {
     : (btn.dataset.orig || btn.textContent);
 }
 
-// ── Mode ─────────────────────────────────────────────────────────────────────
-let currentMode = null;
-
-function applyMode(mode) {
-  currentMode = mode;
-  const dot   = document.getElementById('modeDot');
-  const label = document.getElementById('modeLabel');
-  const sub   = document.getElementById('modeSub');
-  const btn   = document.getElementById('toggleBtn');
-  const link  = document.getElementById('localLink');
-  if (mode === 'live') {
-    dot.className     = 'dot dot-live';
-    label.textContent = 'Live';
-    sub.textContent   = 'api.chat.pathway.training';
-    btn.textContent   = '⇄ Switch to Local';
-    link.style.display = 'none';
-    document.getElementById('backendLogWrap').classList.add('hidden');
-    stopLogPolling();
-    stopHealthPolling();
-  } else {
-    dot.className     = 'dot dot-local';
-    label.textContent = 'Local — backend starting…';
-    sub.textContent   = 'backend: localhost:8000 · frontend: localhost:5173';
-    btn.textContent   = '⇄ Switch to Live';
-    link.style.display = 'block';
-    link.style.color = 'var(--muted)';
-    link.style.pointerEvents = 'none';
-    document.getElementById('backendLogWrap').classList.remove('hidden');
-    startLogPolling();
+// Local services
+async function startService(service) {
+  const btn = document.getElementById(service === 'backend' ? 'startBackendBtn' : 'startFrontendBtn');
+  setLoading(btn, true, ' Launching…');
+  try {
+    const r = await fetch(`/api/local/start/${service}`, { method: 'POST' });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    toast(d.started ? `${service} launch requested` : `${service} is already running`);
     startHealthPolling();
-  }
-}
-
-async function loadStatus() {
-  try {
-    const r = await fetch('/api/status');
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    applyMode(d.mode);
+    if (service === 'backend') startLogPolling();
   } catch (e) {
-    document.getElementById('modeLabel').textContent = 'Error: ' + e.message;
-  }
-}
-
-async function toggleMode() {
-  const btn = document.getElementById('toggleBtn');
-  setLoading(btn, true, ' Switching…');
-  try {
-    const r = await fetch('/api/toggle', { method: 'POST' });
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    applyMode(d.mode);
-    toast(`Switched to ${d.mode === 'live' ? 'Live' : 'Local'} mode`);
-  } catch (e) {
-    toast('Toggle failed: ' + e.message, 'err');
+    toast(`Could not launch ${service}: ${e.message}`, 'err');
   } finally {
     setLoading(btn, false);
-    // Re-draw btn text based on current mode
-    applyMode(currentMode);
   }
 }
+
+function updateServiceStatus(service, state) {
+  const dot = document.getElementById(`${service}Dot`);
+  const label = document.getElementById(`${service}Label`);
+  const link = document.getElementById(`${service}Link`);
+  const btn = document.getElementById(service === 'backend' ? 'startBackendBtn' : 'startFrontendBtn');
+
+  dot.className = `dot ${state.ready ? 'dot-live' : state.launched ? 'dot-local' : 'dot-unknown'}`;
+  label.textContent = state.ready
+    ? `${service[0].toUpperCase() + service.slice(1)} ready`
+    : state.launched
+      ? `${service[0].toUpperCase() + service.slice(1)} starting…`
+      : `${service[0].toUpperCase() + service.slice(1)} stopped`;
+  link.classList.toggle('disabled', !state.ready);
+  btn.disabled = state.ready || state.launched;
+  btn.textContent = state.ready ? 'Running' : state.launched ? 'Starting…' : `Launch ${service[0].toUpperCase() + service.slice(1)}`;
+}
+
+function showRemoteNotice() {
+  document.getElementById('remoteModal').classList.add('show');
+}
+
+function hideRemoteNotice() {
+  document.getElementById('remoteModal').classList.remove('show');
+}
+
+function onRemoteBackdrop(event) {
+  if (event.target === event.currentTarget) hideRemoteNotice();
+}
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') hideRemoteNotice();
+});
 
 // ── Documents ────────────────────────────────────────────────────────────────
 async function loadDocs() {
@@ -372,7 +403,7 @@ async function loadDocs() {
     const d = await r.json();
     if (d.error) throw new Error(d.error);
     if (!d.files.length) {
-      list.innerHTML = '<div class="doc-list-empty">No documents on server</div>';
+      list.innerHTML = '<div class="doc-list-empty">No local documents</div>';
       return;
     }
     list.innerHTML = d.files.map(f => `
@@ -392,7 +423,7 @@ async function loadDocs() {
 }
 
 async function deleteDoc(name) {
-  if (!confirm(`Remove "${name}" from the server?`)) return;
+  if (!confirm(`Remove "${name}" from local documents and the local index?`)) return;
   try {
     const r = await fetch('/api/docs/' + encodeURIComponent(name), { method: 'DELETE' });
     const d = await r.json();
@@ -472,73 +503,6 @@ async function restartBackend() {
 }
 
 // ── Git ──────────────────────────────────────────────────────────────────────
-function showGitLog(text) {
-  const log = document.getElementById('gitLog');
-  log.classList.remove('hidden');
-  log.textContent = text;
-}
-
-async function gitPull() {
-  const btn = document.getElementById('pullBtn');
-  setLoading(btn, true, ' Pulling…');
-  showGitLog('Running git pull…');
-  try {
-    const r = await fetch('/api/git/pull', { method: 'POST' });
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    showGitLog(d.output || 'Already up to date.');
-    toast('Pull complete');
-  } catch (e) {
-    showGitLog('✗ ' + e.message);
-    toast('Pull failed: ' + e.message, 'err');
-  } finally {
-    setLoading(btn, false);
-  }
-}
-
-async function gitCommit() {
-  const msg = document.getElementById('commitMsg').value.trim();
-  if (!msg) { toast('Enter a commit message', 'err'); return; }
-  const btn = document.getElementById('commitBtn');
-  setLoading(btn, true, ' Committing…');
-  showGitLog('Running git add . && git commit…');
-  try {
-    const r = await fetch('/api/git/commit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg }),
-    });
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    showGitLog(d.output || 'Committed.');
-    document.getElementById('commitMsg').value = '';
-    toast('Changes committed');
-  } catch (e) {
-    showGitLog('✗ ' + e.message);
-    toast('Commit failed: ' + e.message, 'err');
-  } finally {
-    setLoading(btn, false);
-  }
-}
-
-async function gitPush() {
-  const btn = document.getElementById('pushBtn');
-  setLoading(btn, true, ' Pushing…');
-  showGitLog('Running git push…');
-  try {
-    const r = await fetch('/api/git/push', { method: 'POST' });
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    showGitLog(d.output || 'Pushed.');
-    toast('Push complete');
-  } catch (e) {
-    showGitLog('✗ ' + e.message);
-    toast('Push failed: ' + e.message, 'err');
-  } finally {
-    setLoading(btn, false);
-  }
-}
-
 // ── Local backend health polling ──────────────────────────────────────────────
 let healthPoller = null;
 
@@ -546,17 +510,10 @@ async function checkHealth() {
   try {
     const r = await fetch('/api/local-health');
     const d = await r.json();
-    const link  = document.getElementById('localLink');
-    const label = document.getElementById('modeLabel');
-    if (d.ready) {
-      label.textContent       = 'Local — backend ready ✓';
-      link.style.color        = 'var(--accent)';
-      link.style.pointerEvents = 'auto';
+    updateServiceStatus('backend', d.backend);
+    updateServiceStatus('frontend', d.frontend);
+    if (d.backend.ready && d.frontend.ready) {
       stopHealthPolling();
-    } else {
-      label.textContent        = 'Local — backend starting…';
-      link.style.color         = 'var(--muted)';
-      link.style.pointerEvents = 'none';
     }
   } catch {}
 }
@@ -662,7 +619,9 @@ async function savePrompt() {
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
-loadStatus();
+checkHealth();
+startHealthPolling();
+startLogPolling();
 loadDocs();
 loadPrompt();
 </script>
