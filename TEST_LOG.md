@@ -351,11 +351,19 @@ Additional online checks still required:
 - [x] Local dashboard tests confirm the remote-action middleware returns HTTP 423 without continuing to SSH logic.
 - [x] Authenticated PDF citation regression confirms the query token is placed before `#page=N`, the file returns HTTP 200 inline, and the page fragment remains intact.
 - [ ] Confirm the deployed WordPress token-minting plugin returns a JWT accepted by `/api/ask`, then open an authenticated PDF citation at the cited page.
-- [ ] Decide whether public `/api/chat` should omit citations, require login, or continue returning protected citation references.
-- [ ] Verify rate-limit client identity through Nginx. With `CHAT_TRUST_PROXY=false`, proxied requests may share the Nginx address; enable trusted forwarding only after confirming port 8000 is not publicly reachable and Nginx overwrites forwarding headers.
-- [ ] Confirm PM2 runs the expected single backend process. The current rate limiter is process-local, so multiple workers have independent limits.
+- [x] Removed public `/api/chat`; authenticated `/api/ask` is the only deployed chatbot endpoint.
+- [x] Verified Nginx client-identity configuration: Uvicorn listens only on `127.0.0.1:8000`, direct public TCP port 8000 fails, Nginx overwrites `X-Forwarded-For` with `$remote_addr`, and `CHAT_TRUST_PROXY=true`.
+- [x] Confirmed PM2 runs one fork-mode `rag-backend` process and the saved process listens on `127.0.0.1:8000`.
 - [ ] Verify production CORS over public HTTPS allows the approved frontend and WordPress origins and rejects an unapproved origin.
-- [ ] Repeat health, missing/invalid JWT, dashboard JWT reload, query-length, HTTP 429, protected-file, chat, and citation smoke tests over public HTTPS.
+- [x] Public HTTPS health returned HTTP 200.
+- [x] Public HTTPS `/api/ask` without a JWT returned HTTP 401.
+- [x] Public HTTPS authenticated `/api/ask` returned HTTP 200 with citations and `remaining_tokens`.
+- [x] Public HTTPS conversation continuity resolved “its” to the prior ordination topic.
+- [x] Public HTTPS reload returned HTTP 403 for a normal JWT and HTTP 200 for a dashboard JWT.
+- [x] Public HTTPS protected PDF access returned HTTP 401 without a JWT and HTTP 200 `application/pdf` with a JWT.
+- [ ] Verify malformed/expired JWT rejection through public HTTPS.
+- [ ] Verify query-length and estimated-token rejection through public HTTPS; both passed through EC2 staging on port 8001.
+- [ ] Trigger and verify short-window HTTP 429 rate limiting through public HTTPS.
 - [x] Keep remote dashboard controls locked. Its legacy SSH restart/reload path is outside this backend release and must be replaced or authenticated before live controls are re-enabled.
 
 Optimal result: every local gate remains green, public HTTPS preserves the same authorization behavior, and Nginx identifies clients without trusting user-supplied forwarding headers.
@@ -411,7 +419,7 @@ Results:
 
 Remaining frontend behavior:
 
-- [ ] Redirect tokenless, expired-token, and incompatible-role visitors to the Pathway login/access page.
+- [x] Redirect tokenless, expired-token, and incompatible-role visitors to the Pathway login/access page; the later dedicated frontend suite verified each case.
 
 Remaining usage-control behavior:
 
@@ -452,7 +460,7 @@ Regression results:
 - [x] Dashboard security suite: 6 checks passed.
 - [x] Python compilation passed.
 - [x] `git diff --check` passed.
-- [ ] Browser screenshot verification was unavailable because the in-app browser could not start in this Windows session. Manual preview is available at `http://127.0.0.1:5173/`.
+- [x] Later headless Chrome verification covered desktop and mobile viewport behavior after the original in-app browser attempt was unavailable.
 
 Failed-first note:
 
@@ -505,8 +513,8 @@ Verification:
 
 Pending frontend work:
 
-- [ ] Display `remaining_tokens` after each successful response.
-- [ ] Present a clear exhausted-balance state for HTTP 429 quota responses.
+- [x] Display `remaining_tokens` after each successful response.
+- [x] Present clear zero-balance and nonzero-insufficient-balance states for daily quota HTTP 429 responses.
 
 Optimal result: the frontend can reliably read a per-user remaining balance after each answer, while exhausted users are rejected before retrieval or model execution.
 
@@ -515,7 +523,7 @@ Optimal result: the frontend can reliably read a per-user remaining balance afte
 Status: not executed. This checklist refers to Ubuntu Expanded Security Maintenance application packages on EC2, not JavaScript ES modules.
 
 - [ ] Record the exact three Ubuntu ESM Apps package names, installed versions, target versions, and compatibility notes.
-- [ ] Confirm a current EC2 snapshot or rollback backup and enough free disk space.
+- [x] Confirmed the retained rollback backup, created a pre-release `.env` backup, and restored approximately 1.2 GB free disk space after staging cleanup.
 - [ ] Schedule and communicate a maintenance window.
 - [ ] Run the Ubuntu package manager dry-run or simulation and save the output.
 - [ ] Apply only the three reviewed Ubuntu ESM Apps updates.
@@ -557,7 +565,7 @@ EC2-only remainder:
 - [ ] Identify and apply the three pending Ubuntu ESM Apps updates.
 - [ ] Install the secured webapp lockfile when the frontend is deployed from this release.
 - [ ] Confirm the live WordPress JWT identity claim.
-- [ ] Run staging and public HTTPS smoke tests before production approval.
+- [x] Ran EC2 staging and public HTTPS backend smoke tests before production approval; remaining CORS, genuine WordPress-role, and public rate-limit checks are tracked separately.
 
 Optimal result: quota balances survive backend restarts and remain consistent across local workers, while production installs only the reviewed zero-advisory dependency graph.
 
@@ -614,6 +622,109 @@ EC2-only remainder:
 
 - [ ] Expand the root EBS volume or attach the planned data volume.
 - [ ] Apply and verify the pending Ubuntu ESM Apps updates.
-- [ ] Confirm live WordPress JWT identity, Nginx forwarding, PM2 process configuration, quota persistence, protected citations, and public HTTPS behavior.
+- [ ] Confirm the genuine live WordPress JWT identity and subscriber capability.
+- [x] Confirmed Nginx forwarding overwrites client identity and direct public port 8000 access is closed.
+- [x] Confirmed the saved PM2 process runs one backend worker bound to `127.0.0.1:8000`.
+- [x] Confirmed SQLite quota persistence across an EC2 staging-process restart.
+- [x] Confirmed protected citations through local production and public HTTPS.
+- [x] Confirmed public HTTPS health, authentication boundary, authenticated answers, conversation continuity, dashboard reload authorization, and citation access.
 
 Optimal result: the pushed `Sal` commit has no known local test failures, and the remaining checks require the actual production infrastructure.
+
+## Pending Priority 3 and 5 Frontend Verification
+
+All earlier completed checks remain marked `[x]`. The production build and PHP syntax checks below were completed during implementation; the new behavior cases remain unchecked for the next dedicated test session.
+
+Static verification:
+
+- [x] `npm.cmd run build` completed with Vite 6.4.3 and copied the generated assets locally.
+- [x] `webapp/page-ask-ai.php` passed PHP syntax validation.
+
+### Hosted chat access redirect
+
+- [x] Direct access to `chat.pathway.training` without a token redirects to the configured Pathway WordPress access page without showing the chat UI.
+- [x] A malformed JWT redirects before the user can submit a request.
+- [x] An expired JWT redirects before the user can submit a request.
+- [x] A JWT missing the configured capability redirects before the user can submit a request.
+- [x] A valid unexpired JWT containing the configured capability remains in the hosted chat and can call `/api/ask`.
+- [x] HTTP 401 and HTTP 403 responses from `/api/ask` redirect to the configured access page.
+- [x] The ordinary WordPress site-wide widget does not redirect its containing page when hosted-chat auth mode is not enabled.
+- [x] A malicious external `accessUrl` value is rejected in favor of the Pathway access-page fallback.
+- [x] Localhost access URLs remain available for explicit local authentication testing.
+- [x] The WordPress Ask AI template passes `requireAuth`, `requiredCap`, `accessUrl`, token, and expiry to the iframe.
+
+Optimal result: unauthorized hosted-chat visitors return to WordPress access control, valid users remain in chat, normal embedded widgets are not redirected, and redirect parameters cannot send visitors to an unrelated site.
+
+### Subscriber compatibility release check
+
+- [ ] Confirm with the owner of the external WordPress JWT issuer which capability is minted for subscriber accounts.
+- [ ] Confirm an intended subscriber can receive a token accepted by production `/api/ask`.
+- [ ] Confirm a user outside the intended audience is still denied.
+- [ ] Only after those checks, decide whether `edit_posts` should remain the access capability or be replaced consistently in WordPress and backend configuration.
+
+Optimal result: intended subscribers can use Ask AI without weakening access for unauthorized roles. This task remains open until the external issuer and live WordPress roles are verified.
+
+### Remaining daily token balance
+
+- [x] A successful `/api/ask` response displays its integer `remaining_tokens` value beside the existing input and response estimates.
+- [x] A later successful response replaces the displayed balance with the newest backend value.
+- [x] When estimated input plus maximum output exceeds the known remaining balance, Send is disabled and the estimate uses the warning style.
+- [x] A quota HTTP 429 with zero remaining tokens displays the exhausted-daily-balance message.
+- [x] A quota HTTP 429 with a nonzero insufficient balance displays the backend-provided remaining amount.
+- [x] A short-window rate-limit HTTP 429 without `remaining_tokens` remains a generic server error and is not mislabeled as daily quota exhaustion.
+- [x] The balance and quota message fit without overlap at desktop and mobile viewport widths.
+
+Optimal result: users can see their latest backend balance, cannot knowingly submit a request larger than it, and can distinguish daily exhaustion from temporary rate limiting.
+
+Execution summary, 2026-06-07 17:17:23 +08:00:
+
+- [x] Dependency-free application mocks and headless Chrome exercised the production webapp build.
+- [x] All 20 locally reproducible frontend security, quota, and localhost checks passed.
+- [x] Desktop viewport: 1440 x 900.
+- [x] Mobile viewport: 390 x 844.
+- [x] `npm.cmd run build` passed.
+- [x] `php -l webapp/page-ask-ai.php` passed.
+- [x] The added `ws` test-only development dependency left the npm audit at zero vulnerabilities.
+
+Failed-first harness notes:
+
+- The first run timed out because Node's built-in WebSocket client could not maintain Chrome's DevTools connection; the test harness now uses the standard test-only `ws` package.
+- Chrome's GPU subprocess could not initialize in this Windows sandbox; the isolated headless test profile now disables GPU and sandbox use.
+- The second balance request initially ran during the typing animation; the harness now waits for the enabled Send button.
+- External fallback navigation produces Chrome's offline error page, so the open-redirect assertion now verifies the requested trusted URL through Chrome network events.
+
+The subscriber compatibility checks above remain external-only and unchecked.
+
+### Localhost Send regression
+
+- [x] Vite's development-only token endpoint accepts loopback requests.
+- [x] The local token contains the configured `edit_posts` capability, stable `sub=local-development` identity, and an eight-hour expiry.
+- [x] The local configuration points to `http://localhost:8000` by default.
+- [x] The localhost Send button becomes enabled after local authentication loads.
+- [x] Clicking Send submits an authenticated request to the configured local API and displays the response balance.
+- [x] The complete frontend suite now passes 20 checks.
+
+Optimal result: starting the backend and Vite frontend locally produces a working authenticated chat without placing a development token or backend secret in tracked frontend source or production assets.
+
+## 2026-06-07 17:23:40 +08:00 - Unchecked Test Reconciliation
+
+Reviewed every remaining unchecked test against the completed local, EC2 staging, production PM2, Nginx, public HTTPS, and frontend-browser evidence.
+
+Newly reconciled as passed:
+
+- Nginx overwrites forwarded client identity, Uvicorn is loopback-only, and public TCP port 8000 is closed.
+- PM2 runs one saved backend worker on `127.0.0.1:8000`.
+- EC2 staging covered authentication, query and token limits, incremental reload, conversation continuity, and durable quota persistence across restart.
+- Public HTTPS covered health, missing-token rejection, authenticated ask, conversation continuity, dashboard reload authorization, and protected PDF access.
+- Frontend tests covered authentication redirects, remaining-token display, quota error states, and desktop/mobile viewport behavior.
+- A current rollback path, pre-release `.env` backup, and approximately 1.2 GB of post-cleanup free disk space were confirmed.
+
+Still intentionally unchecked:
+
+- Genuine WordPress subscriber JWT capability and identity claims.
+- Public CORS allow/reject behavior.
+- Public malformed/expired JWT tests.
+- Public query/token-limit and short-window HTTP 429 tests.
+- Ubuntu ESM Apps review and installation.
+- EC2 storage expansion.
+- EC2 installation of the secured frontend lockfile.

@@ -335,6 +335,14 @@ body {
   font-weight: 600;
 }
 
+.quota-alert {
+  padding: .4rem 5rem 0;
+  color: #a12622;
+  font-size: .82rem;
+  font-weight: 600;
+  text-align: right;
+}
+
 .rcb-row {
   display: flex;
   gap: .5rem;
@@ -456,6 +464,10 @@ body {
 
   .token-estimate {
     padding: 0 .75rem;
+  }
+
+  .quota-alert {
+    padding: .4rem .75rem 0;
   }
 
   .rcb-row {

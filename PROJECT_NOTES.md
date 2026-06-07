@@ -40,10 +40,11 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 ### Authenticated Ask AI
 
 1. WordPress page template `webapp/page-ask-ai.php` requires a logged-in user with `edit_posts`.
-2. It calls `pathway_rag_mint_current_user_token(600)` and embeds the hosted chat app in an iframe with `apiBase`, `token`, `exp`, `source`, and `title` query params.
-3. React detects the token and uses `POST /api/ask`.
+2. It calls `pathway_rag_mint_current_user_token(600)` and embeds the hosted chat app in an iframe with API, token, expiry, required-capability, and WordPress access-page parameters.
+3. React validates the token shape, expiry, and configured capability for hosted-chat navigation, then uses `POST /api/ask`; the backend remains the authority for signature and authorization validation.
 4. Backend validates an HS256 JWT on `/api/ask` using `PATHWAY_RAG_JWT_SECRET` and the required capability from `JWT_REQUIRED_CAP` (default `edit_posts`).
 5. Dashboard upload and reload additionally require `JWT_DASHBOARD_CAP` (default `manage_rag`), so a normal WordPress token cannot mutate the document index.
+6. `chat.pathway.training` redirects missing, expired, malformed, incompatible-capability, HTTP 401, and HTTP 403 sessions to the configured Pathway WordPress access page.
 
 ### File Upload / Reload
 
@@ -186,6 +187,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - Clear chat button currently uses `GiNuclearBomb` from `react-icons/gi`.
 - Disclaimer appears above the input: "This bot can make mistakes..." (currently the source file contains mojibake for symbols).
 - The floating widget is left-side oriented in `Widget.tsx`/CSS and sends parent `postMessage` resize events.
+- The composer displays the backend-provided daily `remaining_tokens` balance after successful answers and shows a dedicated quota message when the backend rejects a reservation.
 
 ## Known Issues / Risks
 
@@ -229,6 +231,8 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The rollback snapshot is under `/home/ubuntu/pathway-backups/20260606-063636`, and the pre-release Git rollback commit is `092f05c`.
 - A byte-identical local copy is stored under the Git-ignored `local-backups/ec2/20260606-063636` directory. All 90 files were SHA-256 verified on 2026-06-06.
 - `webapp/page-ask-ai.php` consumes `pathway_rag_mint_current_user_token()`, but the WordPress plugin that defines that function is managed outside this repository and must be verified in the deployed WordPress environment.
+- The current WordPress page and backend require `edit_posts`. Subscriber access must not be enabled until the external issuer is confirmed to mint an accepted capability for the intended subscriber accounts.
+- Hosted-chat redirect destinations are limited to HTTPS Pathway domains and local development hosts to avoid an open redirect.
 
 ## Production Release Status
 
@@ -249,7 +253,11 @@ The backend release was validated and deployed on 2026-06-06.
 When changing frontend:
 
 - Run `cd webapp && npm run build` to verify TypeScript/Vite and refresh `plugin/dist`.
+- Run `cd webapp && npm run test:frontend-security` for the headless Chrome redirect, quota, and responsive-layout suite.
 - If testing interactively, run backend on `localhost:8000` and Vite on `localhost:5173`.
+- The Vite development server exposes a loopback-only `/__rag-dev-config` endpoint that reads the ignored backend `.env`, mints an eight-hour local JWT with `sub=local-development`, and points the browser at `http://localhost:8000`.
+- This local token endpoint exists only in Vite development middleware; it is not included in the production build.
+- Test hosted access redirects with `requireAuth=1`; local standalone development does not redirect unless this flag is set.
 
 When changing backend:
 
@@ -270,6 +278,7 @@ When changing WordPress/plugin behavior:
 - Build the webapp so `plugin/dist/assets/main.js` and `styles.css` are refreshed.
 - Confirm `RAG_CHATBOT_API_BASE` and optional `RAG_CHATBOT_DEV_SERVER` behavior.
 - For authenticated Ask AI, confirm the token minting function exists in the active WordPress environment.
+- Confirm the deployed token's capability claim for both contributor and intended subscriber accounts before broadening the page-template role check.
 
 ## Preferred Change Style
 

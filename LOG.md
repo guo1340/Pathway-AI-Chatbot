@@ -1010,3 +1010,99 @@ Optimal result:
 
 - The reviewed commit can be pushed to `Sal` with no remaining locally executable test failures.
 - Only infrastructure and live integration checks remain for deployment.
+
+### 2026-06-07 16:58:09 +08:00 - Priority 3 and 5 Frontend Security
+
+- Added a hosted-chat authentication gate for missing, malformed, expired, and incompatible-capability JWTs.
+- Added redirect handling for backend HTTP 401 and HTTP 403 responses.
+- Passed the WordPress access URL, required capability, and authentication requirement into the hosted iframe.
+- Restricted configured redirects to HTTPS Pathway domains and local development hosts.
+- Added display of the backend-provided daily token balance.
+- Added request disabling when the estimated reservation exceeds the known remaining balance.
+- Added distinct messages for exhausted and insufficient daily quota responses.
+- Kept the subscriber-access task open because the JWT issuer is maintained outside this repository and its subscriber capability has not been confirmed.
+
+Completed verification:
+
+1. Run `cd webapp` and `npm.cmd run build`.
+2. Run `php -l webapp/page-ask-ai.php`.
+
+Result:
+
+- Vite production compilation and local asset copy passed.
+- The WordPress page template passed PHP syntax validation.
+- The in-app browser could not initialize in this Windows sandbox, so no pending redirect, quota, or responsive behavior case was marked complete.
+
+Pending behavioral steps:
+
+1. Run the hosted app with `requireAuth=1` and the access URL set to a local test page.
+2. Exercise missing, malformed, expired, insufficient-capability, and valid JWT cases.
+3. Mock or run `/api/ask` responses for successful balances, quota HTTP 429 responses, and ordinary rate-limit HTTP 429 responses.
+4. Verify the normal site-wide WordPress widget does not redirect when hosted-chat auth mode is absent.
+5. Verify desktop and mobile layouts.
+6. Confirm contributor and subscriber token claims in the deployed external WordPress issuer before changing the role requirement.
+
+Optimal result:
+
+- Invalid hosted-chat sessions return to WordPress without exposing a backend error.
+- Valid sessions remain usable.
+- Redirect configuration cannot leave trusted Pathway or local development hosts.
+- The newest remaining balance is visible and daily quota exhaustion is clear.
+- Subscriber access changes only after the live issuer proves the intended capability contract.
+
+### 2026-06-07 17:17:23 +08:00 - Priority 3 and 5 Frontend Test Run
+
+- Added `webapp/scripts/test-frontend-security.mjs` and the `test:frontend-security` npm command.
+- Added `ws` as a development-only dependency for reliable Chrome DevTools communication; it is not included in the shipped frontend bundle.
+- Ran the production build through an isolated local HTTP server, mock `/api/ask`, and headless Chrome.
+- Passed 18 checks covering missing, malformed, expired, and insufficient-capability tokens; valid access; HTTP 401/403 redirects; widget isolation; redirect allowlisting; daily balance updates; quota responses; temporary rate limiting; and WordPress iframe parameters.
+- Verified quota layout at 1440 x 900 and 390 x 844 with no horizontal overflow or composer overlap.
+- Reran the Vite production build and PHP syntax validation successfully.
+- Confirmed npm audit remains at zero vulnerabilities.
+
+Failed-first test-harness corrections:
+
+- Replaced Node's built-in WebSocket client with the test-only `ws` package after the Chrome DevTools socket disconnected.
+- Disabled GPU and browser sandbox use only for the disposable headless test process after the Windows sandbox rejected the GPU subprocess.
+- Waited for the typing animation to restore the enabled Send button before issuing a second request.
+- Verified the trusted external fallback through Chrome network events because an offline external navigation ends on `chrome-error://`.
+
+Remaining tests:
+
+- Confirm the intended subscriber and denied-role behavior using the externally managed WordPress JWT issuer and live test accounts.
+- Decide the final WordPress/backend capability only after those live claims are known.
+
+Optimal result:
+
+- Every locally reproducible Priority 3 and 5 test remains green.
+- The only remaining frontend-security decision is based on verified live WordPress role and token behavior rather than an assumed capability.
+
+### 2026-06-07 17:45:29 +08:00 - Localhost Send Regression
+
+Issue:
+
+- `localhost:5173` had no WordPress JWT, so the Send button remained disabled.
+- The standalone Vite configuration also retained the live API URL.
+
+Fix:
+
+- Added Vite development middleware at `/__rag-dev-config`.
+- Restricted the endpoint to loopback connections.
+- Read the JWT secret and required capability from the ignored `rag-backend/.env`.
+- Minted an eight-hour local JWT with a stable `local-development` identity for durable quota accounting.
+- Loaded the local token automatically on `localhost` and `127.0.0.1`.
+- Preferred the local API configuration over the standalone page's live default.
+- Kept the endpoint out of production builds.
+
+Verification:
+
+- The Vite token endpoint returned a signed local token with `sub`, expiry, and `edit_posts`.
+- Headless Chrome confirmed the localhost Send button becomes enabled.
+- Clicking Send reached the configured local API with authentication and displayed the returned balance.
+- All previous redirect, quota, and responsive checks still passed.
+- Final frontend suite: 20 checks passed.
+- Vite production build, PHP syntax, JavaScript syntax, npm audit, and `git diff --check` passed.
+
+Optimal result:
+
+- With the backend on port 8000 and Vite on port 5173, local chat sends successfully while production continues to require WordPress authentication.

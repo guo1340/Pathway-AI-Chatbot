@@ -27,7 +27,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 ## Priority 3: Frontend Security
 
 - [ ] Restore login-based access control for `chat.pathway.training`. First confirm with the other developer that WordPress token injection works for subscriber accounts so legitimate users are not locked out.
-- [ ] Redirect tokenless, expired-token, and incompatible-role visitors from `chat.pathway.training` to the Pathway WordPress login/access page instead of showing a backend authorization error.
+- [x] Redirect tokenless, expired-token, and incompatible-role visitors from `chat.pathway.training` to the Pathway WordPress login/access page instead of showing a backend authorization error.
 
 ## Priority 4: Backend
 
@@ -38,7 +38,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 - [x] Always use authenticated `/api/ask`; remove the frontend fallback to `/api/chat`.
 - [x] Estimate question plus recent-history input tokens before sending, display the estimate, and disable requests over the configured backend-aligned limit.
-- [ ] Display the backend-provided `remaining_tokens` balance after each successful answer and handle exhausted-balance errors.
+- [x] Display the backend-provided `remaining_tokens` balance after each successful answer and handle exhausted-balance errors.
 
 ## Priority 6: Dashboard
 
@@ -51,11 +51,16 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## Priority 7: UI
 
-- No UI-specific tasks are currently listed.
+- [ ] Optimize the chatbot UI across desktop and mobile, including layout density, visual hierarchy, interaction feedback, accessibility, and consistency with the existing Pathway design.
+
+## Priority 8: Next-Stage Conversation Summaries
+
+- [ ] Backend: design and implement durable conversation summarization after 12 back-and-forth messages and when the user triggers conversation deletion. Before implementation, ask for details about the counting threshold, summary contents and retention, storage location, privacy expectations, and whether deletion should archive a final summary or permanently remove all conversation data.
+- [ ] Frontend: design and implement conversation deletion and summary-related behavior, including the backend request and user-facing confirmation/status states. Before implementation, ask for details about where the control belongs, confirmation wording, whether users can view or restore summaries, and the expected behavior after deletion.
 
 ## In Progress
 
-- Current task: Apply the three pending Ubuntu ESM Apps updates and complete the final Priority 2 EC2 smoke tests.
+- Current task: Confirm subscriber JWT capability compatibility with the externally managed WordPress token issuer before changing the contributor-only access rule.
 
 ## Done
 
@@ -81,6 +86,9 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Added per-user daily token reservations, accounting, and `remaining_tokens` to authenticated answer responses.
 - [x] Persisted daily quota usage in SQLite with atomic cross-worker reservations and anonymized user keys.
 - [x] Updated and locked the webapp toolchain to versions with zero reported npm vulnerabilities.
+- [x] Added the hosted-chat access redirect for missing, expired, incompatible, and backend-rejected JWTs.
+- [x] Added frontend daily token balance display and exhausted-balance handling.
+- [x] Ran all 20 locally reproducible Priority 3 and 5 frontend behavior checks in headless Chrome, including authenticated localhost Send behavior.
 
 ## Notes for Codex
 
@@ -115,12 +123,16 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-07 13:28:47 +08:00 - Added bounded, user-isolated server conversation context and passed all 13 backend regression groups.
 - 2026-06-07 13:28:47 +08:00 - Completed the backend storage assessment; documented root-volume expansion and a dedicated EBS data volume as the practical capacity options.
 - 2026-06-07 13:42:14 +08:00 - Completed the final local pre-push release gate; fixed the Windows webapp build copy step and passed backend, dashboard, frontend, PHP, npm audit, syntax, and diff checks.
+- 2026-06-07 16:58:09 +08:00 - Completed the repository-contained Priority 3 and 5 frontend work; subscriber-role compatibility remains pending external WordPress verification.
+- 2026-06-07 17:17:23 +08:00 - Passed all 18 local frontend auth, quota, and responsive-layout checks; live subscriber-role verification remains pending.
+- 2026-06-07 17:45:29 +08:00 - Fixed localhost Send by adding loopback-only Vite authentication; all 20 frontend checks passed.
 
 ## Steps and Instructions for Testing
 
 - Detailed test procedures and expected results: [`LOG.md`](LOG.md#steps-and-instructions-for-testing)
 - Executed test results: [`TEST_LOG.md`](TEST_LOG.md)
 - Priority 2 security results and the pending production ESM maintenance checklist: [`TEST_LOG.md`](TEST_LOG.md#priority-2-backend-security-verification)
+- Pending Priority 3 and 5 frontend behavior tests: [`TEST_LOG.md`](TEST_LOG.md#pending-priority-3-and-5-frontend-verification)
 - Priority 1 backend structure tests are documented under:
   - Content-aware document chunking
   - Incremental document indexing
