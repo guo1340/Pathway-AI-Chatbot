@@ -1,5 +1,6 @@
 import React from 'react'
 import { GiNuclearBomb } from "react-icons/gi";
+import { IoClose } from "react-icons/io5";
 
 class RagApiError extends Error {
   status: number
@@ -57,6 +58,11 @@ async function askRag(
 // --- Types ---
 type Citation = { title?: string; url?: string }
 type Msg = { who: 'you' | 'ai'; text: string; citations?: Citation[]; time?: string }
+type Notice = {
+  title: string
+  message: string
+  redirecting?: boolean
+}
 
 function estimateTokens(text: string) {
   if (!text) return 0
@@ -121,12 +127,16 @@ export default function App({
   const [convId, setConvId] = React.useState<string | undefined>(undefined)
   const [remainingTokens, setRemainingTokens] = React.useState<number | null>(null)
   const [quotaMessage, setQuotaMessage] = React.useState('')
+  const [authChecking, setAuthChecking] = React.useState(true)
+  const [notice, setNotice] = React.useState<Notice | null>(null)
+  const [clearDialogOpen, setClearDialogOpen] = React.useState(false)
   const [localAuth, setLocalAuth] = React.useState<{
     apiBase: string
     token: string
   } | null>(null)
   const logRef = React.useRef<HTMLDivElement | null>(null)
   const inputRef = React.useRef<HTMLTextAreaElement | null>(null)
+  const redirectTimerRef = React.useRef<number | null>(null)
   const cfg = (window as any).RAG_CHATBOT_CONFIG || {}
 
   const qs = new URLSearchParams(window.location.search)
@@ -165,11 +175,13 @@ export default function App({
   const tokenPayload = readJwtPayload(authToken || undefined)
   const tokenExpiry = Number(tokenPayload?.exp || expFromUrl || 0)
   const tokenCaps = Array.isArray(tokenPayload?.cap) ? tokenPayload.cap : []
+  const tokenPayloadValid = Boolean(tokenPayload)
+  const hasRequiredCap = !requiredCap || tokenCaps.includes(requiredCap)
   const authInvalid = requireAuth && (
     !authToken ||
-    !tokenPayload ||
+    !tokenPayloadValid ||
     tokenExpiry <= Math.floor(Date.now() / 1000) ||
-    (requiredCap && !tokenCaps.includes(requiredCap))
+    !hasRequiredCap
   )
   const authReady = !authInvalid
   const inputTokenLimit = positiveNumber(
@@ -194,10 +206,14 @@ export default function App({
     remainingTokens !== null && estimatedReservation > remainingTokens
 
   React.useEffect(() => {
+    let active = true
     const isLocal =
       window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1'
-    if (!isLocal || tokenFromUrl || cfg.token) return
+    if (!isLocal || tokenFromUrl || cfg.token) {
+      setAuthChecking(false)
+      return
+    }
 
     fetch('/__rag-dev-config', { cache: 'no-store' })
       .then((response) => {
@@ -205,18 +221,74 @@ export default function App({
         return response.json()
       })
       .then((config) => {
-        if (config?.apiBase && config?.token) setLocalAuth(config)
+        if (active && config?.apiBase && config?.token) setLocalAuth(config)
       })
       .catch(() => {
-        setQuotaMessage(
-          'Local authentication is unavailable. Start the frontend with Vite and configure the backend .env.'
-        )
+        if (active) {
+          setNotice({
+            title: 'Local authentication unavailable',
+            message: 'Start the frontend with Vite and configure the backend .env, then reload this page.',
+          })
+        }
       })
+      .finally(() => {
+        if (active) setAuthChecking(false)
+      })
+
+    return () => {
+      active = false
+    }
   }, [cfg.token, tokenFromUrl])
 
   React.useEffect(() => {
-    if (authInvalid) window.location.replace(accessUrl)
-  }, [accessUrl, authInvalid])
+    if (authChecking || !authInvalid) return
+
+    let message = 'Please log in to access Ask AI.'
+    if (authToken && !tokenPayloadValid) {
+      message = 'Your sign-in link is invalid. Please log in again.'
+    } else if (authToken && tokenExpiry <= Math.floor(Date.now() / 1000)) {
+      message = 'Your session has expired. Please log in again.'
+    } else if (!hasRequiredCap) {
+      message = 'Your account is not authorized to use Ask AI. Please log in with an authorized account.'
+    }
+
+    setNotice({
+      title: 'Access required',
+      message: `${message} Redirecting to the Pathway login page.`,
+      redirecting: true,
+    })
+    redirectTimerRef.current = window.setTimeout(
+      () => window.location.replace(accessUrl),
+      1600
+    )
+
+    return () => {
+      if (redirectTimerRef.current !== null) {
+        window.clearTimeout(redirectTimerRef.current)
+        redirectTimerRef.current = null
+      }
+    }
+  }, [
+    accessUrl,
+    authChecking,
+    authInvalid,
+    authToken,
+    hasRequiredCap,
+    requiredCap,
+    tokenExpiry,
+    tokenPayloadValid,
+  ])
+
+  React.useEffect(() => {
+    if (!clearDialogOpen && !notice) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (clearDialogOpen) setClearDialogOpen(false)
+      else if (!notice?.redirecting) setNotice(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [clearDialogOpen, notice])
 
   // 🧠 Load conversation from sessionStorage on mount
   React.useEffect(() => {
@@ -233,7 +305,11 @@ export default function App({
 
   // 🧠 Save messages to sessionStorage on every update
   React.useEffect(() => {
-    sessionStorage.setItem('chat_history', JSON.stringify(msgs))
+    if (msgs.length) {
+      sessionStorage.setItem('chat_history', JSON.stringify(msgs))
+    } else {
+      sessionStorage.removeItem('chat_history')
+    }
   }, [msgs])
 
   // Animate "Thinking..." dots while busy
@@ -387,7 +463,18 @@ export default function App({
     } catch (e: any) {
       if (e instanceof RagApiError && (e.status === 401 || e.status === 403) && requireAuth) {
         setBusy(false)
-        window.location.replace(accessUrl)
+        setNotice({
+          title: e.status === 403 ? 'Access denied' : 'Session expired',
+          message:
+            e.status === 403
+              ? 'Your account is not authorized to use Ask AI. Redirecting to the Pathway login page.'
+              : 'Your session is no longer valid. Redirecting to the Pathway login page.',
+          redirecting: true,
+        })
+        redirectTimerRef.current = window.setTimeout(
+          () => window.location.replace(accessUrl),
+          1600
+        )
         return
       }
       if (e instanceof RagApiError && e.status === 429 && e.remainingTokens !== undefined) {
@@ -398,17 +485,18 @@ export default function App({
             : `This request needs more tokens than your remaining daily balance of ${e.remainingTokens.toLocaleString()}.`
         )
       }
-      setMsgs((m) => [
-        ...m,
-        {
-          who: 'ai',
-          text:
-            e instanceof RagApiError && e.status === 429 && e.remainingTokens !== undefined
-              ? 'Your daily AI token balance cannot cover this request.'
-              : `Error: ${e.message}`,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ])
+      setNotice({
+        title:
+          e instanceof RagApiError && e.status === 429
+            ? 'Message could not be sent'
+            : 'Response unavailable',
+        message:
+          e instanceof RagApiError && e.status === 429 && e.remainingTokens !== undefined
+            ? 'Your daily AI token balance cannot cover this request.'
+            : e instanceof RagApiError && e.status === 429
+              ? 'Too many requests were sent. Please wait briefly and try again.'
+              : 'The chatbot could not complete this response. Please try again.',
+      })
     }
     setBusy(false)
   }
@@ -422,7 +510,10 @@ export default function App({
   // 🧠 Optional clear chat button
   function clearConversation() {
     setMsgs([])
+    setQ('')
     setConvId(undefined)
+    setQuotaMessage('')
+    setClearDialogOpen(false)
     sessionStorage.removeItem('chat_history')
   }
 
@@ -437,10 +528,101 @@ export default function App({
   }
 
   // ---- render ----
-  if (!authReady) return null
+  if (authChecking) {
+    return (
+      <div className="status-overlay" role="status" aria-live="polite">
+        <div className="status-spinner" aria-hidden="true" />
+        <strong>Checking access...</strong>
+      </div>
+    )
+  }
+
+  if (!authReady) {
+    return (
+      <div className="status-overlay" role="alert" aria-live="assertive">
+        <div className="status-spinner" aria-hidden="true" />
+        <strong>{notice?.title || 'Access required'}</strong>
+        <span>{notice?.message || 'Redirecting to the Pathway login page.'}</span>
+      </div>
+    )
+  }
 
   return (
     <div className="rcb-card" role="complementary" aria-label="RAG Chatbot">
+      {busy && (
+        <div className="thinking-overlay" role="status" aria-live="polite">
+          <div className="status-spinner" aria-hidden="true" />
+          <span>Waiting for Pathway's bot...</span>
+        </div>
+      )}
+
+      {notice && (
+        <div
+          className="dialog-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !notice.redirecting) {
+              setNotice(null)
+            }
+          }}
+        >
+          <div className="dialog-panel" role="alertdialog" aria-modal="true" aria-labelledby="notice-title">
+            {!notice.redirecting && (
+              <button
+                type="button"
+                className="dialog-close"
+                onClick={() => setNotice(null)}
+                aria-label="Close notification"
+                title="Close"
+              >
+                <IoClose />
+              </button>
+            )}
+            <h2 id="notice-title">{notice.title}</h2>
+            <p>{notice.message}</p>
+            {notice.redirecting ? (
+              <button type="button" onClick={() => window.location.replace(accessUrl)}>
+                Go to login
+              </button>
+            ) : (
+              <button type="button" onClick={() => setNotice(null)}>
+                Understood
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {clearDialogOpen && (
+        <div
+          className="dialog-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setClearDialogOpen(false)
+          }}
+        >
+          <div className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="clear-dialog-title">
+            <button
+              type="button"
+              className="dialog-close"
+              onClick={() => setClearDialogOpen(false)}
+              aria-label="Close clear chat confirmation"
+              title="Close"
+            >
+              <IoClose />
+            </button>
+            <h2 id="clear-dialog-title">Clear chat history?</h2>
+            <p>This permanently clears the chat shown in this browser and cannot be undone. Your daily token usage will not reset.</p>
+            <div className="dialog-actions">
+              <button type="button" className="dialog-secondary" onClick={() => setClearDialogOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" className="dialog-danger" onClick={clearConversation}>
+                Clear chat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="rcb-head">
         {/* {title || 'Pathway Chatbot (Beta)'} */}
         <a href="https://pathway.training/" target="_top" rel="noreferrer">
@@ -456,11 +638,12 @@ export default function App({
         <button
           onClick={(e) => {
             handleRipple(e);
-            clearConversation();
+            setClearDialogOpen(true);
           }
           }
           className="clear-btn"
-          title="Clear chat memory"
+          title="Clear chat history"
+          aria-label="Clear chat history"
         >
           <GiNuclearBomb />
         </button>
@@ -580,7 +763,7 @@ export default function App({
               className="chat-input"
             />
             <button
-              className={busy ? '' : 'send-button'}
+              className="send-button"
               onClick={send}
               disabled={
                 busy ||

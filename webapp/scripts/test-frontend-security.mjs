@@ -20,6 +20,8 @@ const MIME = {
 };
 
 const results = [];
+const askBodies = [];
+const priority8Only = process.argv.includes("--priority8");
 
 function record(name) {
   results.push(name);
@@ -77,6 +79,7 @@ const server = createServer((req, res) => {
     });
     req.on("end", () => {
       const body = JSON.parse(raw || "{}");
+      askBodies.push(body);
       const query = body.query || "";
       res.setHeader("Content-Type", "application/json");
 
@@ -104,9 +107,33 @@ const server = createServer((req, res) => {
         }));
         return;
       }
+      if (query === "quota warning") {
+        res.writeHead(429);
+        res.end(JSON.stringify({
+          detail: { message: "Daily token limit exceeded", remaining_tokens: 5000 },
+        }));
+        return;
+      }
       if (query === "rate limited") {
         res.writeHead(429);
         res.end(JSON.stringify({ detail: "Too many chat requests" }));
+        return;
+      }
+      if (query === "server failure") {
+        res.writeHead(500);
+        res.end(JSON.stringify({ detail: "Temporary backend failure" }));
+        return;
+      }
+      if (query === "slow response") {
+        setTimeout(() => {
+          res.writeHead(200);
+          res.end(JSON.stringify({
+            answer: "Slow answer",
+            citations: [],
+            conversation_id: "test-conversation",
+            remaining_tokens: 4500,
+          }));
+        }, 800);
         return;
       }
 
@@ -299,6 +326,333 @@ async function freshValidPage(cdp) {
   await waitForSelector(cdp, "#message");
 }
 
+async function clickText(cdp, selector, text) {
+  await cdp.evaluate(`(() => {
+    const element = Array.from(document.querySelectorAll(${JSON.stringify(selector)}))
+      .find((node) => node.textContent.trim() === ${JSON.stringify(text)});
+    if (!element) throw new Error('Missing ${text}');
+    element.click();
+  })()`);
+}
+
+async function runPriority8(cdp) {
+  const freshIsolatedValidPage = async () => {
+    await cdp.evaluate("try { sessionStorage.clear(); } catch {}");
+    await freshValidPage(cdp);
+  };
+
+  await cdp.send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `
+      window.__sawAuthOverlay = false;
+      window.__authOverlaySemantics = null;
+      window.__authOverlayLayout = null;
+      new MutationObserver(() => {
+        const overlay = document.querySelector('.status-overlay');
+        if (overlay) {
+          const rect = overlay.getBoundingClientRect();
+          window.__sawAuthOverlay = true;
+          window.__authOverlaySemantics = [
+            overlay.getAttribute('role'),
+            overlay.getAttribute('aria-live'),
+          ];
+          window.__authOverlayLayout = {
+            innerWidth,
+            innerHeight,
+            scrollWidth: document.documentElement.scrollWidth,
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+          };
+        }
+      }).observe(document, { childList: true, subtree: true });
+    `,
+  });
+
+  await freshIsolatedValidPage();
+  assert.equal(await cdp.evaluate("window.__sawAuthOverlay"), true);
+  assert.deepEqual(
+    await cdp.evaluate("window.__authOverlaySemantics"),
+    ["status", "polite"]
+  );
+  record("authentication checking overlay is rendered");
+
+  const invalidSessions = [
+    [{}, "Please log in"],
+    [{ token: "malformed" }, "sign-in link is invalid"],
+    [{ token: expiredToken }, "session has expired"],
+    [{ token: wrongCapToken }, "not authorized"],
+  ];
+  for (const [params, expected] of invalidSessions) {
+    await navigate(cdp, pageUrl({
+      ...params,
+      requireAuth: "1",
+      requiredCap: "edit_posts",
+      accessUrl: `${APP_ORIGIN}/access`,
+    }));
+    await waitFor(
+      () => cdp.evaluate(
+        `document.querySelector('.status-overlay')?.textContent.includes(${JSON.stringify(expected)})`
+      ),
+      `${expected} explanation`
+    );
+  }
+  record("invalid hosted sessions explain missing, malformed, expired, and unauthorized access");
+
+  for (const [query, expected] of [
+    ["auth 401", "no longer valid"],
+    ["auth 403", "not authorized"],
+  ]) {
+    await freshIsolatedValidPage();
+    await setInputAndSend(cdp, query);
+    await waitFor(
+      () => cdp.evaluate(
+        `document.querySelector('.dialog-panel')?.textContent.includes(${JSON.stringify(expected)})`
+      ),
+      `${query} authorization failure dialog`
+    );
+  }
+  await clickText(cdp, ".dialog-panel button", "Go to login");
+  await waitFor(
+    async () => (await cdp.evaluate("location.href")).startsWith(`${APP_ORIGIN}/access`),
+    "immediate login redirect"
+  );
+  record("backend 401 and 403 failures explain access and support immediate redirect");
+
+  async function openFailure() {
+    await freshIsolatedValidPage();
+    await setInputAndSend(cdp, "server failure");
+    await waitForSelector(cdp, ".dialog-panel");
+    assert.equal(
+      await cdp.evaluate(
+        "document.querySelector('.dialog-panel').textContent.includes('Temporary backend failure')"
+      ),
+      false
+    );
+  }
+
+  await openFailure();
+  await cdp.evaluate("document.querySelector('.dialog-close').click()");
+  await waitFor(
+    () => cdp.evaluate("!document.querySelector('.dialog-panel')"),
+    "failure close icon"
+  );
+  await openFailure();
+  await clickText(cdp, ".dialog-panel button", "Understood");
+  await waitFor(
+    () => cdp.evaluate("!document.querySelector('.dialog-panel')"),
+    "failure understood button"
+  );
+  await openFailure();
+  await cdp.evaluate(
+    "document.querySelector('.dialog-backdrop').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))"
+  );
+  await waitFor(
+    () => cdp.evaluate("!document.querySelector('.dialog-panel')"),
+    "failure backdrop"
+  );
+  await openFailure();
+  await cdp.evaluate(
+    "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))"
+  );
+  await waitFor(
+    () => cdp.evaluate("!document.querySelector('.dialog-panel')"),
+    "failure escape"
+  );
+  record("generic failure dialog hides raw details and supports all dismissal paths");
+
+  await freshIsolatedValidPage();
+  await setInputAndSend(cdp, "rate limited");
+  await waitFor(
+    () => cdp.evaluate(
+      "document.querySelector('.dialog-panel')?.textContent.includes('wait briefly')"
+    ),
+    "temporary rate-limit notification"
+  );
+  assert.equal(
+    await cdp.evaluate(
+      "document.querySelector('.dialog-panel').textContent.includes('daily')"
+    ),
+    false
+  );
+  record("temporary rate limit has a distinct notification");
+
+  await freshIsolatedValidPage();
+  await setInputAndSend(cdp, "slow response");
+  await waitForSelector(cdp, ".thinking-overlay");
+  assert.deepEqual(
+    await cdp.evaluate(`(() => {
+      const overlay = document.querySelector('.thinking-overlay');
+      return [
+        document.querySelector('.send-button')?.disabled,
+        overlay?.getAttribute('role'),
+        overlay?.getAttribute('aria-live'),
+      ];
+    })()`),
+    [true, "status", "polite"]
+  );
+  await waitFor(
+    () => cdp.evaluate("!document.querySelector('.thinking-overlay')"),
+    "backend waiting overlay removal"
+  );
+  record("backend waiting overlay blocks duplicate sends and clears after completion");
+
+  await freshIsolatedValidPage();
+  await setInputAndSend(cdp, "balance one");
+  await waitFor(
+    () => cdp.evaluate(
+      "document.querySelector('.token-estimate')?.textContent.includes('5,000 daily tokens remaining')"
+    ),
+    "balance before clear dialog"
+  );
+
+  const openClearDialog = async () => {
+    await cdp.evaluate("document.querySelector('.clear-btn').click()");
+    await waitForSelector(cdp, "#clear-dialog-title");
+  };
+
+  await openClearDialog();
+  assert.equal(
+    await cdp.evaluate("document.querySelectorAll('.rcb-msg.you').length"),
+    1
+  );
+  await clickText(cdp, ".dialog-actions button", "Cancel");
+  assert.equal(
+    await cdp.evaluate("document.querySelectorAll('.rcb-msg.you').length"),
+    1
+  );
+  record("clear confirmation Cancel preserves chat history");
+
+  await openClearDialog();
+  await cdp.evaluate("document.querySelector('.dialog-close').click()");
+  await openClearDialog();
+  await cdp.evaluate(
+    "document.querySelector('.dialog-backdrop').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))"
+  );
+  await openClearDialog();
+  await cdp.evaluate(
+    "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))"
+  );
+  assert.equal(
+    await cdp.evaluate("document.querySelectorAll('.rcb-msg.you').length"),
+    1
+  );
+  record("clear confirmation close, backdrop, and Escape preserve chat history");
+
+  await setInputAndSend(cdp, "quota warning");
+  await waitForSelector(cdp, ".quota-alert");
+  await clickText(cdp, ".dialog-panel button", "Understood");
+  await cdp.evaluate(`(() => {
+    const input = document.querySelector('#message');
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      'value'
+    ).set;
+    setter.call(input, 'draft to clear');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+
+  await openClearDialog();
+  assert.match(
+    await cdp.evaluate("document.querySelector('.dialog-panel').textContent"),
+    /cannot be undone/
+  );
+  assert.match(
+    await cdp.evaluate("document.querySelector('.dialog-panel').textContent"),
+    /token usage will not reset/
+  );
+  await clickText(cdp, ".dialog-actions button", "Clear chat");
+  await waitFor(
+    () => cdp.evaluate("document.querySelectorAll('.rcb-msg.you').length === 0"),
+    "confirmed clear"
+  );
+  assert.equal(await cdp.evaluate("sessionStorage.getItem('chat_history')"), null);
+  assert.equal(await cdp.evaluate("document.querySelector('#message').value"), "");
+  assert.equal(await cdp.evaluate("Boolean(document.querySelector('.quota-alert'))"), false);
+  assert.equal(
+    await cdp.evaluate(
+      "document.querySelector('.token-estimate').textContent.includes('5,000 daily tokens remaining')"
+    ),
+    true
+  );
+  await setInputAndSend(cdp, "after clear");
+  await waitFor(
+    () => cdp.evaluate(
+      "document.querySelector('.send-button:not([disabled])') !== null"
+    ),
+    "post-clear response"
+  );
+  const postClearBody = askBodies.at(-1);
+  assert.equal(postClearBody.query, "after clear");
+  assert.equal(postClearBody.conversation_id, undefined);
+  assert.deepEqual(postClearBody.history, []);
+  record("confirmed clear resets frontend conversation state and preserves token balance");
+
+  await cdp.send("Emulation.setDeviceMetricsOverride", {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 1,
+    mobile: true,
+  });
+  await navigate(cdp, pageUrl({
+    requireAuth: "1",
+    requiredCap: "edit_posts",
+    accessUrl: `${APP_ORIGIN}/access`,
+  }));
+  await waitForSelector(cdp, ".status-overlay");
+  const mobileAuthLayout = await cdp.evaluate(`(() => {
+    const overlay = document.querySelector('.status-overlay').getBoundingClientRect();
+    return {
+      innerWidth,
+      innerHeight,
+      scrollWidth: document.documentElement.scrollWidth,
+      left: overlay.left,
+      right: overlay.right,
+      top: overlay.top,
+      bottom: overlay.bottom,
+    };
+  })()`);
+  assert.ok(mobileAuthLayout.scrollWidth <= mobileAuthLayout.innerWidth);
+  assert.ok(mobileAuthLayout.left >= 0 && mobileAuthLayout.right <= mobileAuthLayout.innerWidth);
+  assert.ok(mobileAuthLayout.top >= 0 && mobileAuthLayout.bottom <= mobileAuthLayout.innerHeight);
+  await freshIsolatedValidPage();
+  await openClearDialog();
+  const mobileLayout = await cdp.evaluate(`(() => {
+    const panel = document.querySelector('.dialog-panel').getBoundingClientRect();
+    return {
+      innerWidth,
+      innerHeight,
+      scrollWidth: document.documentElement.scrollWidth,
+      left: panel.left,
+      right: panel.right,
+      top: panel.top,
+      bottom: panel.bottom,
+    };
+  })()`);
+  assert.ok(mobileLayout.scrollWidth <= mobileLayout.innerWidth);
+  assert.ok(mobileLayout.left >= 0 && mobileLayout.right <= mobileLayout.innerWidth);
+  assert.ok(mobileLayout.top >= 0 && mobileLayout.bottom <= mobileLayout.innerHeight);
+  await clickText(cdp, ".dialog-actions button", "Cancel");
+  await setInputAndSend(cdp, "slow response");
+  await waitForSelector(cdp, ".thinking-overlay");
+  const mobileWaitingLayout = await cdp.evaluate(`(() => {
+    const overlay = document.querySelector('.thinking-overlay').getBoundingClientRect();
+    return {
+      innerWidth,
+      innerHeight,
+      scrollWidth: document.documentElement.scrollWidth,
+      left: overlay.left,
+      right: overlay.right,
+      top: overlay.top,
+      bottom: overlay.bottom,
+    };
+  })()`);
+  assert.ok(mobileWaitingLayout.scrollWidth <= mobileWaitingLayout.innerWidth);
+  assert.ok(mobileWaitingLayout.left >= 0 && mobileWaitingLayout.right <= mobileWaitingLayout.innerWidth);
+  assert.ok(mobileWaitingLayout.top >= 0 && mobileWaitingLayout.bottom <= mobileWaitingLayout.innerHeight);
+  record("Priority 8 dialogs and overlays fit the mobile viewport");
+}
+
 async function run() {
   await new Promise((resolve) => server.listen(APP_PORT, "0.0.0.0", resolve));
   const chrome = spawn(CHROME, [
@@ -327,6 +681,12 @@ async function run() {
   try {
     console.log("Starting headless Chrome frontend checks...");
     cdp = await connectBrowser();
+
+    if (priority8Only) {
+      await runPriority8(cdp);
+      console.log(`\n${results.length} Priority 8 frontend checks passed.`);
+      return;
+    }
 
     await expectRedirect(
       cdp,

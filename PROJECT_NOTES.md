@@ -188,6 +188,9 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - Disclaimer appears above the input: "This bot can make mistakes..." (currently the source file contains mojibake for symbols).
 - The floating widget is left-side oriented in `Widget.tsx`/CSS and sends parent `postMessage` resize events.
 - The composer displays the backend-provided daily `remaining_tokens` balance after successful answers and shows a dedicated quota message when the backend rejects a reservation.
+- Authentication checking and backend response waiting use separate blocking overlays.
+- Request failures use a dismissible notification dialog; authorization failures explain the redirect and provide an immediate login action.
+- The nuke button clears only browser/session conversation state after explicit confirmation. It does not reset daily token usage or invoke backend summarization/deletion.
 
 ## Known Issues / Risks
 
@@ -254,6 +257,7 @@ When changing frontend:
 
 - Run `cd webapp && npm run build` to verify TypeScript/Vite and refresh `plugin/dist`.
 - Run `cd webapp && npm run test:frontend-security` for the headless Chrome redirect, quota, and responsive-layout suite.
+- Run `cd webapp && npm run test:frontend-priority8` for the 10 authorization-notification, clear-confirmation, and loading-overlay checks without repeating the earlier frontend suite.
 - If testing interactively, run backend on `localhost:8000` and Vite on `localhost:5173`.
 - The Vite development server exposes a loopback-only `/__rag-dev-config` endpoint that reads the ignored backend `.env`, mints an eight-hour local JWT with `sub=local-development`, and points the browser at `http://localhost:8000`.
 - This local token endpoint exists only in Vite development middleware; it is not included in the production build.

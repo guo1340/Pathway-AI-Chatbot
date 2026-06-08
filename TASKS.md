@@ -53,14 +53,19 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 - [ ] Optimize the chatbot UI across desktop and mobile, including layout density, visual hierarchy, interaction feedback, accessibility, and consistency with the existing Pathway design.
 
-## Priority 8: Next-Stage Conversation Summaries
+## Priority 8: Next-Stage Development.
 
 - [ ] Backend: design and implement durable conversation summarization after 12 back-and-forth messages and when the user triggers conversation deletion. Before implementation, ask for details about the counting threshold, summary contents and retention, storage location, privacy expectations, and whether deletion should archive a final summary or permanently remove all conversation data.
 - [ ] Frontend: design and implement conversation deletion and summary-related behavior, including the backend request and user-facing confirmation/status states. Before implementation, ask for details about where the control belongs, confirmation wording, whether users can view or restore summaries, and the expected behavior after deletion.
+- [x] Frontend: send logged in but not authorized users back to the login screen with an explanatory message.
+- [x] Frontend: show a pop-up notification explaining why a message failed and redirect when authorization requires it.
+- [ ] Backend: adjust the logic for when user click the nuke button to clear history. This should not reset the token usage, and it should call for a summarization for the messages not summarized and delete current chats.
+- [x] Frontend: require confirmation before the nuke button clears browser chat history. The dialog supports Cancel, close, backdrop click, Escape, and explicit confirmation.
+- [x] Frontend: show a loading overlay while checking authentication and a separate loading overlay while waiting for the backend response.
 
 ## In Progress
 
-- Current task: Confirm subscriber JWT capability compatibility with the externally managed WordPress token issuer before changing the contributor-only access rule.
+- Current task: Live WordPress role verification remains external. Conversation summarization and backend clear-history behavior remain untouched.
 
 ## Done
 
@@ -89,6 +94,10 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Added the hosted-chat access redirect for missing, expired, incompatible, and backend-rejected JWTs.
 - [x] Added frontend daily token balance display and exhausted-balance handling.
 - [x] Ran all 20 locally reproducible Priority 3 and 5 frontend behavior checks in headless Chrome, including authenticated localhost Send behavior.
+- [x] Added explanatory authorization and request-failure dialogs with redirect handling.
+- [x] Added destructive browser-history clear confirmation without resetting token usage.
+- [x] Added separate authentication-checking and backend-response loading overlays.
+- [x] Ran all 10 locally reproducible Priority 8 frontend interaction checks and corrected the missing-token explanation plus stable busy-button selector.
 
 ## Notes for Codex
 
@@ -126,6 +135,8 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-07 16:58:09 +08:00 - Completed the repository-contained Priority 3 and 5 frontend work; subscriber-role compatibility remains pending external WordPress verification.
 - 2026-06-07 17:17:23 +08:00 - Passed all 18 local frontend auth, quota, and responsive-layout checks; live subscriber-role verification remains pending.
 - 2026-06-07 17:45:29 +08:00 - Fixed localhost Send by adding loopback-only Vite authentication; all 20 frontend checks passed.
+- 2026-06-08 10:41:50 +08:00 - Completed the non-summary Priority 8 frontend states and generated their pending browser suite.
+- 2026-06-08 11:22:31 +08:00 - Ran all 10 local Priority 8 interaction checks; fixed missing-token messaging and busy-button consistency; only live WordPress role verification remains.
 
 ## Steps and Instructions for Testing
 
@@ -133,6 +144,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - Executed test results: [`TEST_LOG.md`](TEST_LOG.md)
 - Priority 2 security results and the pending production ESM maintenance checklist: [`TEST_LOG.md`](TEST_LOG.md#priority-2-backend-security-verification)
 - Pending Priority 3 and 5 frontend behavior tests: [`TEST_LOG.md`](TEST_LOG.md#pending-priority-3-and-5-frontend-verification)
+- Pending Priority 8 frontend interaction tests: [`TEST_LOG.md`](TEST_LOG.md#pending-priority-8-frontend-interaction-verification)
 - Priority 1 backend structure tests are documented under:
   - Content-aware document chunking
   - Incremental document indexing

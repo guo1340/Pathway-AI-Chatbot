@@ -1106,3 +1106,72 @@ Verification:
 Optimal result:
 
 - With the backend on port 8000 and Vite on port 5173, local chat sends successfully while production continues to require WordPress authentication.
+
+### 2026-06-08 10:41:50 +08:00 - Priority 8 Frontend Interaction States
+
+- Added an authentication-checking overlay and a separate backend-response waiting overlay.
+- Added explanatory authorization states before hosted redirects and an immediate `Go to login` action.
+- Replaced generic chat error bubbles with a dismissible failure notification dialog.
+- Added destructive clear-chat confirmation with Cancel, close icon, backdrop click, Escape, and explicit confirmation.
+- Kept clear-chat behavior frontend-only: it clears rendered/session history and starts a fresh conversation without resetting the displayed token balance.
+- Did not add conversation summarization, summary UI, backend deletion, or token-reset behavior.
+- Added the new browser test cases to `TEST_LOG.md` as unchecked for the next dedicated test run.
+
+Static verification steps:
+
+1. Run `cd webapp && npm.cmd run build`.
+2. Run `node --check scripts/test-frontend-security.mjs`.
+3. Run `git diff --check`.
+
+Generated behavioral test command:
+
+```powershell
+cd webapp
+npm.cmd run test:frontend-priority8
+```
+
+This command runs only the new Priority 8 cases and does not repeat the 20 previously completed frontend checks.
+
+Pending behavioral verification:
+
+1. Exercise every failure-dialog dismissal path and authorization redirect state.
+2. Exercise every clear-chat confirmation and cancellation path.
+3. Verify authentication and backend-waiting overlays on desktop and mobile.
+4. Confirm clearing preserves `remaining_tokens` and does not call any backend summary or deletion endpoint.
+
+Optimal result:
+
+- Frontend users receive clear status and failure feedback.
+- Destructive browser-history clearing always requires deliberate confirmation.
+- All summarization-related work remains untouched and pending.
+
+### 2026-06-08 11:22:31 +08:00 - Priority 8 Frontend Interaction Test Run
+
+- Ran the dedicated production-bundle browser suite without repeating the 20 previously completed frontend checks.
+- Passed 10 Priority 8 checks covering session explanations, backend authorization failures, failure-dialog dismissal, rate-limit messaging, loading overlays, clear-chat confirmation, token preservation, accessibility semantics, and mobile fit.
+- Fixed missing-token messaging so an absent token requests login instead of claiming the session expired.
+- Kept the Send button's `.send-button` class while busy so its disabled state and styling remain stable.
+- Improved test isolation and verified that confirmed clearing removes messages, conversation ID, draft input, quota warning, and session history while preserving the latest token balance.
+
+Failed-first results:
+
+1. The initial waiting-state check could not find the busy Send button because its class was removed while busy.
+2. The first clear-dialog run inherited prior scenario history from `sessionStorage`.
+3. The expanded access-reason check exposed incorrect missing-token wording.
+4. Transient authentication-overlay geometry required event-time capture and a persistent auth state for reliable mobile measurement.
+
+Steps and instructions for testing:
+
+1. From `webapp`, run `npm.cmd run build`.
+2. Run `npm.cmd run test:frontend-priority8`.
+3. Confirm the command reports `10 Priority 8 frontend checks passed`.
+4. Run `node --check scripts/test-frontend-security.mjs`.
+5. Run `npm.cmd audit --audit-level=high` and confirm zero vulnerabilities.
+6. From the repository root, run `git diff --check`.
+
+Optimal result:
+
+- All local Priority 8 interaction checks pass.
+- Missing, malformed, expired, and unauthorized sessions display distinct explanations.
+- Clear confirmation cannot erase history accidentally and does not reset token usage.
+- The only remaining case is the externally managed WordPress unauthorized-account round trip.

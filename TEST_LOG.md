@@ -706,6 +706,64 @@ The subscriber compatibility checks above remain external-only and unchecked.
 
 Optimal result: starting the backend and Vite frontend locally produces a working authenticated chat without placing a development token or backend secret in tracked frontend source or production assets.
 
+## Pending Priority 8 Frontend Interaction Verification
+
+All previously executed frontend tests remain checked above. The locally reproducible Priority 8 cases were run on 2026-06-08; the external WordPress-account case remains pending.
+
+### Authorization and failure notifications
+
+- [x] Missing, malformed, expired, and insufficient-capability sessions display the correct reason before redirecting.
+- [ ] A logged-in but unauthorized session is returned through the WordPress access page to the login screen with the configured explanatory message.
+- [x] Backend HTTP 401 and HTTP 403 failures show the appropriate session/access message and redirect after the delay.
+- [x] The `Go to login` button redirects immediately.
+- [x] Generic backend failures show `Response unavailable` without exposing raw backend details.
+- [x] Temporary HTTP 429 rate limits show a retry message and do not claim that daily quota is exhausted.
+- [x] A non-redirecting failure dialog closes through its close icon, Understood button, backdrop click, and Escape.
+
+Optimal result: users receive a clear, non-technical reason for failure, and only authentication-related failures navigate away.
+
+### Clear-chat confirmation
+
+- [x] Clicking the nuke button opens the destructive confirmation dialog without clearing messages.
+- [x] Cancel closes the dialog and preserves messages.
+- [x] The close icon closes the dialog and preserves messages.
+- [x] Clicking the backdrop closes the dialog and preserves messages.
+- [x] Escape closes the dialog and preserves messages.
+- [x] Confirming clears rendered messages, the current conversation ID, draft input, quota warning, and `sessionStorage` chat history.
+- [x] Confirming does not reset or hide the latest daily `remaining_tokens` balance.
+- [x] The dialog states that cleared browser history cannot be recovered and token usage will not reset.
+
+Optimal result: chat history is never cleared accidentally, while confirmed frontend clearing starts a fresh visible conversation without changing quota usage.
+
+### Loading overlays
+
+- [x] The authentication overlay is visible while local or hosted access is being checked.
+- [x] The authentication overlay is removed after valid authentication completes.
+- [x] The backend-waiting overlay appears after Send and remains visible until the response and typing sequence complete.
+- [x] The waiting overlay prevents duplicate sends while the request is active.
+- [x] Both overlays expose an accessible live status and fit desktop and mobile viewports without overflow.
+
+Optimal result: users always understand whether the app is checking access or waiting for an answer, and cannot accidentally submit duplicate requests.
+
+## 2026-06-08 11:22:31 +08:00 - Priority 8 Frontend Interaction Test Run
+
+- [x] `npm.cmd run build`
+- [x] `npm.cmd run test:frontend-priority8` - 10 checks passed.
+- [x] `node --check scripts/test-frontend-security.mjs`
+- [x] `npm.cmd audit --audit-level=high` - 0 vulnerabilities.
+- [x] `git diff --check`
+
+Failed-first findings corrected:
+
+- Kept the Send button's stable `.send-button` class while busy so its disabled state remains consistently styled and identifiable.
+- Isolated browser scenarios by clearing `sessionStorage` between independent cases.
+- Corrected missing-token messaging so it says to log in instead of incorrectly reporting an expired session.
+- Captured transient authentication-overlay semantics during rendering and measured the persistent auth overlay for reliable mobile geometry verification.
+
+Remaining external test:
+
+- [ ] Use a real logged-in WordPress account without the required capability and confirm the access page returns it to login with the configured explanation.
+
 ## 2026-06-07 17:23:40 +08:00 - Unchecked Test Reconciliation
 
 Reviewed every remaining unchecked test against the completed local, EC2 staging, production PM2, Nginx, public HTTPS, and frontend-browser evidence.
