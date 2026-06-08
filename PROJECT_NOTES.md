@@ -45,6 +45,7 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 4. Backend validates an HS256 JWT on `/api/ask` using `PATHWAY_RAG_JWT_SECRET` and the required capability from `JWT_REQUIRED_CAP` (default `edit_posts`).
 5. Dashboard upload and reload additionally require `JWT_DASHBOARD_CAP` (default `manage_rag`), so a normal WordPress token cannot mutate the document index.
 6. `chat.pathway.training` redirects missing, expired, malformed, incompatible-capability, HTTP 401, and HTTP 403 sessions to the configured Pathway WordPress access page.
+7. HTTP 401 means the token is missing, expired, malformed, or signed with a secret the backend does not accept. HTTP 403 means signature and expiry passed but the `cap` claim lacks `JWT_REQUIRED_CAP`.
 
 ### File Upload / Reload
 
@@ -190,6 +191,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The composer displays the backend-provided daily `remaining_tokens` balance after successful answers and shows a dedicated quota message when the backend rejects a reservation.
 - Authentication checking and backend response waiting use separate blocking overlays.
 - Request failures use a dismissible notification dialog; authorization failures explain the redirect and provide an immediate login action.
+- The authorization dialog's `Go to login` control is a top-level link to `https://pathway.training/wp-login.php`, so it works from the cross-origin chat iframe.
 - The nuke button clears only browser/session conversation state after explicit confirmation. It does not reset daily token usage or invoke backend summarization/deletion.
 
 ## Known Issues / Risks
@@ -221,6 +223,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The request-rate limiter remains short-window and IP-based; the daily token quota is separately keyed by JWT user identity.
 - Daily token accounting survives restarts and is shared across workers that use the same SQLite path. A network database would still be required if the backend is later spread across multiple servers.
 - The repository does not include the WordPress token issuer, so the deployed token must be checked for one configured stable identity claim before release.
+- A user who passes `page-ask-ai.php`'s `current_user_can('edit_posts')` check and then receives HTTP 401 from `/api/ask` is not being rejected by the backend role check. Compare hashes of the issuer and backend signing secrets without printing either secret, then check token expiry.
 - The webapp npm toolchain is locked to audited versions including Vite 6.4.3, Rollup 4.61.1, Picomatch 4.0.4, and PostCSS 8.5.15.
 - The separate three pending Ubuntu ESM Apps operating-system updates have not been applied on EC2.
 - Real `.env`, vector store, docs, node_modules, and generated files exist locally; avoid committing secrets or generated state.

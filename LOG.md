@@ -1175,3 +1175,46 @@ Optimal result:
 - Missing, malformed, expired, and unauthorized sessions display distinct explanations.
 - Clear confirmation cannot erase history accidentally and does not reset token usage.
 - The only remaining case is the externally managed WordPress unauthorized-account round trip.
+
+### 2026-06-08 12:53:48 +08:00 - Live WordPress Authentication 401 Diagnosis
+
+Diagnosis:
+
+- The screenshot shows `/api/ask` returning HTTP 401 after WordPress displayed the authenticated chat.
+- `page-ask-ai.php` requires `edit_posts` before minting the token, while the backend returns HTTP 403 for an accepted JWT missing that capability.
+- The observed response therefore indicates JWT validation failure rather than the wrong WordPress role. The most likely deployment cause is a signing-secret mismatch; token expiry is the other direct 401 path.
+
+Changes:
+
+- Changed backend HTTP 401 wording from `Session expired` to `Authentication failed`.
+- Kept HTTP 403 wording as `Access denied`.
+- Added separate expired-token and rejected-token explanations.
+- Replaced iframe-local login navigation with a top-level link to `https://pathway.training/wp-login.php`.
+- Extended the focused browser suite to verify the link URL and `_top` target.
+
+Testing:
+
+1. Run `cd webapp`.
+2. Run `npm.cmd run build`.
+3. Run `npm.cmd run test:frontend-priority8`.
+4. Confirm all 10 checks pass.
+5. Run `node --check scripts/test-frontend-security.mjs`.
+
+Live deployment verification:
+
+1. Compute a SHA-256 fingerprint of the backend `PATHWAY_RAG_JWT_SECRET` without displaying the secret.
+2. Ask the owner of `pathway_rag_mint_current_user_token()` to compute the issuer secret's fingerprint the same way.
+3. Confirm the fingerprints match.
+4. Reload Ask AI to mint a fresh ten-minute token, send one message, and confirm `/api/ask` returns HTTP 200.
+5. If it still returns HTTP 401, decode only the JWT payload locally and inspect `exp`, `cap`, and a configured identity claim. Never paste or log the complete token.
+
+Backend test limitation:
+
+- The focused backend unit test could not run because local `uv` and `.venv` point to a removed Python 3.12 installation and system Python lacks FastAPI.
+- Existing test source covers the boundary: invalid JWT returns 401, a valid JWT with the wrong capability returns 403, and a valid `edit_posts` JWT returns 200.
+
+Optimal result:
+
+- A fresh live WordPress token receives HTTP 200.
+- Wrong-role accounts are distinguishable through HTTP 403.
+- The login link leaves the iframe and opens the WordPress login page.

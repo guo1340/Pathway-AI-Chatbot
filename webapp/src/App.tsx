@@ -2,6 +2,8 @@ import React from 'react'
 import { GiNuclearBomb } from "react-icons/gi";
 import { IoClose } from "react-icons/io5";
 
+const WORDPRESS_LOGIN_URL = 'https://pathway.training/wp-login.php'
+
 class RagApiError extends Error {
   status: number
   remainingTokens?: number
@@ -464,11 +466,13 @@ export default function App({
       if (e instanceof RagApiError && (e.status === 401 || e.status === 403) && requireAuth) {
         setBusy(false)
         setNotice({
-          title: e.status === 403 ? 'Access denied' : 'Session expired',
+          title: e.status === 403 ? 'Access denied' : 'Authentication failed',
           message:
             e.status === 403
               ? 'Your account is not authorized to use Ask AI. Redirecting to the Pathway login page.'
-              : 'Your session is no longer valid. Redirecting to the Pathway login page.',
+              : e.message === 'Token expired'
+                ? 'Your session has expired. Please sign in again.'
+                : 'The server rejected your sign-in token. Please sign in again. If this continues, the site authentication configuration needs attention.',
           redirecting: true,
         })
         redirectTimerRef.current = window.setTimeout(
@@ -580,9 +584,9 @@ export default function App({
             <h2 id="notice-title">{notice.title}</h2>
             <p>{notice.message}</p>
             {notice.redirecting ? (
-              <button type="button" onClick={() => window.location.replace(accessUrl)}>
+              <a className="dialog-link-button" href={WORDPRESS_LOGIN_URL} target="_top">
                 Go to login
-              </button>
+              </a>
             ) : (
               <button type="button" onClick={() => setNotice(null)}>
                 Understood

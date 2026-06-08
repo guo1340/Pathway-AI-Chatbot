@@ -113,6 +113,7 @@ body {
 }
 
 .dialog-panel > button:not(.dialog-close),
+.dialog-link-button,
 .dialog-actions button {
   min-height: 40px;
   padding: .55rem .9rem;
@@ -122,6 +123,15 @@ body {
   color: #102322;
   font: inherit;
   cursor: pointer;
+}
+
+.dialog-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  color: #102c2b;
+  text-decoration: none;
 }
 
 .dialog-close {

@@ -65,7 +65,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## In Progress
 
-- Current task: Live WordPress role verification remains external. Conversation summarization and backend clear-history behavior remain untouched.
+- Current task: Verify that the live WordPress JWT issuer and backend use the same signing secret. The observed HTTP 401 is token validation failure, not the HTTP 403 wrong-role path.
 
 ## Done
 
@@ -98,6 +98,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Added destructive browser-history clear confirmation without resetting token usage.
 - [x] Added separate authentication-checking and backend-response loading overlays.
 - [x] Ran all 10 locally reproducible Priority 8 frontend interaction checks and corrected the missing-token explanation plus stable busy-button selector.
+- [x] Diagnosed the live Ask AI HTTP 401 boundary, clarified token-rejection messaging, and linked the login action directly to the top-level WordPress login page.
 
 ## Notes for Codex
 
@@ -137,6 +138,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-07 17:45:29 +08:00 - Fixed localhost Send by adding loopback-only Vite authentication; all 20 frontend checks passed.
 - 2026-06-08 10:41:50 +08:00 - Completed the non-summary Priority 8 frontend states and generated their pending browser suite.
 - 2026-06-08 11:22:31 +08:00 - Ran all 10 local Priority 8 interaction checks; fixed missing-token messaging and busy-button consistency; only live WordPress role verification remains.
+- 2026-06-08 12:53:48 +08:00 - Diagnosed the production 401 as token validation rather than role denial, fixed the iframe login action, and passed all 10 focused frontend checks.
 
 ## Steps and Instructions for Testing
 

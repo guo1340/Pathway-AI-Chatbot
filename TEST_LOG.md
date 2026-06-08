@@ -764,6 +764,29 @@ Remaining external test:
 
 - [ ] Use a real logged-in WordPress account without the required capability and confirm the access page returns it to login with the configured explanation.
 
+## 2026-06-08 12:53:48 +08:00 - Live WordPress 401 Diagnosis
+
+Observed evidence:
+
+- [x] The WordPress template checks `current_user_can('edit_posts')` before displaying the chat iframe.
+- [x] The backend uses HTTP 403 for a valid JWT missing `edit_posts`; the reported live request returned HTTP 401.
+- [x] HTTP 401 now reports token rejection instead of assuming the WordPress session expired.
+- [x] `Go to login` links to `https://pathway.training/wp-login.php` with `target="_top"`.
+- [x] The production frontend build and all 10 focused browser checks passed.
+- [x] The frontend test-harness JavaScript syntax passed.
+
+Pending live verification:
+
+- [ ] Compare SHA-256 fingerprints of the WordPress issuer signing secret and backend `PATHWAY_RAG_JWT_SECRET` without printing either raw secret.
+- [ ] Mint a fresh live WordPress token and confirm `/api/ask` returns HTTP 200.
+- [ ] If fingerprints match, inspect only the fresh token's `exp`, `cap`, and stable identity claim without recording the complete token.
+
+Backend rerun limitation:
+
+- The focused backend unit test could not start because the repository `.venv` and `uv` environment reference a removed Python 3.12 installation, while system Python lacks FastAPI. Existing test source verifies invalid JWT = 401, missing capability = 403, and valid `edit_posts` JWT = 200.
+
+Optimal result: a newly minted WordPress JWT is accepted by `/api/ask`; wrong-role accounts receive HTTP 403, while signing or expiry failures receive HTTP 401.
+
 ## 2026-06-07 17:23:40 +08:00 - Unchecked Test Reconciliation
 
 Reviewed every remaining unchecked test against the completed local, EC2 staging, production PM2, Nginx, public HTTPS, and frontend-browser evidence.

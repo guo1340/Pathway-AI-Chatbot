@@ -400,7 +400,7 @@ async function runPriority8(cdp) {
   record("invalid hosted sessions explain missing, malformed, expired, and unauthorized access");
 
   for (const [query, expected] of [
-    ["auth 401", "no longer valid"],
+    ["auth 401", "rejected your sign-in token"],
     ["auth 403", "not authorized"],
   ]) {
     await freshIsolatedValidPage();
@@ -412,12 +412,14 @@ async function runPriority8(cdp) {
       `${query} authorization failure dialog`
     );
   }
-  await clickText(cdp, ".dialog-panel button", "Go to login");
-  await waitFor(
-    async () => (await cdp.evaluate("location.href")).startsWith(`${APP_ORIGIN}/access`),
-    "immediate login redirect"
+  assert.deepEqual(
+    await cdp.evaluate(`(() => {
+      const link = document.querySelector('.dialog-link-button');
+      return [link?.href, link?.target];
+    })()`),
+    ["https://pathway.training/wp-login.php", "_top"]
   );
-  record("backend 401 and 403 failures explain access and support immediate redirect");
+  record("backend 401 and 403 failures explain access and provide the WordPress login link");
 
   async function openFailure() {
     await freshIsolatedValidPage();
