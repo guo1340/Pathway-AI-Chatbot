@@ -55,17 +55,17 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## Priority 8: Next-Stage Development.
 
-- [ ] Backend: design and implement durable conversation summarization after 12 back-and-forth messages and when the user triggers conversation deletion. Before implementation, ask for details about the counting threshold, summary contents and retention, storage location, privacy expectations, and whether deletion should archive a final summary or permanently remove all conversation data.
-- [ ] Frontend: design and implement conversation deletion and summary-related behavior, including the backend request and user-facing confirmation/status states. Before implementation, ask for details about where the control belongs, confirmation wording, whether users can view or restore summaries, and the expected behavior after deletion.
+- [x] Backend: design and implement durable conversation summarization after 12 sets of back-and-forth messages and when the user triggers conversation deletion. Before implementation, ask for details about the counting threshold, summary contents and retention, storage location, privacy expectations, and whether deletion should archive a final summary or permanently remove all conversation data.
+- [x] Frontend: design and implement conversation deletion and summary-related behavior, including the backend request and user-facing confirmation/status states. Before implementation, ask for details about where the control belongs, confirmation wording, whether users can view or restore summaries, and the expected behavior after deletion.
 - [x] Frontend: send logged in but not authorized users back to the login screen with an explanatory message.
 - [x] Frontend: show a pop-up notification explaining why a message failed and redirect when authorization requires it.
-- [ ] Backend: adjust the logic for when user click the nuke button to clear history. This should not reset the token usage, and it should call for a summarization for the messages not summarized and delete current chats.
+- [x] Backend: adjust the logic for when user click the nuke button to clear history. This should not reset the token usage, and it should call for a summarization for the messages not summarized and delete current chats. It should never delete summary.
 - [x] Frontend: require confirmation before the nuke button clears browser chat history. The dialog supports Cancel, close, backdrop click, Escape, and explicit confirmation.
 - [x] Frontend: show a loading overlay while checking authentication and a separate loading overlay while waiting for the backend response.
 
 ## In Progress
 
-- Current task: Verify that the live WordPress JWT issuer and backend use the same signing secret. The observed HTTP 401 is token validation failure, not the HTTP 403 wrong-role path.
+- Current task: Durable conversation summary/history implementation and local tests are complete. Live WordPress signing-secret verification remains separately pending.
 
 ## Done
 
@@ -99,6 +99,10 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Added separate authentication-checking and backend-response loading overlays.
 - [x] Ran all 10 locally reproducible Priority 8 frontend interaction checks and corrected the missing-token explanation plus stable busy-button selector.
 - [x] Diagnosed the live Ask AI HTTP 401 boundary, clarified token-rejection messaging, and linked the login action directly to the top-level WordPress login page.
+- [x] Added one durable per-user conversation thread with a private cumulative summary and at most 12 visible raw exchanges.
+- [x] Added authenticated self-history loading and backend clear compaction without exposing summaries in the frontend.
+- [x] Counted automatic and clear-triggered summarization against daily token usage and added transparent clear-dialog wording.
+- [x] Ran the durable summary/history tests and complete backend/frontend regressions; 15 backend, 3 summary frontend, 10 Priority 8, and 20 frontend security checks passed.
 
 ## Notes for Codex
 
@@ -139,6 +143,8 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-08 10:41:50 +08:00 - Completed the non-summary Priority 8 frontend states and generated their pending browser suite.
 - 2026-06-08 11:22:31 +08:00 - Ran all 10 local Priority 8 interaction checks; fixed missing-token messaging and busy-button consistency; only live WordPress role verification remains.
 - 2026-06-08 12:53:48 +08:00 - Diagnosed the production 401 as token validation rather than role denial, fixed the iframe login action, and passed all 10 focused frontend checks.
+- 2026-06-10 22:54:49 +08:00 - Implemented durable per-user history, private cumulative summaries, automatic 12-exchange compaction, and summary-preserving clear behavior; generated tests remain pending.
+- 2026-06-10 23:49:02 +08:00 - Ran and fixed the durable summary/history tests; all focused and regression suites passed.
 
 ## Steps and Instructions for Testing
 

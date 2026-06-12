@@ -354,14 +354,14 @@ Additional online checks still required:
 - [x] Removed public `/api/chat`; authenticated `/api/ask` is the only deployed chatbot endpoint.
 - [x] Verified Nginx client-identity configuration: Uvicorn listens only on `127.0.0.1:8000`, direct public TCP port 8000 fails, Nginx overwrites `X-Forwarded-For` with `$remote_addr`, and `CHAT_TRUST_PROXY=true`.
 - [x] Confirmed PM2 runs one fork-mode `rag-backend` process and the saved process listens on `127.0.0.1:8000`.
-- [ ] Verify production CORS over public HTTPS allows the approved frontend and WordPress origins and rejects an unapproved origin.
+- [x] Verified production CORS over public HTTPS: all three approved origins received matching `access-control-allow-origin` headers, while `https://attacker.example` returned HTTP 400 without that header.
 - [x] Public HTTPS health returned HTTP 200.
 - [x] Public HTTPS `/api/ask` without a JWT returned HTTP 401.
 - [x] Public HTTPS authenticated `/api/ask` returned HTTP 200 with citations and `remaining_tokens`.
 - [x] Public HTTPS conversation continuity resolved “its” to the prior ordination topic.
 - [x] Public HTTPS reload returned HTTP 403 for a normal JWT and HTTP 200 for a dashboard JWT.
 - [x] Public HTTPS protected PDF access returned HTTP 401 without a JWT and HTTP 200 `application/pdf` with a JWT.
-- [ ] Verify malformed/expired JWT rejection through public HTTPS.
+- [x] Verified malformed and expired JWT rejection through public HTTPS; both returned HTTP 401 with the expected `Invalid token` and `Token expired` details.
 - [ ] Verify query-length and estimated-token rejection through public HTTPS; both passed through EC2 staging on port 8001.
 - [ ] Trigger and verify short-window HTTP 429 rate limiting through public HTTPS.
 - [x] Keep remote dashboard controls locked. Its legacy SSH restart/reload path is outside this backend release and must be replaced or authenticated before live controls are re-enabled.
@@ -803,9 +803,95 @@ Newly reconciled as passed:
 Still intentionally unchecked:
 
 - Genuine WordPress subscriber JWT capability and identity claims.
-- Public CORS allow/reject behavior.
-- Public malformed/expired JWT tests.
 - Public query/token-limit and short-window HTTP 429 tests.
 - Ubuntu ESM Apps review and installation.
 - EC2 storage expansion.
 - EC2 installation of the secured frontend lockfile.
+
+## 2026-06-09 17:04:34 +08:00 - Public Edge-Test Partial Run
+
+Passed:
+
+- [x] Approved CORS origins `https://chat.pathway.training`, `https://pathway.training`, and the configured Amplify origin returned HTTP 200 with their matching allow-origin header.
+- [x] The unapproved `https://attacker.example` origin returned HTTP 400 without an allow-origin header.
+- [x] A malformed public JWT returned HTTP 401 with `Invalid token`.
+- [x] A correctly signed expired public JWT returned HTTP 401 with `Token expired`.
+
+Not yet executed successfully:
+
+- [ ] Public character-limit rejection.
+- [ ] Public estimated-token-limit rejection.
+- [ ] Public short-window rate limiting.
+
+Failure cause:
+
+- The older shell JWT stored in `$TOKEN` was absent or no longer available. Curl therefore sent no usable bearer token, and every affected request correctly returned HTTP 401 `Missing token` before reaching the intended validation or rate-limit code.
+- The emoji pasted into one command was visibly encoding-corrupted. The rerun should generate it with `chr(0x1F600)` inside Python rather than embedding the character in the terminal.
+- Production `.env` was changed to `CHAT_RATE_LIMIT_REQUESTS=3` before the failed rate-limit attempt. Restore the backed-up `.env` and restart PM2 before any other testing.
+
+Optimal result:
+
+- Production is first restored to its normal rate limit.
+- A freshly generated one-hour test JWT is validated with a small authenticated request.
+- The three pending public tests are rerun with that fresh token.
+
+## Pending Durable Conversation Summary And History Verification
+
+Previously executed tests remain checked in their existing sections. The following tests were generated on 2026-06-10 and have not been run.
+
+### Backend persistence and isolation
+
+- [x] SQLite initialization creates the conversation tables and index without changing existing quota rows.
+- [x] One authenticated user receives one stable thread ID even when requests provide different client conversation IDs.
+- [x] `GET /api/history` returns only that user's raw messages and never returns the private summary.
+- [x] Two users cannot read or influence each other's history or summary.
+- [x] Raw history and summary survive database reinitialization with the same SQLite file.
+
+### Automatic summarization
+
+- [x] The first 12 completed exchanges remain visible as 24 raw messages.
+- [x] The 13th exchange summarizes the oldest exchange, saves a non-empty cumulative summary, and leaves the newest 12 exchanges visible.
+- [x] Later compaction updates the cumulative summary without losing older summary context.
+- [x] Empty or failed summarization leaves all raw messages intact.
+- [x] Future answers receive the private summary and recent raw history as hidden context.
+- [x] Automatic summarization input and output reduce `remaining_tokens`.
+
+### Clear behavior
+
+- [x] Clear summarizes all visible exchanges, removes their raw rows, preserves summary context, and keeps the stable thread ID.
+- [x] Clearing an empty visible history performs no model call and consumes no additional tokens.
+- [x] Clear charges summarization but does not reset existing daily usage.
+- [x] Insufficient balance or summary failure preserves visible raw history.
+- [x] A new message after clear receives retained summary context.
+
+### Frontend behavior
+
+- [x] `npm.cmd run test:conversation-summary` loads the authenticated user's newest 12 exchanges after refresh.
+- [x] The frontend does not render or expose the private summary.
+- [x] A full 12-exchange window warns that the next message may use additional tokens for summarization.
+- [x] Clear confirmation explains summarization token usage and that existing usage will not reset.
+- [x] Successful clear waits for the backend before removing visible messages and updates the balance.
+- [x] Failed clear explains the failure and keeps visible history.
+
+Optimal result: each authenticated user has one durable linear thread, sees at most 12 recent exchanges, retains older context only through a private cumulative summary, and can clear visible history without losing summary context or resetting quota.
+
+## 2026-06-10 23:49:02 +08:00 - Durable Summary Test Run
+
+- [x] Three focused backend conversation tests passed.
+- [x] Complete backend security suite passed: 15 tests.
+- [x] Conversation-summary frontend suite passed: 3 checks.
+- [x] Priority 8 frontend suite passed: 10 checks.
+- [x] Complete frontend security suite passed: 20 checks.
+- [x] Frontend production build passed.
+- [x] Python and JavaScript syntax checks passed.
+- [x] `git diff --check` passed.
+
+Failed-first corrections:
+
+- Used the healthy repository-local `.uv-security-env` because system Python lacked FastAPI.
+- Shortened a summary-context test query that exceeded the suite's intentional 12-character query limit.
+- Made quota reservation read the current output-token cap at call time instead of retaining its import-time value.
+- Isolated legacy token-estimate and quota tests from durable conversation context.
+- Updated the old clear test to expect the stable one-thread conversation ID.
+- Updated the legacy rate-limit assertion to the sanitized notification dialog.
+- Removed a redundant Vite `document.readyState` wait and retained the stronger enabled-Send readiness check.

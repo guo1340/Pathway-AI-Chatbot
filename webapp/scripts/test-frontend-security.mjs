@@ -22,6 +22,10 @@ const MIME = {
 const results = [];
 const askBodies = [];
 const priority8Only = process.argv.includes("--priority8");
+const conversationSummaryOnly = process.argv.includes("--conversation-summary");
+let mockHistoryMessages = [];
+let clearConversationCalls = 0;
+let clearConversationShouldFail = false;
 
 function record(name) {
   results.push(name);
@@ -69,6 +73,37 @@ const server = createServer((req, res) => {
   if (url.pathname === "/access") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end("<!doctype html><title>Access</title><div id=\"access-page\">ACCESS PAGE</div>");
+    return;
+  }
+
+  if (url.pathname === "/api/history" && req.method === "GET") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      messages: conversationSummaryOnly ? mockHistoryMessages : [],
+      conversation_id: "thread-test-user",
+    }));
+    return;
+  }
+
+  if (url.pathname === "/api/conversation/clear" && req.method === "POST") {
+    clearConversationCalls += 1;
+    if (clearConversationShouldFail) {
+      res.writeHead(429, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        detail: {
+          message: "Daily token limit exceeded",
+          remaining_tokens: 100,
+        },
+      }));
+      return;
+    }
+    mockHistoryMessages = [];
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      conversation_id: "thread-test-user",
+      remaining_tokens: 5000,
+      summarized: true,
+    }));
     return;
   }
 
@@ -557,11 +592,11 @@ async function runPriority8(cdp) {
   await openClearDialog();
   assert.match(
     await cdp.evaluate("document.querySelector('.dialog-panel').textContent"),
-    /cannot be undone/
+    /summarizes the visible chat/
   );
   assert.match(
     await cdp.evaluate("document.querySelector('.dialog-panel').textContent"),
-    /token usage will not reset/
+    /Summarization uses daily tokens/
   );
   await clickText(cdp, ".dialog-actions button", "Clear chat");
   await waitFor(
@@ -586,7 +621,7 @@ async function runPriority8(cdp) {
   );
   const postClearBody = askBodies.at(-1);
   assert.equal(postClearBody.query, "after clear");
-  assert.equal(postClearBody.conversation_id, undefined);
+  assert.equal(postClearBody.conversation_id, "thread-test-user");
   assert.deepEqual(postClearBody.history, []);
   record("confirmed clear resets frontend conversation state and preserves token balance");
 
@@ -655,6 +690,79 @@ async function runPriority8(cdp) {
   record("Priority 8 dialogs and overlays fit the mobile viewport");
 }
 
+async function runConversationSummary(cdp) {
+  mockHistoryMessages = Array.from({ length: 12 }, (_, index) => [
+    {
+      who: "you",
+      text: `visible question ${index + 1}`,
+      citations: [],
+      time: "10:00",
+    },
+    {
+      who: "ai",
+      text: `visible answer ${index + 1}`,
+      citations: [],
+      time: "10:00",
+    },
+  ]).flat();
+
+  await freshValidPage(cdp);
+  await waitFor(
+    () => cdp.evaluate("document.querySelectorAll('.rcb-msg.you').length === 12"),
+    "durable visible history"
+  );
+  assert.equal(
+    await cdp.evaluate("document.body.textContent.includes('private summary')"),
+    false
+  );
+  assert.equal(
+    await cdp.evaluate(
+      "document.querySelector('.summary-token-notice')?.textContent.includes('additional daily tokens')"
+    ),
+    true
+  );
+  record("authenticated user loads only the 12 visible exchanges");
+
+  await cdp.evaluate("document.querySelector('.clear-btn').click()");
+  await waitForSelector(cdp, "#clear-dialog-title");
+  const warning = await cdp.evaluate(
+    "document.querySelector('.dialog-panel').textContent"
+  );
+  assert.match(warning, /Summarization uses daily tokens/);
+  assert.match(warning, /existing token usage will not reset/);
+  await clickText(cdp, ".dialog-actions button", "Clear chat");
+  await waitFor(
+    () => cdp.evaluate("document.querySelectorAll('.rcb-msg.you').length === 0"),
+    "summarized clear"
+  );
+  assert.equal(clearConversationCalls, 1);
+  record("clear summarizes on the backend before removing visible history");
+
+  mockHistoryMessages = [
+    { who: "you", text: "keep this", citations: [], time: "10:01" },
+    { who: "ai", text: "kept answer", citations: [], time: "10:01" },
+  ];
+  clearConversationShouldFail = true;
+  await freshValidPage(cdp);
+  await waitFor(
+    () => cdp.evaluate("document.querySelectorAll('.rcb-msg.you').length === 1"),
+    "history before failed clear"
+  );
+  await cdp.evaluate("document.querySelector('.clear-btn').click()");
+  await clickText(cdp, ".dialog-actions button", "Clear chat");
+  await waitFor(
+    () => cdp.evaluate(
+      "document.querySelector('.dialog-panel')?.textContent.includes('not enough daily tokens')"
+    ),
+    "failed summary notice"
+  );
+  assert.equal(
+    await cdp.evaluate("document.querySelectorAll('.rcb-msg.you').length"),
+    1
+  );
+  record("failed summarization keeps visible history");
+}
+
 async function run() {
   await new Promise((resolve) => server.listen(APP_PORT, "0.0.0.0", resolve));
   const chrome = spawn(CHROME, [
@@ -687,6 +795,11 @@ async function run() {
     if (priority8Only) {
       await runPriority8(cdp);
       console.log(`\n${results.length} Priority 8 frontend checks passed.`);
+      return;
+    }
+    if (conversationSummaryOnly) {
+      await runConversationSummary(cdp);
+      console.log(`\n${results.length} conversation summary frontend checks passed.`);
       return;
     }
 
@@ -823,7 +936,7 @@ async function run() {
     await setInputAndSend(cdp, "rate limited");
     await waitFor(
       () => cdp.evaluate(
-        "Array.from(document.querySelectorAll('.ai-text')).some((node) => node.textContent.includes('Too many chat requests'))"
+        "document.querySelector('.dialog-panel')?.textContent.includes('wait briefly')"
       ),
       "generic rate-limit error"
     );
@@ -912,7 +1025,7 @@ async function run() {
     assert.ok(localPayload.exp > Math.floor(Date.now() / 1000) + 28000);
     record("Vite mints a short-lived loopback-only local user token");
 
-    await navigate(cdp, `http://127.0.0.1:${VITE_PORT}/`);
+    await navigate(cdp, `http://127.0.0.1:${VITE_PORT}/`, false);
     await waitFor(
       () => cdp.evaluate(
         "Boolean(document.querySelector('.send-button:not([disabled])'))"

@@ -476,6 +476,13 @@ body {
   text-align: right;
 }
 
+.summary-token-notice {
+  margin: 0 0 .4rem;
+  color: #4b5d5c;
+  font-size: .78rem;
+  line-height: 1.35;
+}
+
 .rcb-row {
   display: flex;
   gap: .5rem;

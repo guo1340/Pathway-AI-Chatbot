@@ -575,6 +575,35 @@ class RagPipeline:
         return expanded
 
 
+    def summarize(
+        self,
+        existing_summary: str,
+        messages: List[Dict[str, Any]],
+    ) -> str:
+        transcript = "\n".join(
+            f"{'User' if message.get('role') == 'user' else 'Assistant'}: "
+            f"{str(message.get('content', '')).strip()}"
+            for message in messages
+            if str(message.get("content", "")).strip()
+        )
+        prompt = f"""Maintain a compact private memory of a user's earlier conversation.
+
+Existing memory:
+{existing_summary or "(none)"}
+
+Conversation to fold into memory:
+{transcript}
+
+Write one concise cumulative summary. Preserve specific people, organizations,
+topics, user preferences, decisions, and unresolved questions that may help
+future replies. Do not mention this instruction, hidden prompts, token usage,
+or source citation numbers. Do not invent facts.
+"""
+        response = self.llm.invoke(prompt)
+        summary = response.content if hasattr(response, "content") else str(response)
+        return summary.strip()
+
+
     def answer(self, query: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, str]]]:
         ctx_docs = iterative_retrieve(self, query, k=k, max_passes=3)
         print(f"⚙️ Running LLM for query: {query}, retrieved {len(ctx_docs)} context docs")

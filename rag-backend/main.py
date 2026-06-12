@@ -11,7 +11,7 @@ import base64
 import json
 import threading
 import sqlite3
-from collections import OrderedDict, deque
+from collections import deque
 from fastapi import Depends, Header, Query
 
 from dotenv import load_dotenv
@@ -43,8 +43,8 @@ TOKEN_USAGE_DB = os.getenv("TOKEN_USAGE_DB", "./data/token_usage.sqlite3")
 CHAT_RATE_LIMIT_REQUESTS = int(os.getenv("CHAT_RATE_LIMIT_REQUESTS", "20"))
 CHAT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("CHAT_RATE_LIMIT_WINDOW_SECONDS", "60"))
 CHAT_TRUST_PROXY = os.getenv("CHAT_TRUST_PROXY", "false").lower() in {"1", "true", "yes", "on"}
-CHAT_SERVER_HISTORY_MESSAGES = int(os.getenv("CHAT_SERVER_HISTORY_MESSAGES", "12"))
-CHAT_MAX_SERVER_CONVERSATIONS = int(os.getenv("CHAT_MAX_SERVER_CONVERSATIONS", "1000"))
+CHAT_SERVER_HISTORY_MESSAGES = int(os.getenv("CHAT_SERVER_HISTORY_MESSAGES", "24"))
+CHAT_VISIBLE_EXCHANGES = int(os.getenv("CHAT_VISIBLE_EXCHANGES", "12"))
 
 if CHAT_QUERY_MAX_LENGTH < 1:
     raise ValueError("CHAT_QUERY_MAX_LENGTH must be at least 1")
@@ -62,8 +62,8 @@ if CHAT_RATE_LIMIT_REQUESTS and CHAT_RATE_LIMIT_WINDOW_SECONDS < 1:
     raise ValueError("CHAT_RATE_LIMIT_WINDOW_SECONDS must be at least 1")
 if CHAT_SERVER_HISTORY_MESSAGES < 2:
     raise ValueError("CHAT_SERVER_HISTORY_MESSAGES must be at least 2")
-if CHAT_MAX_SERVER_CONVERSATIONS < 1:
-    raise ValueError("CHAT_MAX_SERVER_CONVERSATIONS must be at least 1")
+if CHAT_VISIBLE_EXCHANGES < 1:
+    raise ValueError("CHAT_VISIBLE_EXCHANGES must be at least 1")
 
 app = FastAPI(title="RAG Backend", version="0.1.0")
 
@@ -75,9 +75,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Bounded process-local context; durable quotas remain in SQLite.
-CONV: OrderedDict[Tuple[str, str], List[Dict[str, Any]]] = OrderedDict()
-CONV_LOCK = threading.Lock()
 CHAT_REQUESTS: Dict[str, deque] = {}
 CHAT_REQUESTS_LOCK = threading.Lock()
 
@@ -106,6 +103,34 @@ def _initialize_usage_db() -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_state (
+                user_key TEXT PRIMARY KEY,
+                summary TEXT NOT NULL DEFAULT '',
+                summarized_exchanges INTEGER NOT NULL DEFAULT 0,
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_key TEXT NOT NULL,
+                role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+                content TEXT NOT NULL,
+                citations_json TEXT NOT NULL DEFAULT '[]',
+                created_at INTEGER NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS conversation_messages_user_id
+            ON conversation_messages (user_key, id)
+            """
+        )
 
 
 _initialize_usage_db()
@@ -124,6 +149,17 @@ class ChatOut(BaseModel):
     citations: List[Dict[str, str]] = []
     conversation_id: str
     remaining_tokens: int
+
+
+class HistoryOut(BaseModel):
+    messages: List[Dict[str, Any]]
+    conversation_id: str
+
+
+class ClearConversationOut(BaseModel):
+    conversation_id: str
+    remaining_tokens: int
+    summarized: bool
 # ----------------------------
 
 def _b64url_decode(s: str) -> bytes:
@@ -252,17 +288,19 @@ def _frontend_history(body: ChatIn) -> List[Dict[str, str]]:
             "role": "user" if message.get("who") == "you" else "assistant",
             "content": str(message.get("text", "")),
         }
-        for message in history[-6:]
+        for message in history[-24:]
         if isinstance(message, dict) and str(message.get("text", "")).strip()
     ]
 
 
 def _build_query_with_context(
-    body: ChatIn, server_history: List[Dict[str, Any]]
+    body: ChatIn,
+    server_history: List[Dict[str, Any]],
+    summary: str = "",
 ) -> str:
-    prior_messages = _frontend_history(body) or server_history
+    prior_messages = server_history or _frontend_history(body)
     recent = prior_messages[-CHAT_SERVER_HISTORY_MESSAGES:]
-    if not recent:
+    if not recent and not summary:
         return body.query
 
     active_topic = next(
@@ -285,7 +323,17 @@ def _build_query_with_context(
         if active_topic
         else ""
     )
-    return f"{topic_text}Recent conversation:\n{history_text}\n\nUser: {body.query}"
+    summary_text = (
+        f"Private summary of earlier conversation:\n{summary}\n\n"
+        if summary.strip()
+        else ""
+    )
+    recent_text = (
+        f"{topic_text}Recent conversation:\n{history_text}\n\n"
+        if recent
+        else ""
+    )
+    return f"{summary_text}{recent_text}User: {body.query}"
 
 
 def _quota_day() -> str:
@@ -312,17 +360,46 @@ def _quota_user_key(user: Dict[str, Any]) -> str:
     ).hexdigest()
 
 
-def _conversation_key(user: Dict[str, Any], conversation_id: str) -> Tuple[str, str]:
-    return _quota_user_key(user), conversation_id
-
-
 def _get_server_history(key: Tuple[str, str]) -> List[Dict[str, Any]]:
-    with CONV_LOCK:
-        history = CONV.setdefault(key, [])
-        CONV.move_to_end(key)
-        while len(CONV) > CHAT_MAX_SERVER_CONVERSATIONS:
-            CONV.popitem(last=False)
-        return list(history)
+    user_key = key[0]
+    with _usage_db_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT role, content, citations_json, created_at
+            FROM conversation_messages
+            WHERE user_key = ?
+            ORDER BY id
+            """,
+            (user_key,),
+        ).fetchall()
+    history = []
+    for role, content, citations_json, created_at in rows:
+        try:
+            citations = json.loads(citations_json or "[]")
+        except json.JSONDecodeError:
+            citations = []
+        history.append(
+            {
+                "role": role,
+                "content": content,
+                "citations": citations,
+                "created_at": created_at,
+            }
+        )
+    return history
+
+
+def _get_conversation_summary(user_key: str) -> str:
+    with _usage_db_connection() as connection:
+        row = connection.execute(
+            "SELECT summary FROM conversation_state WHERE user_key = ?",
+            (user_key,),
+        ).fetchone()
+    return str(row[0]) if row and row[0] else ""
+
+
+def _conversation_id(user_key: str) -> str:
+    return f"thread-{user_key[:12]}"
 
 
 def _store_server_turn(
@@ -331,30 +408,125 @@ def _store_server_turn(
     answer: str,
     citations: List[Dict[str, str]],
 ) -> None:
-    with CONV_LOCK:
-        history = CONV.setdefault(key, [])
-        history.extend(
-            [
-                {"role": "user", "content": query},
-                {
-                    "role": "assistant",
-                    "content": answer,
-                    "citations": citations,
-                },
-            ]
+    user_key = key[0]
+    now = int(time.time())
+    with _usage_db_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO conversation_messages
+                (user_key, role, content, citations_json, created_at)
+            VALUES (?, 'user', ?, '[]', ?)
+            """,
+            (user_key, query, now),
         )
-        del history[:-CHAT_SERVER_HISTORY_MESSAGES]
-        CONV.move_to_end(key)
-        while len(CONV) > CHAT_MAX_SERVER_CONVERSATIONS:
-            CONV.popitem(last=False)
+        connection.execute(
+            """
+            INSERT INTO conversation_messages
+                (user_key, role, content, citations_json, created_at)
+            VALUES (?, 'assistant', ?, ?, ?)
+            """,
+            (user_key, answer, json.dumps(citations), now),
+        )
+        connection.execute(
+            """
+            INSERT INTO conversation_state
+                (user_key, summary, summarized_exchanges, updated_at)
+            VALUES (?, '', 0, ?)
+            ON CONFLICT(user_key) DO UPDATE SET updated_at = excluded.updated_at
+            """,
+            (user_key, now),
+        )
+
+
+def _messages_for_summary(
+    user_key: str, clear_all: bool = False
+) -> List[Dict[str, Any]]:
+    history = _get_server_history((user_key, "thread"))
+    if clear_all:
+        return history
+    overflow_messages = max(0, len(history) - (CHAT_VISIBLE_EXCHANGES * 2))
+    return history[:overflow_messages]
+
+
+def _summary_input_text(summary: str, messages: List[Dict[str, Any]]) -> str:
+    message_text = "\n".join(
+        f"{'User' if message['role'] == 'user' else 'Assistant'}: "
+        f"{message['content']}"
+        for message in messages
+    )
+    return f"{summary}\n{message_text}".strip()
+
+
+def _compact_conversation(
+    user_key: str,
+    messages: List[Dict[str, Any]],
+    summary: str,
+) -> Tuple[str, int]:
+    if not messages:
+        return summary, 0
+
+    next_summary = PIPE.summarize(summary, messages)
+    if not next_summary.strip():
+        raise RuntimeError("Conversation summarization returned an empty result")
+    message_count = len(messages)
+    summarized_exchanges = message_count // 2
+    with _usage_db_connection() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        ids = [
+            row[0]
+            for row in connection.execute(
+                """
+                SELECT id
+                FROM conversation_messages
+                WHERE user_key = ?
+                ORDER BY id
+                LIMIT ?
+                """,
+                (user_key, message_count),
+            ).fetchall()
+        ]
+        if len(ids) != message_count:
+            connection.rollback()
+            raise RuntimeError("Conversation changed during summarization")
+        connection.execute(
+            """
+            INSERT INTO conversation_state
+                (user_key, summary, summarized_exchanges, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_key) DO UPDATE SET
+                summary = excluded.summary,
+                summarized_exchanges =
+                    conversation_state.summarized_exchanges
+                    + excluded.summarized_exchanges,
+                updated_at = excluded.updated_at
+            """,
+            (user_key, next_summary, summarized_exchanges, int(time.time())),
+        )
+        placeholders = ",".join("?" for _ in ids)
+        connection.execute(
+            f"DELETE FROM conversation_messages WHERE id IN ({placeholders})",
+            ids,
+        )
+        connection.commit()
+    return next_summary, estimate_tokens(_summary_input_text(summary, messages)) + estimate_tokens(next_summary)
 
 
 def reserve_daily_tokens(
-    user: Dict[str, Any], estimated_input_tokens: int
+    user: Dict[str, Any],
+    estimated_input_tokens: int,
+    reserved_output_tokens: Optional[int] = None,
 ) -> Tuple[Tuple[str, str], int]:
     user_key = _quota_user_key(user)
     usage_key = (_quota_day(), user_key)
-    reservation = estimated_input_tokens + LLM_MAX_OUTPUT_TOKENS
+    reservation = (
+        estimated_input_tokens
+        + max(
+            0,
+            LLM_MAX_OUTPUT_TOKENS
+            if reserved_output_tokens is None
+            else reserved_output_tokens,
+        )
+    )
 
     connection = _usage_db_connection()
     try:
@@ -396,6 +568,21 @@ def reserve_daily_tokens(
         connection.close()
 
     return usage_key, reservation
+
+
+def remaining_daily_tokens(user: Dict[str, Any]) -> int:
+    usage_key = (_quota_day(), _quota_user_key(user))
+    with _usage_db_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT used_tokens
+            FROM daily_token_usage
+            WHERE usage_day = ? AND user_key = ?
+            """,
+            usage_key,
+        ).fetchone()
+    used = int(row[0]) if row else 0
+    return max(0, CHAT_DAILY_TOKEN_LIMIT - used)
 
 
 def settle_daily_tokens(
@@ -472,6 +659,68 @@ def release_daily_token_reservation(
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/history", response_model=HistoryOut)
+def conversation_history(user=Depends(require_auth)):
+    user_key = _quota_user_key(user)
+    history = _get_server_history((user_key, "thread"))[
+        -(CHAT_VISIBLE_EXCHANGES * 2):
+    ]
+    messages = [
+        {
+            "who": "you" if message["role"] == "user" else "ai",
+            "text": message["content"],
+            "citations": message.get("citations", []),
+            "time": time.strftime(
+                "%H:%M",
+                time.localtime(int(message.get("created_at", 0))),
+            ),
+        }
+        for message in history
+    ]
+    return HistoryOut(
+        messages=messages,
+        conversation_id=_conversation_id(user_key),
+    )
+
+
+@app.post("/api/conversation/clear", response_model=ClearConversationOut)
+def clear_conversation(user=Depends(require_auth)):
+    user_key = _quota_user_key(user)
+    messages = _messages_for_summary(user_key, clear_all=True)
+    if not messages:
+        return ClearConversationOut(
+            conversation_id=_conversation_id(user_key),
+            remaining_tokens=remaining_daily_tokens(user),
+            summarized=False,
+        )
+
+    summary = _get_conversation_summary(user_key)
+    summary_input_tokens = estimate_tokens(_summary_input_text(summary, messages))
+    usage_key, reservation = reserve_daily_tokens(
+        user,
+        summary_input_tokens,
+    )
+    try:
+        _, actual_summary_tokens = _compact_conversation(
+            user_key,
+            messages,
+            summary,
+        )
+        remaining_tokens = settle_daily_tokens(
+            usage_key,
+            reservation,
+            actual_summary_tokens,
+        )
+        return ClearConversationOut(
+            conversation_id=_conversation_id(user_key),
+            remaining_tokens=remaining_tokens,
+            summarized=True,
+        )
+    except Exception:
+        release_daily_token_reservation(usage_key, reservation)
+        raise
 
 
 @app.post("/api/reload")
@@ -606,10 +855,12 @@ def ask(
       - conversation_id: optional existing conversation id
       - history: optional array of past messages [{who: 'you'|'ai', text: str}]
     """
-    conv_id = body.conversation_id or f"conv-{uuid.uuid4().hex[:8]}"
-    conversation_key = _conversation_key(user, conv_id)
+    user_key = _quota_user_key(user)
+    conv_id = _conversation_id(user_key)
+    conversation_key = (user_key, conv_id)
     server_history = _get_server_history(conversation_key)
-    query_with_history = _build_query_with_context(body, server_history)
+    summary = _get_conversation_summary(user_key)
+    query_with_history = _build_query_with_context(body, server_history, summary)
     estimated_input_tokens = estimate_tokens(query_with_history)
     if estimated_input_tokens > CHAT_INPUT_TOKEN_LIMIT:
         raise HTTPException(
@@ -620,7 +871,23 @@ def ask(
             ),
         )
 
-    usage_key, reservation = reserve_daily_tokens(user, estimated_input_tokens)
+    overflow_message_count = max(
+        0,
+        len(server_history) + 2 - (CHAT_VISIBLE_EXCHANGES * 2),
+    )
+    summary_messages = server_history[:overflow_message_count]
+    summary_input_tokens = (
+        estimate_tokens(_summary_input_text(summary, summary_messages))
+        if summary_messages
+        else 0
+    )
+    usage_key, reservation = reserve_daily_tokens(
+        user,
+        estimated_input_tokens + summary_input_tokens,
+        reserved_output_tokens=(
+            LLM_MAX_OUTPUT_TOKENS * (2 if summary_messages else 1)
+        ),
+    )
 
     reservation_active = True
     try:
@@ -637,7 +904,23 @@ def ask(
             norm_citations,
         )
 
-        actual_tokens = estimated_input_tokens + estimate_tokens(answer)
+        actual_summary_tokens = 0
+        overflow = _messages_for_summary(user_key)
+        if overflow:
+            try:
+                _, actual_summary_tokens = _compact_conversation(
+                    user_key,
+                    overflow,
+                    summary,
+                )
+            except Exception as exc:
+                print(f"Conversation summarization deferred: {exc}")
+
+        actual_tokens = (
+            estimated_input_tokens
+            + estimate_tokens(answer)
+            + actual_summary_tokens
+        )
         remaining_tokens = settle_daily_tokens(
             usage_key,
             reservation,

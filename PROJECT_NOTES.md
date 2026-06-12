@@ -34,8 +34,9 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 ### Public Chat
 
 1. React UI sends all chatbot requests to authenticated `POST /api/ask`.
-2. Backend loads bounded process-local context keyed by both the authenticated user and conversation ID, then includes the prior active topic and recent turns in follow-up prompts.
+2. Backend loads the authenticated user's private cumulative summary plus newest durable raw exchanges from SQLite.
 3. `RagPipeline.answer()` retrieves context from Chroma, invokes the LLM, prepares citations, and returns `{ answer, citations, conversation_id, remaining_tokens }`.
+4. Each user has one linear thread. The newest 12 completed exchanges remain as visible raw history; older exchanges are folded into the private summary before their raw rows are removed.
 
 ### Authenticated Ask AI
 
@@ -126,6 +127,8 @@ Backend:
 
 - `GET /api/health`: health check.
 - `POST /api/ask`: authenticated chat endpoint with history support.
+- `GET /api/history`: returns only the authenticated user's newest visible raw exchanges; it never returns the private summary.
+- `POST /api/conversation/clear`: summarizes all visible raw exchanges, preserves the cumulative summary, removes the raw rows, and returns the updated token balance.
 - `GET /api/files/{name}`: authenticated file access using a bearer token or citation `token` query parameter.
 - `POST /api/upload`: dashboard-authorized upload and re-index.
 - `POST /api/reload`: dashboard-authorized index reload.
@@ -173,8 +176,11 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - Citation URLs use `API_BASE` and default to `http://localhost:8000/api/files/{filename}` for the current local-only dashboard; page fragments are preserved where possible.
 - Adjacent-page expansion skips documents such as `.txt`, `.md`, and `.html` files when they do not have numeric page metadata.
 - `prompt.txt` is loaded fresh inside `RagPipeline.answer()` for each query.
-- The backend conversation store is process-local and not durable, but it is isolated by authenticated user plus conversation ID and bounded by `CHAT_SERVER_HISTORY_MESSAGES` and `CHAT_MAX_SERVER_CONVERSATIONS`.
-- Successful server turns are used when frontend history is absent. The latest prior user message is supplied as the active topic, and all added context counts toward input and daily token limits.
+- Durable conversation rows and cumulative summaries share the SQLite database configured by `TOKEN_USAGE_DB`.
+- Conversation ownership uses the same HMAC-derived stable user key as daily quota storage, so raw WordPress user IDs are not stored.
+- Each user has one stable linear thread. Client-provided conversation IDs remain accepted for request compatibility but do not create separate threads.
+- `CHAT_VISIBLE_EXCHANGES` defaults to 12. Overflow exchanges are summarized, and raw rows are removed only after a non-empty replacement summary is saved.
+- The private cumulative summary and recent raw messages are hidden context for future answers. Automatic and clear-triggered summarization consume daily tokens.
 - `App.tsx` also persists visible chat history in `sessionStorage`.
 
 ## UI/Design Notes
@@ -192,7 +198,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - Authentication checking and backend response waiting use separate blocking overlays.
 - Request failures use a dismissible notification dialog; authorization failures explain the redirect and provide an immediate login action.
 - The authorization dialog's `Go to login` control is a top-level link to `https://pathway.training/wp-login.php`, so it works from the cross-origin chat iframe.
-- The nuke button clears only browser/session conversation state after explicit confirmation. It does not reset daily token usage or invoke backend summarization/deletion.
+- The nuke button calls authenticated backend compaction. Visible raw history is removed only after it is folded into the retained private summary; daily token usage is not reset.
 
 ## Known Issues / Risks
 
@@ -222,6 +228,9 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The rate limiter is process-local, so each worker has a separate request bucket; a shared store is still required before scaling to multiple workers.
 - The request-rate limiter remains short-window and IP-based; the daily token quota is separately keyed by JWT user identity.
 - Daily token accounting survives restarts and is shared across workers that use the same SQLite path. A network database would still be required if the backend is later spread across multiple servers.
+- Conversation history and summaries survive restarts in the same SQLite file. Same-user summarization currently assumes one backend worker; a future multi-worker deployment should add distributed per-user locking.
+- Rotating `PATHWAY_RAG_JWT_SECRET` changes the HMAC-derived conversation owner key and requires a history-key migration first.
+- Admin history lookup is intentionally not exposed yet. A future dashboard endpoint can use the existing user-keyed tables after authorization and audit requirements are defined.
 - The repository does not include the WordPress token issuer, so the deployed token must be checked for one configured stable identity claim before release.
 - A user who passes `page-ask-ai.php`'s `current_user_can('edit_posts')` check and then receives HTTP 401 from `/api/ask` is not being rejected by the backend role check. Compare hashes of the issuer and backend signing secrets without printing either secret, then check token expiry.
 - The webapp npm toolchain is locked to audited versions including Vite 6.4.3, Rollup 4.61.1, Picomatch 4.0.4, and PostCSS 8.5.15.
@@ -261,6 +270,7 @@ When changing frontend:
 - Run `cd webapp && npm run build` to verify TypeScript/Vite and refresh `plugin/dist`.
 - Run `cd webapp && npm run test:frontend-security` for the headless Chrome redirect, quota, and responsive-layout suite.
 - Run `cd webapp && npm run test:frontend-priority8` for the 10 authorization-notification, clear-confirmation, and loading-overlay checks without repeating the earlier frontend suite.
+- Run `cd webapp && npm run test:conversation-summary` for the newly generated self-history and summary-preserving clear checks.
 - If testing interactively, run backend on `localhost:8000` and Vite on `localhost:5173`.
 - The Vite development server exposes a loopback-only `/__rag-dev-config` endpoint that reads the ignored backend `.env`, mints an eight-hour local JWT with `sub=local-development`, and points the browser at `http://localhost:8000`.
 - This local token endpoint exists only in Vite development middleware; it is not included in the production build.
@@ -270,6 +280,7 @@ When changing backend:
 
 - Prefer a lightweight import/syntax check first.
 - Run `uv run --project rag-backend python -m unittest discover -s rag-backend/tests -p "test_backend_security.py" -v` for the isolated backend security suite.
+- On the current Windows workspace, the checked-in `.venv` points to a removed interpreter and system Python lacks FastAPI. Use `..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v` from `rag-backend`.
 - Run the FastAPI server if env/secrets and vector index are available.
 - Be aware that importing `main.py` initializes `RagPipeline.from_disk()` and may require embeddings/provider credentials.
 

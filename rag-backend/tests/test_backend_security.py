@@ -39,7 +39,7 @@ os.environ.update(
         "CHAT_RATE_LIMIT_WINDOW_SECONDS": "60",
         "CHAT_TRUST_PROXY": "false",
         "CHAT_SERVER_HISTORY_MESSAGES": "12",
-        "CHAT_MAX_SERVER_CONVERSATIONS": "1000",
+        "CHAT_VISIBLE_EXCHANGES": "12",
         "CORS_ORIGINS": (
             "http://localhost:5173,http://localhost:3000,"
             "https://main.d2wlgxponag5j6.amplifyapp.com,"
@@ -55,6 +55,9 @@ class StubPipeline:
         self.reload_calls = 0
         self.citations = []
         self.fail_answer = False
+        self.fail_summary = False
+        self.empty_summary = False
+        self.summary_calls = 0
 
     @classmethod
     def from_disk(cls):
@@ -65,6 +68,15 @@ class StubPipeline:
         if self.fail_answer:
             raise RuntimeError("stub answer failure")
         return "stub answer [1]" if self.citations else "stub answer", self.citations
+
+    def summarize(self, existing_summary, messages):
+        self.summary_calls += 1
+        if self.fail_summary:
+            raise RuntimeError("stub summary failure")
+        if self.empty_summary:
+            return ""
+        folded = " | ".join(message["content"] for message in messages)
+        return f"{existing_summary} | {folded}".strip(" |")
 
     def reload(self):
         self.reload_calls += 1
@@ -135,15 +147,20 @@ class BackendSecurityTests(unittest.TestCase):
 
     def setUp(self):
         main.CHAT_REQUESTS.clear()
-        main.CONV.clear()
         main.PIPE.answer_calls.clear()
         main.PIPE.citations = []
         main.PIPE.fail_answer = False
+        main.PIPE.fail_summary = False
+        main.PIPE.empty_summary = False
+        main.PIPE.summary_calls = 0
         main.CHAT_RATE_LIMIT_REQUESTS = 0
         main.CHAT_RATE_LIMIT_WINDOW_SECONDS = 60
         main.CHAT_TRUST_PROXY = False
         main.CHAT_SERVER_HISTORY_MESSAGES = 12
-        main.CHAT_MAX_SERVER_CONVERSATIONS = 1000
+        main.CHAT_VISIBLE_EXCHANGES = 12
+        with main._usage_db_connection() as connection:
+            connection.execute("DELETE FROM conversation_messages")
+            connection.execute("DELETE FROM conversation_state")
         main.CHAT_INPUT_TOKEN_LIMIT = 1000
         main.CHAT_DAILY_TOKEN_LIMIT = 100000
         main.LLM_MAX_OUTPUT_TOKENS = 1200
@@ -223,6 +240,8 @@ class BackendSecurityTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(main.PIPE.answer_calls), before + 1)
 
+        with main._usage_db_connection() as connection:
+            connection.execute("DELETE FROM conversation_messages")
         main.CHAT_INPUT_TOKEN_LIMIT = 2
         before = len(main.PIPE.answer_calls)
         response = self.client.post(
@@ -234,6 +253,8 @@ class BackendSecurityTests(unittest.TestCase):
         self.assertIn("Estimated input is 3 tokens", response.json()["detail"])
         self.assertEqual(len(main.PIPE.answer_calls), before)
 
+        with main._usage_db_connection() as connection:
+            connection.execute("DELETE FROM conversation_messages")
         main.CHAT_INPUT_TOKEN_LIMIT = 5
         response = self.client.post(
             "/api/ask",
@@ -258,6 +279,8 @@ class BackendSecurityTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["remaining_tokens"], 15)
 
+        with main._usage_db_connection() as connection:
+            connection.execute("DELETE FROM conversation_messages")
         response = self.client.post(
             "/api/ask",
             headers=auth(self.normal_token),
@@ -266,6 +289,8 @@ class BackendSecurityTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["remaining_tokens"], 10)
 
+        with main._usage_db_connection() as connection:
+            connection.execute("DELETE FROM conversation_messages")
         other_user = make_token(["edit_posts"], claims={"user_id": 42})
         response = self.client.post(
             "/api/ask",
@@ -414,60 +439,258 @@ class BackendSecurityTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(main.PIPE.answer_calls), before + 1)
 
-    def test_server_conversation_context_is_bounded_and_user_isolated(self):
+    def test_durable_conversation_summary_history_and_clear_are_user_isolated(self):
         user_a = make_token(["edit_posts"], claims={"sub": "topic-user-a"})
         user_b = make_token(["edit_posts"], claims={"sub": "topic-user-b"})
+        main.CHAT_VISIBLE_EXCHANGES = 2
 
-        first = self.client.post(
+        for query in ("Azusa", "its history", "latest"):
+            response = self.client.post(
+                "/api/ask",
+                headers=auth(user_a),
+                json={"query": query, "conversation_id": "ignored-client-id"},
+            )
+            self.assertEqual(response.status_code, 200)
+
+        history = self.client.get("/api/history", headers=auth(user_a))
+        self.assertEqual(history.status_code, 200)
+        self.assertEqual(len(history.json()["messages"]), 4)
+        self.assertEqual(history.json()["messages"][0]["text"], "its history")
+        self.assertTrue(history.json()["conversation_id"].startswith("thread-"))
+
+        user_key = main._quota_user_key({"sub": "topic-user-a"})
+        self.assertIn("Azusa", main._get_conversation_summary(user_key))
+
+        other_history = self.client.get("/api/history", headers=auth(user_b))
+        self.assertEqual(other_history.status_code, 200)
+        self.assertEqual(other_history.json()["messages"], [])
+
+        cleared = self.client.post(
+            "/api/conversation/clear",
+            headers=auth(user_a),
+        )
+        self.assertEqual(cleared.status_code, 200)
+        self.assertTrue(cleared.json()["summarized"])
+        self.assertEqual(
+            self.client.get("/api/history", headers=auth(user_a)).json()["messages"],
+            [],
+        )
+        self.assertIn("latest", main._get_conversation_summary(user_key))
+
+        resumed = self.client.post(
             "/api/ask",
             headers=auth(user_a),
-            json={"query": "Azusa", "conversation_id": "shared-conversation"},
+            json={"query": "remember?"},
         )
-        self.assertEqual(first.status_code, 200)
-
-        follow_up = self.client.post(
-            "/api/ask",
-            headers=auth(user_a),
-            json={"query": "its history", "conversation_id": "shared-conversation"},
-        )
-        self.assertEqual(follow_up.status_code, 200)
-        contextual_query = main.PIPE.answer_calls[-1]
+        self.assertEqual(resumed.status_code, 200)
         self.assertIn(
-            "Active topic from the previous user turn: Azusa",
-            contextual_query,
+            "Private summary of earlier conversation",
+            main.PIPE.answer_calls[-1],
         )
-        self.assertIn("Assistant: stub answer", contextual_query)
+        self.assertIn("Azusa", main.PIPE.answer_calls[-1])
 
-        other_user = self.client.post(
-            "/api/ask",
-            headers=auth(user_b),
-            json={"query": "its history", "conversation_id": "shared-conversation"},
-        )
-        self.assertEqual(other_user.status_code, 200)
-        self.assertEqual(main.PIPE.answer_calls[-1], "its history")
+    def test_exact_visible_window_restart_and_summary_failure_safety(self):
+        user = make_token(["edit_posts"], claims={"sub": "summary-window-user"})
+        main.CHAT_VISIBLE_EXCHANGES = 12
+        main.CHAT_DAILY_TOKEN_LIMIT = 100000
+        main.LLM_MAX_OUTPUT_TOKENS = 5
+        with main._usage_db_connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO daily_token_usage (usage_day, user_key, used_tokens)
+                VALUES ('2099-01-01', 'schema-check', 7)
+                """
+            )
+        main._initialize_usage_db()
+        with main._usage_db_connection() as connection:
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                ).fetchall()
+            }
+            self.assertIn("conversation_state", tables)
+            self.assertIn("conversation_messages", tables)
+            self.assertEqual(
+                connection.execute(
+                    """
+                    SELECT used_tokens FROM daily_token_usage
+                    WHERE usage_day = '2099-01-01' AND user_key = 'schema-check'
+                    """
+                ).fetchone()[0],
+                7,
+            )
 
-        main.CHAT_SERVER_HISTORY_MESSAGES = 2
-        latest = self.client.post(
-            "/api/ask",
-            headers=auth(user_a),
-            json={"query": "latest", "conversation_id": "shared-conversation"},
-        )
-        self.assertEqual(latest.status_code, 200)
-        key = main._conversation_key(
-            {"sub": "topic-user-a"}, "shared-conversation"
-        )
-        self.assertEqual(len(main.CONV[key]), 2)
-        self.assertEqual(main.CONV[key][0]["content"], "latest")
+        for index in range(12):
+            response = self.client.post(
+                "/api/ask",
+                headers=auth(user),
+                json={"query": f"turn-{index + 1}"},
+            )
+            self.assertEqual(response.status_code, 200)
 
-        main.CHAT_MAX_SERVER_CONVERSATIONS = 1
-        replacement = self.client.post(
+        history = self.client.get("/api/history", headers=auth(user)).json()
+        self.assertEqual(len(history["messages"]), 24)
+        self.assertEqual(main.PIPE.summary_calls, 0)
+        before_thirteenth = response.json()["remaining_tokens"]
+
+        thirteenth = self.client.post(
             "/api/ask",
-            headers=auth(user_a),
-            json={"query": "other", "conversation_id": "replacement"},
+            headers=auth(user),
+            json={"query": "turn-13"},
         )
-        self.assertEqual(replacement.status_code, 200)
-        self.assertNotIn(key, main.CONV)
-        self.assertEqual(len(main.CONV), 1)
+        self.assertEqual(thirteenth.status_code, 200)
+        self.assertEqual(main.PIPE.summary_calls, 1)
+        self.assertLess(thirteenth.json()["remaining_tokens"], before_thirteenth)
+        history = self.client.get("/api/history", headers=auth(user)).json()
+        self.assertEqual(len(history["messages"]), 24)
+        self.assertEqual(history["messages"][0]["text"], "turn-2")
+
+        user_key = main._quota_user_key({"sub": "summary-window-user"})
+        summary_before_restart = main._get_conversation_summary(user_key)
+        self.assertIn("turn-1", summary_before_restart)
+        main._initialize_usage_db()
+        self.assertEqual(
+            main._get_conversation_summary(user_key),
+            summary_before_restart,
+        )
+        self.assertEqual(
+            len(self.client.get("/api/history", headers=auth(user)).json()["messages"]),
+            24,
+        )
+
+        failing_user = make_token(
+            ["edit_posts"], claims={"sub": "summary-failure-user"}
+        )
+        main.CHAT_VISIBLE_EXCHANGES = 1
+        self.assertEqual(
+            self.client.post(
+                "/api/ask",
+                headers=auth(failing_user),
+                json={"query": "first"},
+            ).status_code,
+            200,
+        )
+        main.PIPE.fail_summary = True
+        self.assertEqual(
+            self.client.post(
+                "/api/ask",
+                headers=auth(failing_user),
+                json={"query": "second"},
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            len(
+                main._get_server_history(
+                    (main._quota_user_key({"sub": "summary-failure-user"}), "thread")
+                )
+            ),
+            4,
+        )
+
+        main.PIPE.fail_summary = False
+        main.PIPE.empty_summary = True
+        self.assertEqual(
+            self.client.post(
+                "/api/ask",
+                headers=auth(failing_user),
+                json={"query": "third"},
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            len(
+                main._get_server_history(
+                    (main._quota_user_key({"sub": "summary-failure-user"}), "thread")
+                )
+            ),
+            6,
+        )
+
+    def test_clear_noop_quota_and_failure_preserve_history(self):
+        empty_user = make_token(["edit_posts"], claims={"sub": "empty-clear-user"})
+        before_calls = main.PIPE.summary_calls
+        empty_clear = self.client.post(
+            "/api/conversation/clear",
+            headers=auth(empty_user),
+        )
+        self.assertEqual(empty_clear.status_code, 200)
+        self.assertFalse(empty_clear.json()["summarized"])
+        self.assertEqual(main.PIPE.summary_calls, before_calls)
+
+        user = make_token(["edit_posts"], claims={"sub": "clear-quota-user"})
+        main.CHAT_DAILY_TOKEN_LIMIT = 100
+        main.LLM_MAX_OUTPUT_TOKENS = 5
+        sent = self.client.post(
+            "/api/ask",
+            headers=auth(user),
+            json={"query": "keep"},
+        )
+        self.assertEqual(sent.status_code, 200)
+        before_clear = sent.json()["remaining_tokens"]
+        cleared = self.client.post(
+            "/api/conversation/clear",
+            headers=auth(user),
+        )
+        self.assertEqual(cleared.status_code, 200)
+        self.assertLess(cleared.json()["remaining_tokens"], before_clear)
+        self.assertEqual(
+            self.client.get("/api/history", headers=auth(user)).json()["messages"],
+            [],
+        )
+
+        blocked_user = make_token(
+            ["edit_posts"], claims={"sub": "blocked-clear-user"}
+        )
+        main.CHAT_DAILY_TOKEN_LIMIT = 20
+        sent = self.client.post(
+            "/api/ask",
+            headers=auth(blocked_user),
+            json={"query": "keep"},
+        )
+        self.assertEqual(sent.status_code, 200)
+        main.CHAT_DAILY_TOKEN_LIMIT = 6
+        blocked = self.client.post(
+            "/api/conversation/clear",
+            headers=auth(blocked_user),
+        )
+        self.assertEqual(blocked.status_code, 429)
+        self.assertEqual(
+            len(
+                self.client.get(
+                    "/api/history", headers=auth(blocked_user)
+                ).json()["messages"]
+            ),
+            2,
+        )
+
+        failing_user = make_token(
+            ["edit_posts"], claims={"sub": "failed-clear-user"}
+        )
+        main.CHAT_DAILY_TOKEN_LIMIT = 100
+        self.assertEqual(
+            self.client.post(
+                "/api/ask",
+                headers=auth(failing_user),
+                json={"query": "keep"},
+            ).status_code,
+            200,
+        )
+        main.PIPE.fail_summary = True
+        with self.assertRaises(RuntimeError):
+            self.client.post(
+                "/api/conversation/clear",
+                headers=auth(failing_user),
+            )
+        self.assertEqual(
+            len(
+                self.client.get(
+                    "/api/history", headers=auth(failing_user)
+                ).json()["messages"]
+            ),
+            2,
+        )
 
     def test_rate_limiting(self):
         main.CHAT_RATE_LIMIT_REQUESTS = 2
@@ -693,10 +916,7 @@ class BackendSecurityTests(unittest.TestCase):
                 {"CHAT_SERVER_HISTORY_MESSAGES": "1"},
                 "CHAT_SERVER_HISTORY_MESSAGES",
             ),
-            (
-                {"CHAT_MAX_SERVER_CONVERSATIONS": "0"},
-                "CHAT_MAX_SERVER_CONVERSATIONS",
-            ),
+            ({"CHAT_VISIBLE_EXCHANGES": "0"}, "CHAT_VISIBLE_EXCHANGES"),
         ]
         for overrides, expected in cases:
             env = os.environ.copy()

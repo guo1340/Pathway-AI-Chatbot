@@ -57,6 +57,44 @@ async function askRag(
   return await res.json()
 }
 
+async function loadRagHistory(apiBase: string, token: string): Promise<any> {
+  const res = await fetch(`${apiBase.replace(/\/$/, '')}/api/history`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(`History request failed: ${res.status}`)
+  return await res.json()
+}
+
+async function clearRagConversation(apiBase: string, token: string): Promise<any> {
+  const res = await fetch(
+    `${apiBase.replace(/\/$/, '')}/api/conversation/clear`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+    }
+  )
+  if (!res.ok) {
+    let payload: any = null
+    try {
+      payload = await res.json()
+    } catch {
+      /* fall back to the HTTP status */
+    }
+    const detail = payload?.detail
+    const message =
+      (typeof detail === 'string' && detail) ||
+      (typeof detail?.message === 'string' && detail.message) ||
+      `Server error: ${res.status}`
+    const remainingTokens = Number(detail?.remaining_tokens)
+    throw new RagApiError(
+      message,
+      res.status,
+      Number.isFinite(remainingTokens) ? remainingTokens : undefined
+    )
+  }
+  return await res.json()
+}
+
 // --- Types ---
 type Citation = { title?: string; url?: string }
 type Msg = { who: 'you' | 'ai'; text: string; citations?: Citation[]; time?: string }
@@ -314,6 +352,27 @@ export default function App({
     }
   }, [msgs])
 
+  React.useEffect(() => {
+    if (authChecking || !authReady || !authToken) return
+    let active = true
+    loadRagHistory(effectiveApiBase, authToken)
+      .then((data) => {
+        if (!active) return
+        setMsgs(Array.isArray(data?.messages) ? data.messages : [])
+        setConvId(
+          typeof data?.conversation_id === 'string'
+            ? data.conversation_id
+            : undefined
+        )
+      })
+      .catch(() => {
+        /* keep sessionStorage as an offline fallback */
+      })
+    return () => {
+      active = false
+    }
+  }, [authChecking, authReady, authToken, effectiveApiBase])
+
   // Animate "Thinking..." dots while busy
   React.useEffect(() => {
     if (!busy) {
@@ -434,7 +493,7 @@ export default function App({
       const citations: Citation[] | undefined = data.citations
 
       setMsgs((m) => [
-        ...m,
+        ...m.slice(-23),
         {
           who: 'ai',
           text: '',
@@ -512,13 +571,38 @@ export default function App({
   }, [msgs])
 
   // 🧠 Optional clear chat button
-  function clearConversation() {
-    setMsgs([])
-    setQ('')
-    setConvId(undefined)
-    setQuotaMessage('')
-    setClearDialogOpen(false)
-    sessionStorage.removeItem('chat_history')
+  async function clearConversation() {
+    if (!authToken || busy) return
+    setBusy(true)
+    try {
+      const data = await clearRagConversation(effectiveApiBase, authToken)
+      const nextRemainingTokens = Number(data?.remaining_tokens)
+      if (Number.isFinite(nextRemainingTokens)) {
+        setRemainingTokens(Math.max(0, nextRemainingTokens))
+      }
+      setMsgs([])
+      setQ('')
+      setConvId(
+        typeof data?.conversation_id === 'string'
+          ? data.conversation_id
+          : undefined
+      )
+      setQuotaMessage('')
+      setClearDialogOpen(false)
+      sessionStorage.removeItem('chat_history')
+    } catch (e: any) {
+      if (e instanceof RagApiError && e.remainingTokens !== undefined) {
+        setRemainingTokens(Math.max(0, e.remainingTokens))
+      }
+      setNotice({
+        title: 'Chat could not be cleared',
+        message:
+          e instanceof RagApiError && e.status === 429
+            ? 'There are not enough daily tokens to summarize this chat. Your visible history was kept.'
+            : 'The chat could not be summarized safely, so your visible history was kept. Please try again.',
+      })
+    }
+    setBusy(false)
   }
 
   function handleRipple(e: React.MouseEvent<HTMLButtonElement>) {
@@ -614,7 +698,7 @@ export default function App({
               <IoClose />
             </button>
             <h2 id="clear-dialog-title">Clear chat history?</h2>
-            <p>This permanently clears the chat shown in this browser and cannot be undone. Your daily token usage will not reset.</p>
+            <p>This summarizes the visible chat for future context, then clears it from view. Summarization uses daily tokens, and existing token usage will not reset.</p>
             <div className="dialog-actions">
               <button type="button" className="dialog-secondary" onClick={() => setClearDialogOpen(false)}>
                 Cancel
@@ -741,6 +825,11 @@ export default function App({
               </>
             )}
           </div>
+          {msgs.length >= 24 && (
+            <div className="summary-token-notice" role="status">
+              Your next message may summarize older chat and use additional daily tokens.
+            </div>
+          )}
           {quotaMessage && (
             <div className="quota-alert" role="alert">
               {quotaMessage}

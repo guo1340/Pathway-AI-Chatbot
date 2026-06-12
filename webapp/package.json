@@ -8,7 +8,8 @@
     "build": "vite build && node scripts/copy-plugin-dist.mjs",
     "preview": "vite preview",
     "test:frontend-security": "node scripts/test-frontend-security.mjs",
-    "test:frontend-priority8": "node scripts/test-frontend-security.mjs --priority8"
+    "test:frontend-priority8": "node scripts/test-frontend-security.mjs --priority8",
+    "test:conversation-summary": "node scripts/test-frontend-security.mjs --conversation-summary"
   },
   "dependencies": {
     "react": "^18.3.1",

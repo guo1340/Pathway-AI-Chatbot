@@ -1218,3 +1218,103 @@ Optimal result:
 - A fresh live WordPress token receives HTTP 200.
 - Wrong-role accounts are distinguishable through HTTP 403.
 - The login link leaves the iframe and opens the WordPress login page.
+
+### 2026-06-09 17:04:34 +08:00 - Public Edge-Test Partial Run
+
+Reviewed the latest EC2 public API test transcript.
+
+Completed:
+
+- Production CORS allowed all configured origins and rejected an unapproved origin.
+- Public malformed and expired JWT requests returned the expected HTTP 401 responses.
+
+Failed test setup:
+
+- Public character-limit, estimated-token-limit, and rate-limit requests used an empty or unavailable `$TOKEN`, so authentication correctly stopped them with HTTP 401 before the intended checks.
+- The rate-limit test changed production configuration to three requests but did not restore it after authentication failed.
+
+Required recovery and rerun:
+
+1. Restore `.env.before-rate-limit-test`, restart PM2 with updated environment values, and verify the normal rate limit.
+2. Mint a fresh one-hour EC2 test JWT and prove it with one authenticated public request.
+3. Rerun character and token limits.
+4. Temporarily set the rate limit to one request, verify the second request receives HTTP 429, then restore production configuration immediately.
+
+Optimal result:
+
+- Production returns to `CHAT_RATE_LIMIT_REQUESTS=100`.
+- The remaining three tests execute through authenticated public HTTPS and produce HTTP 422, HTTP 422, and HTTP 429 respectively.
+
+### 2026-06-10 22:54:49 +08:00 - Durable Conversation Summary And Self-History
+
+Implemented:
+
+- Replaced process-local conversation memory with durable SQLite state keyed by the existing anonymized user key.
+- Kept one linear thread per user and added authenticated self-history loading.
+- Retained the newest 12 completed exchanges as raw rows and summarized older exchanges into private cumulative memory.
+- Added backend clear compaction that preserves summary context and never resets daily usage.
+- Counted automatic and clear-triggered summarization against daily token balance.
+- Warned users when the next message may trigger token-consuming automatic summarization.
+- Kept summaries hidden from frontend responses.
+- Left admin user search unimplemented while preserving a schema suitable for a later dashboard API.
+
+Safety behavior:
+
+- Raw messages are removed only in the transaction that saves a non-empty replacement summary.
+- Failed or unaffordable clear requests preserve visible messages.
+- Client conversation IDs cannot create or switch threads.
+
+Static verification completed:
+
+1. `python -m py_compile main.py rag.py tests/test_backend_security.py`
+2. `node --check scripts/test-frontend-security.mjs`
+3. `npm.cmd run build`
+4. `git diff --check`
+
+Generated tests, intentionally not run:
+
+1. From `rag-backend`, run `python -m unittest tests.test_backend_security.BackendSecurityTests.test_durable_conversation_summary_history_and_clear_are_user_isolated -v`.
+2. From `webapp`, run `npm.cmd run test:conversation-summary`.
+3. Run the complete backend suite after the focused checks pass.
+
+Optimal result:
+
+- Refresh restores only the newest 12 exchanges for the authenticated user.
+- The 13th completed exchange compacts the oldest exchange into private summary memory.
+- Clear compacts visible messages, retains summary context, and charges but never resets quota.
+- Summary or quota failure never removes raw history.
+
+### 2026-06-10 23:49:02 +08:00 - Durable Summary And History Test Run
+
+Results:
+
+- Three focused backend conversation tests passed.
+- All 15 backend security tests passed.
+- All 3 conversation-summary frontend checks passed.
+- All 10 Priority 8 frontend checks passed.
+- All 20 frontend security checks passed.
+- Production frontend build, Python syntax, JavaScript syntax, and diff checks passed.
+
+Failed-first fixes:
+
+1. The default system Python lacked FastAPI; tests now use the existing repository-local `.uv-security-env`.
+2. A test query exceeded the suite's 12-character query limit and was shortened.
+3. `reserve_daily_tokens()` captured the output-token cap at import time; it now reads the current configured value when called.
+4. Legacy quota and input-limit tests were isolated from durable prior conversation context.
+5. The old clear assertion now expects the stable thread ID returned by the one-thread API.
+6. The old rate-limit check now verifies the sanitized notification dialog instead of raw backend text.
+7. The Vite localhost check now waits for the enabled Send control instead of a redundant page-complete state.
+
+Additional coverage:
+
+- Verified exact 12-exchange retention and 13th-exchange compaction.
+- Verified cumulative summary preservation and SQLite reinitialization.
+- Verified empty and failed automatic summaries preserve raw messages.
+- Verified empty clear is a no-op.
+- Verified successful clear charges quota.
+- Verified insufficient quota and clear-time model failure preserve history.
+
+Optimal result:
+
+- Every newly generated summary/history test is checked.
+- Existing backend and frontend behavior remains green.
