@@ -228,6 +228,10 @@ export default function App({
     cfg.inputTokenLimit || import.meta.env.VITE_CHAT_INPUT_TOKEN_LIMIT,
     2000
   )
+  const queryMaxLength = positiveNumber(
+    cfg.queryMaxLength || import.meta.env.VITE_CHAT_QUERY_MAX_LENGTH,
+    4000
+  )
   const maxOutputTokens = positiveNumber(
     cfg.maxOutputTokens || import.meta.env.VITE_LLM_MAX_OUTPUT_TOKENS,
     1200
@@ -402,30 +406,17 @@ export default function App({
     }
   }
 
-  function appendToken(url: string, token?: string | null) {
-    if (!token) return url
-    const [base, hash] = url.split('#')
-    const join = base.includes('?') ? '&' : '?'
-    return `${base}${join}token=${encodeURIComponent(token)}${hash ? `#${hash}` : ''}`
-  }
-
-  function toHttpUrl(c: Citation, apiBase: string, token?: string | null) {
+  function toHttpUrl(c: Citation, apiBase: string) {
     if (!c.url) return undefined
 
     // Absolute URL already
     if (c.url.startsWith('http')) {
-      // If it is your secured file endpoint, add token
-      if (c.url.includes('/api/files/')) {
-        return appendToken(c.url, token)
-      }
       return c.url
     }
 
     // If it is already a root-relative path
     if (c.url.startsWith('/')) {
-      const abs = `${apiBase.replace(/\/$/, '')}${c.url}`
-      if (abs.includes('/api/files/')) return appendToken(abs, token)
-      return abs
+      return `${apiBase.replace(/\/$/, '')}${c.url}`
     }
 
     // file://... -> convert to /api/files/<name>
@@ -435,8 +426,7 @@ export default function App({
         const [file, fragment] = name.split('#')
         const safeFile = encodeURIComponent(file)
         const fragPart = fragment ? `#${fragment}` : ''
-        const abs = `${apiBase.replace(/\/$/, '')}/api/files/${safeFile}${fragPart}`
-        return appendToken(abs, token)
+        return `${apiBase.replace(/\/$/, '')}/api/files/${safeFile}${fragPart}`
       }
     }
 
@@ -758,7 +748,7 @@ export default function App({
                 const idx = parseInt(match[1], 10) - 1
                 const citation = citations[idx]
                 if (!citation) return part
-                const href = toHttpUrl(citation, effectiveApiBase, authToken)
+                const href = toHttpUrl(citation, effectiveApiBase)
                 const title =
                   citation.title || basenameFromUrl(citation.url) || 'source'
                 return (
@@ -853,6 +843,7 @@ export default function App({
                 }
               }}
               rows={1}
+              maxLength={queryMaxLength}
               className="chat-input"
             />
             <button

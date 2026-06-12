@@ -3,7 +3,7 @@ import re
 import uuid
 import mimetypes
 from typing import Optional, List, Dict, Any, Tuple
-from urllib.parse import quote
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 import time
 import hmac
 import hashlib
@@ -45,6 +45,7 @@ CHAT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("CHAT_RATE_LIMIT_WINDOW_SECONDS",
 CHAT_TRUST_PROXY = os.getenv("CHAT_TRUST_PROXY", "false").lower() in {"1", "true", "yes", "on"}
 CHAT_SERVER_HISTORY_MESSAGES = int(os.getenv("CHAT_SERVER_HISTORY_MESSAGES", "24"))
 CHAT_VISIBLE_EXCHANGES = int(os.getenv("CHAT_VISIBLE_EXCHANGES", "12"))
+FILE_TICKET_TTL_SECONDS = int(os.getenv("FILE_TICKET_TTL_SECONDS", "900"))
 
 if CHAT_QUERY_MAX_LENGTH < 1:
     raise ValueError("CHAT_QUERY_MAX_LENGTH must be at least 1")
@@ -64,6 +65,8 @@ if CHAT_SERVER_HISTORY_MESSAGES < 2:
     raise ValueError("CHAT_SERVER_HISTORY_MESSAGES must be at least 2")
 if CHAT_VISIBLE_EXCHANGES < 1:
     raise ValueError("CHAT_VISIBLE_EXCHANGES must be at least 1")
+if FILE_TICKET_TTL_SECONDS < 1:
+    raise ValueError("FILE_TICKET_TTL_SECONDS must be at least 1")
 
 app = FastAPI(title="RAG Backend", version="0.1.0")
 
@@ -77,6 +80,8 @@ app.add_middleware(
 
 CHAT_REQUESTS: Dict[str, deque] = {}
 CHAT_REQUESTS_LOCK = threading.Lock()
+CONVERSATION_LOCKS: Dict[str, threading.Lock] = {}
+CONVERSATION_LOCKS_LOCK = threading.Lock()
 
 # init pipeline
 PIPE = RagPipeline.from_disk()
@@ -218,20 +223,10 @@ def require_dashboard_auth(authorization: Optional[str] = Header(default=None)) 
     return _verify_jwt_hs256(token, [JWT_REQUIRED_CAP, JWT_DASHBOARD_CAP])
 
 
-def require_auth_from_header_or_query(
-    authorization: Optional[str] = Header(default=None),
-    token: Optional[str] = Query(default=None),
-) -> dict:
-    """
-    Allows auth via:
-    - Authorization: Bearer <jwt>
-    - ?token=<jwt>   (needed for <a href> downloads)
-    """
+def require_auth_header(authorization: Optional[str]) -> dict:
     if authorization and authorization.lower().startswith("bearer "):
         jwt = authorization.split(" ", 1)[1].strip()
         return _verify_jwt_hs256(jwt)
-    if token:
-        return _verify_jwt_hs256(token)
     raise HTTPException(status_code=401, detail="Missing token")
 
 def enforce_chat_rate_limit(request: Request) -> None:
@@ -400,6 +395,11 @@ def _get_conversation_summary(user_key: str) -> str:
 
 def _conversation_id(user_key: str) -> str:
     return f"thread-{user_key[:12]}"
+
+
+def _conversation_lock(user_key: str) -> threading.Lock:
+    with CONVERSATION_LOCKS_LOCK:
+        return CONVERSATION_LOCKS.setdefault(user_key, threading.Lock())
 
 
 def _store_server_turn(
@@ -671,7 +671,7 @@ def conversation_history(user=Depends(require_auth)):
         {
             "who": "you" if message["role"] == "user" else "ai",
             "text": message["content"],
-            "citations": message.get("citations", []),
+            "citations": _add_file_tickets(message.get("citations", [])),
             "time": time.strftime(
                 "%H:%M",
                 time.localtime(int(message.get("created_at", 0))),
@@ -688,39 +688,40 @@ def conversation_history(user=Depends(require_auth)):
 @app.post("/api/conversation/clear", response_model=ClearConversationOut)
 def clear_conversation(user=Depends(require_auth)):
     user_key = _quota_user_key(user)
-    messages = _messages_for_summary(user_key, clear_all=True)
-    if not messages:
-        return ClearConversationOut(
-            conversation_id=_conversation_id(user_key),
-            remaining_tokens=remaining_daily_tokens(user),
-            summarized=False,
-        )
+    with _conversation_lock(user_key):
+        messages = _messages_for_summary(user_key, clear_all=True)
+        if not messages:
+            return ClearConversationOut(
+                conversation_id=_conversation_id(user_key),
+                remaining_tokens=remaining_daily_tokens(user),
+                summarized=False,
+            )
 
-    summary = _get_conversation_summary(user_key)
-    summary_input_tokens = estimate_tokens(_summary_input_text(summary, messages))
-    usage_key, reservation = reserve_daily_tokens(
-        user,
-        summary_input_tokens,
-    )
-    try:
-        _, actual_summary_tokens = _compact_conversation(
-            user_key,
-            messages,
-            summary,
+        summary = _get_conversation_summary(user_key)
+        summary_input_tokens = estimate_tokens(_summary_input_text(summary, messages))
+        usage_key, reservation = reserve_daily_tokens(
+            user,
+            summary_input_tokens,
         )
-        remaining_tokens = settle_daily_tokens(
-            usage_key,
-            reservation,
-            actual_summary_tokens,
-        )
-        return ClearConversationOut(
-            conversation_id=_conversation_id(user_key),
-            remaining_tokens=remaining_tokens,
-            summarized=True,
-        )
-    except Exception:
-        release_daily_token_reservation(usage_key, reservation)
-        raise
+        try:
+            _, actual_summary_tokens = _compact_conversation(
+                user_key,
+                messages,
+                summary,
+            )
+            remaining_tokens = settle_daily_tokens(
+                usage_key,
+                reservation,
+                actual_summary_tokens,
+            )
+            return ClearConversationOut(
+                conversation_id=_conversation_id(user_key),
+                remaining_tokens=remaining_tokens,
+                summarized=True,
+            )
+        except Exception:
+            release_daily_token_reservation(usage_key, reservation)
+            raise
 
 
 @app.post("/api/reload")
@@ -733,6 +734,65 @@ def reload_index(user=Depends(require_dashboard_auth)):
 def _basename_from_path(p: str) -> str:
     p = p.replace("\\", "/")
     return os.path.basename(p)
+
+
+def _file_ticket(name: str, expires_at: Optional[int] = None) -> str:
+    safe = os.path.basename(name)
+    payload = {
+        "name": safe,
+        "exp": expires_at or int(time.time()) + FILE_TICKET_TTL_SECONDS,
+    }
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, separators=(",", ":")).encode()
+    ).decode().rstrip("=")
+    signature = hmac.new(
+        JWT_SECRET.encode(),
+        f"file:{encoded}".encode(),
+        hashlib.sha256,
+    ).digest()
+    return f"{encoded}.{base64.urlsafe_b64encode(signature).decode().rstrip('=')}"
+
+
+def _verify_file_ticket(ticket: str, name: str) -> None:
+    if not JWT_SECRET:
+        raise HTTPException(status_code=500, detail="Server misconfigured")
+    try:
+        encoded, signature = ticket.split(".", 1)
+        expected = hmac.new(
+            JWT_SECRET.encode(),
+            f"file:{encoded}".encode(),
+            hashlib.sha256,
+        ).digest()
+        if not hmac.compare_digest(_b64url_decode(signature), expected):
+            raise HTTPException(status_code=401, detail="Invalid file ticket")
+        payload = json.loads(_b64url_decode(encoded))
+        if payload.get("name") != os.path.basename(name):
+            raise HTTPException(status_code=401, detail="Invalid file ticket")
+        if int(payload.get("exp", 0)) <= int(time.time()):
+            raise HTTPException(status_code=401, detail="File ticket expired")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid file ticket")
+
+
+def _add_file_tickets(citations: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    ticketed = []
+    for citation in citations or []:
+        item = dict(citation)
+        url = item.get("url") or ""
+        parsed = urlsplit(url)
+        marker = "/api/files/"
+        if marker in parsed.path:
+            filename = unquote(parsed.path.split(marker, 1)[1].split("/", 1)[0])
+            query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+            query.pop("token", None)
+            query["file_token"] = _file_ticket(filename)
+            item["url"] = urlunsplit(
+                (parsed.scheme, parsed.netloc, parsed.path, urlencode(query), parsed.fragment)
+            )
+        ticketed.append(item)
+    return ticketed
 
 
 def _normalize_citations_with_map(
@@ -810,7 +870,11 @@ def _renumber_answer_markers(text: str, old_to_new: Dict[int, int]) -> str:
 
 
 @app.get("/api/files/{name}")
-def get_file(name: str, user=Depends(require_auth_from_header_or_query)):
+def get_file(
+    name: str,
+    authorization: Optional[str] = Header(default=None),
+    file_token: Optional[str] = Query(default=None),
+):
     """
     Streams a file from DOCS_DIR.
     - Protects against path traversal.
@@ -818,6 +882,13 @@ def get_file(name: str, user=Depends(require_auth_from_header_or_query)):
     - Guesses MIME type for other files for correct preview/download behavior.
     """
     safe = os.path.basename(name)  # prevent ../../ tricks
+    if authorization:
+        require_auth_header(authorization)
+    elif file_token:
+        _verify_file_ticket(file_token, safe)
+    else:
+        raise HTTPException(status_code=401, detail="Missing file authorization")
+
     path = os.path.join(DOCS_DIR, safe)
 
     if not os.path.isfile(path):
@@ -829,7 +900,10 @@ def get_file(name: str, user=Depends(require_auth_from_header_or_query)):
         mime_type = "application/octet-stream"
 
     # Use inline disposition for PDFs so browser viewers honor #page=N anchors
-    headers = {}
+    headers = {
+        "Cache-Control": "private, no-store",
+        "Referrer-Policy": "no-referrer",
+    }
     if mime_type == "application/pdf":
         headers["Content-Disposition"] = f'inline; filename="{safe}"'
     else:
@@ -856,88 +930,89 @@ def ask(
       - history: optional array of past messages [{who: 'you'|'ai', text: str}]
     """
     user_key = _quota_user_key(user)
-    conv_id = _conversation_id(user_key)
-    conversation_key = (user_key, conv_id)
-    server_history = _get_server_history(conversation_key)
-    summary = _get_conversation_summary(user_key)
-    query_with_history = _build_query_with_context(body, server_history, summary)
-    estimated_input_tokens = estimate_tokens(query_with_history)
-    if estimated_input_tokens > CHAT_INPUT_TOKEN_LIMIT:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"Estimated input is {estimated_input_tokens} tokens; "
-                f"limit is {CHAT_INPUT_TOKEN_LIMIT}"
+    with _conversation_lock(user_key):
+        conv_id = _conversation_id(user_key)
+        conversation_key = (user_key, conv_id)
+        server_history = _get_server_history(conversation_key)
+        summary = _get_conversation_summary(user_key)
+        query_with_history = _build_query_with_context(body, server_history, summary)
+        estimated_input_tokens = estimate_tokens(query_with_history)
+        if estimated_input_tokens > CHAT_INPUT_TOKEN_LIMIT:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Estimated input is {estimated_input_tokens} tokens; "
+                    f"limit is {CHAT_INPUT_TOKEN_LIMIT}"
+                ),
+            )
+
+        overflow_message_count = max(
+            0,
+            len(server_history) + 2 - (CHAT_VISIBLE_EXCHANGES * 2),
+        )
+        summary_messages = server_history[:overflow_message_count]
+        summary_input_tokens = (
+            estimate_tokens(_summary_input_text(summary, summary_messages))
+            if summary_messages
+            else 0
+        )
+        usage_key, reservation = reserve_daily_tokens(
+            user,
+            estimated_input_tokens + summary_input_tokens,
+            reserved_output_tokens=(
+                LLM_MAX_OUTPUT_TOKENS * (2 if summary_messages else 1)
             ),
         )
 
-    overflow_message_count = max(
-        0,
-        len(server_history) + 2 - (CHAT_VISIBLE_EXCHANGES * 2),
-    )
-    summary_messages = server_history[:overflow_message_count]
-    summary_input_tokens = (
-        estimate_tokens(_summary_input_text(summary, summary_messages))
-        if summary_messages
-        else 0
-    )
-    usage_key, reservation = reserve_daily_tokens(
-        user,
-        estimated_input_tokens + summary_input_tokens,
-        reserved_output_tokens=(
-            LLM_MAX_OUTPUT_TOKENS * (2 if summary_messages else 1)
-        ),
-    )
+        reservation_active = True
+        try:
+            answer, citations = PIPE.answer(query_with_history)
 
-    reservation_active = True
-    try:
-        answer, citations = PIPE.answer(query_with_history)
+            # Normalize and map citations
+            norm_citations, old_to_new = _normalize_citations_with_map(citations, request)
+            answer = _renumber_answer_markers(answer, old_to_new)
 
-        # Normalize and map citations
-        norm_citations, old_to_new = _normalize_citations_with_map(citations, request)
-        answer = _renumber_answer_markers(answer, old_to_new)
+            _store_server_turn(
+                conversation_key,
+                body.query,
+                answer,
+                norm_citations,
+            )
 
-        _store_server_turn(
-            conversation_key,
-            body.query,
-            answer,
-            norm_citations,
-        )
+            actual_summary_tokens = 0
+            overflow = _messages_for_summary(user_key)
+            if overflow:
+                try:
+                    _, actual_summary_tokens = _compact_conversation(
+                        user_key,
+                        overflow,
+                        summary,
+                    )
+                except Exception as exc:
+                    print(f"Conversation summarization deferred: {exc}")
 
-        actual_summary_tokens = 0
-        overflow = _messages_for_summary(user_key)
-        if overflow:
-            try:
-                _, actual_summary_tokens = _compact_conversation(
-                    user_key,
-                    overflow,
-                    summary,
-                )
-            except Exception as exc:
-                print(f"Conversation summarization deferred: {exc}")
+            actual_tokens = (
+                estimated_input_tokens
+                + estimate_tokens(answer)
+                + actual_summary_tokens
+            )
+            remaining_tokens = settle_daily_tokens(
+                usage_key,
+                reservation,
+                actual_tokens,
+            )
+            reservation_active = False
 
-        actual_tokens = (
-            estimated_input_tokens
-            + estimate_tokens(answer)
-            + actual_summary_tokens
-        )
-        remaining_tokens = settle_daily_tokens(
-            usage_key,
-            reservation,
-            actual_tokens,
-        )
-        reservation_active = False
-
-        return ChatOut(
-            answer=answer,
-            citations=norm_citations,
-            conversation_id=conv_id,
-            remaining_tokens=remaining_tokens,
-        )
-    except Exception:
-        if reservation_active:
-            release_daily_token_reservation(usage_key, reservation)
-        raise
+            return ChatOut(
+                answer=answer,
+                citations=_add_file_tickets(norm_citations),
+                conversation_id=conv_id,
+                remaining_tokens=remaining_tokens,
+            )
+        except Exception:
+            if reservation_active:
+                release_daily_token_reservation(usage_key, reservation)
+            raise
 
 
 @app.post("/api/upload")

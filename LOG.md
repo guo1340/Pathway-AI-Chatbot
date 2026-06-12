@@ -1318,3 +1318,68 @@ Optimal result:
 
 - Every newly generated summary/history test is checked.
 - Existing backend and frontend behavior remains green.
+
+### 2026-06-12 17:45:11 +08:00 - Durable Summary And History Audit
+
+Implemented:
+
+- Audited the committed backend, frontend, tests, and deployment notes for the durable one-thread conversation feature.
+- Added a process-local lock per anonymized user so simultaneous sends, or a send racing with clear, cannot overwrite a cumulative summary or compact stale message rows in the current single-worker deployment.
+- Added a delayed-summary concurrency regression test.
+- Improved the final localhost browser-test failure message with the current page and button state.
+
+Testing steps:
+
+1. From `rag-backend`, run `..\.uv-security-env\Scripts\python.exe -m unittest tests.test_backend_security.BackendSecurityTests.test_concurrent_same_user_requests_preserve_summary_order -v`.
+2. From `rag-backend`, run `..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v`.
+3. From `webapp`, run `npm.cmd run test:conversation-summary`.
+4. From `webapp`, run `npm.cmd run test:frontend-priority8`.
+5. From `webapp`, run `npm.cmd run test:frontend-security`.
+6. From `webapp`, run `npm.cmd run build`.
+7. Run `git diff --check` from the repository root.
+
+Optimal result:
+
+- Concurrent requests for one user are serialized and preserve the cumulative summary.
+- Different users remain independent because locks are keyed by anonymized user identity.
+- All 16 backend tests, 3 summary frontend checks, 10 Priority 8 checks, and 20 frontend security checks pass.
+- The production frontend build and static checks pass.
+- Continue running one backend PM2 process until distributed locking is implemented.
+
+### 2026-06-12 18:10:23 +08:00 - Infrastructure, Input Limit, And Citation Security Audit
+
+Implemented:
+
+- Confirmed the current tracked tree contains no former public EC2 address and no tracked PEM or private-key file.
+- Confirmed the backend already rejects chat queries over 4,000 characters and rejects estimated question-plus-history input over 2,000 tokens before retrieval or model execution.
+- Added a matching configurable 4,000-character frontend textarea limit for earlier user feedback.
+- Replaced full chat JWTs in citation URLs with HMAC-signed tickets limited to one filename and 900 seconds by default.
+- Kept source titles, filenames, PDF page fragments, and authenticated bearer-header file access.
+- Stored canonical citation URLs without expiring tickets and issued fresh tickets in Ask and history responses.
+- Added no-store and no-referrer response headers for protected files.
+- Added `.pem` and `.key` ignore rules.
+
+Git history finding:
+
+- Older commits still contain the former public EC2 IP and hostname even though the current tree is clean.
+- Complete removal from GitHub requires a coordinated history rewrite and force-push of affected branches and tags. This was not performed automatically because it changes commit hashes for every collaborator.
+- Treat the server address as public metadata and rely on SSH allowlisting, closed direct backend ports, authentication, and security groups rather than address secrecy.
+
+Testing steps:
+
+1. From `rag-backend`, run `..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v`.
+2. From `dashboard`, run `npm.cmd run test:security`.
+3. From `webapp`, run `npm.cmd run test:conversation-summary`.
+4. From `webapp`, run `npm.cmd run test:frontend-priority8`.
+5. From `webapp`, run `npm.cmd run test:frontend-security`.
+6. From `webapp`, run `npm.cmd run build`.
+7. Search the current tracked tree for the former host and confirm no `.pem` or `.key` files are tracked.
+8. Open a cited PDF and confirm the filename and page reference remain visible while the URL contains `file_token`, not the chat JWT.
+
+Optimal result:
+
+- Oversized character and estimated-token requests are stopped before retrieval or LLM work.
+- Citation links open the referenced file but cannot authorize chat requests or another filename.
+- Expired or altered file tickets return HTTP 401.
+- The current tracked source contains no public deployment address or private key.
+- Git history scrubbing is performed only after collaborator coordination and a backup.

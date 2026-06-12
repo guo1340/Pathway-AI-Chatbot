@@ -36,6 +36,8 @@ rag-backend/docs/**/*.md
 .vscode/
 .idea/
 *.swp
+*.pem
+*.key
 
 # Logs
 *.log

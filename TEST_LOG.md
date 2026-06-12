@@ -895,3 +895,52 @@ Failed-first corrections:
 - Updated the old clear test to expect the stable one-thread conversation ID.
 - Updated the legacy rate-limit assertion to the sanitized notification dialog.
 - Removed a redundant Vite `document.readyState` wait and retained the stronger enabled-Send readiness check.
+
+## 2026-06-12 17:45:11 +08:00 - Durable Conversation Audit And Concurrency Verification
+
+- [x] Focused same-user concurrency regression passed.
+- [x] Complete backend security suite passed: 16 tests.
+- [x] Conversation-summary frontend suite passed: 3 checks.
+- [x] Priority 8 frontend suite passed: 10 checks.
+- [x] Complete frontend security suite passed: 20 checks.
+- [x] Frontend production build passed.
+- [x] Python syntax checks passed.
+
+Corrections made during the audit:
+
+- Serialized same-user ask and clear operations to prevent stale summary snapshots during concurrent requests.
+- Restored a clear-failure assertion that was temporarily misplaced while adding the concurrency test.
+- Reran the two fixed-port frontend suites sequentially after parallel execution produced `EADDRINUSE`.
+- Added browser-state diagnostics after the localhost Send check timed out twice; the complete rerun then passed all 20 checks.
+
+Optimal result:
+
+- The current single-process backend cannot lose cumulative summary updates when one user submits overlapping operations.
+- All durable history, authorization, quota, clear, responsive-layout, and localhost Send regressions remain green.
+
+## 2026-06-12 18:10:23 +08:00 - Infrastructure, Query Limit, And Citation Verification
+
+- [x] Current tracked tree contains no former public EC2 IP or hostname.
+- [x] No `.pem` or `.key` file is tracked.
+- [x] Git history audit found the former address in older commits; coordinated history rewrite remains pending.
+- [x] Backend 4,000-character query validation passed before pipeline execution.
+- [x] Backend estimated input-token validation remained active.
+- [x] Frontend production build passed with the matching 4,000-character textarea limit.
+- [x] Bearer-header protected file access passed.
+- [x] Legacy full-JWT `?token=` file access returned HTTP 401.
+- [x] Filename-scoped citation ticket access passed.
+- [x] Wrong-filename and expired citation tickets returned HTTP 401.
+- [x] Citation URLs retained filenames and PDF page fragments without containing the chat JWT.
+- [x] History responses issued usable file tickets while stored citations remained canonical.
+- [x] Complete backend security suite passed: 16 tests.
+- [x] Dashboard security suite passed: 6 checks.
+- [x] Conversation-summary frontend suite passed: 3 checks.
+- [x] Priority 8 frontend suite passed: 10 checks.
+- [x] Complete frontend security suite passed: 20 checks.
+- [x] Frontend production build, Python syntax, and diff checks passed.
+
+Optimal result:
+
+- Users can see and open cited source files without exposing a reusable chat credential.
+- Database citation rows contain only normal citation metadata, not secrets or expiring access tokens.
+- Deployment identifiers remain absent from the current tree, and history removal is handled as a deliberate repository migration.

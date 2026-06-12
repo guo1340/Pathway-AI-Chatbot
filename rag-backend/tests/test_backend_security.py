@@ -58,6 +58,7 @@ class StubPipeline:
         self.fail_summary = False
         self.empty_summary = False
         self.summary_calls = 0
+        self.summary_delay = 0
 
     @classmethod
     def from_disk(cls):
@@ -71,6 +72,8 @@ class StubPipeline:
 
     def summarize(self, existing_summary, messages):
         self.summary_calls += 1
+        if self.summary_delay:
+            time.sleep(self.summary_delay)
         if self.fail_summary:
             raise RuntimeError("stub summary failure")
         if self.empty_summary:
@@ -153,11 +156,14 @@ class BackendSecurityTests(unittest.TestCase):
         main.PIPE.fail_summary = False
         main.PIPE.empty_summary = False
         main.PIPE.summary_calls = 0
+        main.PIPE.summary_delay = 0
+        main.CONVERSATION_LOCKS.clear()
         main.CHAT_RATE_LIMIT_REQUESTS = 0
         main.CHAT_RATE_LIMIT_WINDOW_SECONDS = 60
         main.CHAT_TRUST_PROXY = False
         main.CHAT_SERVER_HISTORY_MESSAGES = 12
         main.CHAT_VISIBLE_EXCHANGES = 12
+        main.FILE_TICKET_TTL_SECONDS = 900
         with main._usage_db_connection() as connection:
             connection.execute("DELETE FROM conversation_messages")
             connection.execute("DELETE FROM conversation_state")
@@ -692,6 +698,38 @@ class BackendSecurityTests(unittest.TestCase):
             2,
         )
 
+    def test_concurrent_same_user_requests_preserve_summary_order(self):
+        user = make_token(["edit_posts"], claims={"sub": "concurrent-summary-user"})
+        main.CHAT_VISIBLE_EXCHANGES = 1
+        main.CHAT_DAILY_TOKEN_LIMIT = 100000
+        main.LLM_MAX_OUTPUT_TOKENS = 5
+        main.PIPE.summary_delay = 0.05
+
+        first = self.client.post(
+            "/api/ask",
+            headers=auth(user),
+            json={"query": "first"},
+        )
+        self.assertEqual(first.status_code, 200)
+
+        def send(query):
+            return self.client.post(
+                "/api/ask",
+                headers=auth(user),
+                json={"query": query},
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = list(executor.map(send, ("second", "third")))
+        self.assertTrue(all(response.status_code == 200 for response in responses))
+
+        user_key = main._quota_user_key({"sub": "concurrent-summary-user"})
+        summary = main._get_conversation_summary(user_key)
+        self.assertIn("first", summary)
+        self.assertTrue("second" in summary or "third" in summary)
+        history = self.client.get("/api/history", headers=auth(user)).json()["messages"]
+        self.assertEqual(len(history), 2)
+
     def test_rate_limiting(self):
         main.CHAT_RATE_LIMIT_REQUESTS = 2
         self.assertEqual(
@@ -797,8 +835,6 @@ class BackendSecurityTests(unittest.TestCase):
     def test_protected_document_access(self):
         protected = DOCS_DIR / "protected.txt"
         protected.write_text("protected content", encoding="utf-8")
-        expired = make_token(["edit_posts"], -10)
-        insufficient = make_token(["read"])
 
         self.assertEqual(
             self.client.get("/api/files/protected.txt").status_code, 401
@@ -814,20 +850,34 @@ class BackendSecurityTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, b"protected content")
+        self.assertEqual(
+            self.client.get(
+                f"/api/files/protected.txt?token={self.normal_token}"
+            ).status_code,
+            401,
+        )
+        ticket = main._file_ticket("protected.txt")
         response = self.client.get(
-            f"/api/files/protected.txt?token={self.normal_token}"
+            f"/api/files/protected.txt?file_token={ticket}"
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, b"protected content")
+        self.assertEqual(response.headers["cache-control"], "private, no-store")
+        self.assertEqual(response.headers["referrer-policy"], "no-referrer")
         self.assertEqual(
-            self.client.get(f"/api/files/protected.txt?token={expired}").status_code,
+            self.client.get(
+                f"/api/files/other.txt?file_token={ticket}"
+            ).status_code,
             401,
+        )
+        expired_ticket = main._file_ticket(
+            "protected.txt", expires_at=int(time.time()) - 1
         )
         self.assertEqual(
             self.client.get(
-                f"/api/files/protected.txt?token={insufficient}"
+                f"/api/files/protected.txt?file_token={expired_ticket}"
             ).status_code,
-            403,
+            401,
         )
         response = self.client.get(
             "/api/files/..%2Foutside.txt", headers=auth(self.normal_token)
@@ -877,17 +927,20 @@ class BackendSecurityTests(unittest.TestCase):
         )
         self.assertEqual(authenticated_chat.status_code, 200)
         authenticated_url = authenticated_chat.json()["citations"][0]["url"]
-        citation_base, _, citation_fragment = authenticated_url.partition("#")
-        separator = "&" if "?" in citation_base else "?"
-        citation_url = f"{citation_base}{separator}token={self.normal_token}"
-        if citation_fragment:
-            citation_url += f"#{citation_fragment}"
-        self.assertTrue(citation_url.endswith("#page=2"))
-        self.assertIn("?token=", citation_url)
-        citation = self.client.get(citation_url)
+        self.assertTrue(authenticated_url.endswith("#page=2"))
+        self.assertIn("?file_token=", authenticated_url)
+        self.assertNotIn("?token=", authenticated_url)
+        self.assertNotIn(self.normal_token, authenticated_url)
+        citation = self.client.get(authenticated_url)
         self.assertEqual(citation.status_code, 200)
         self.assertEqual(citation.headers["content-type"], "application/pdf")
         self.assertIn("inline", citation.headers["content-disposition"])
+
+        history_url = self.client.get(
+            "/api/history", headers=auth(self.normal_token)
+        ).json()["messages"][-1]["citations"][0]["url"]
+        self.assertIn("?file_token=", history_url)
+        self.assertEqual(self.client.get(history_url).status_code, 200)
 
     def test_invalid_configuration_fails_startup(self):
         script = (
@@ -917,6 +970,7 @@ class BackendSecurityTests(unittest.TestCase):
                 "CHAT_SERVER_HISTORY_MESSAGES",
             ),
             ({"CHAT_VISIBLE_EXCHANGES": "0"}, "CHAT_VISIBLE_EXCHANGES"),
+            ({"FILE_TICKET_TTL_SECONDS": "0"}, "FILE_TICKET_TTL_SECONDS"),
         ]
         for overrides, expected in cases:
             env = os.environ.copy()

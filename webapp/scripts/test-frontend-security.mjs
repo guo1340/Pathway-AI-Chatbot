@@ -1026,12 +1026,21 @@ async function run() {
     record("Vite mints a short-lived loopback-only local user token");
 
     await navigate(cdp, `http://127.0.0.1:${VITE_PORT}/`, false);
-    await waitFor(
-      () => cdp.evaluate(
-        "Boolean(document.querySelector('.send-button:not([disabled])'))"
-      ),
-      "localhost Send button enabled"
-    );
+    try {
+      await waitFor(
+        () => cdp.evaluate(
+          "Boolean(document.querySelector('.send-button:not([disabled])'))"
+        ),
+        "localhost Send button enabled"
+      );
+    } catch (error) {
+      const state = await cdp.evaluate(`(() => ({
+        href: location.href,
+        body: document.body?.innerText,
+        buttonDisabled: document.querySelector('.send-button')?.disabled,
+      }))()`);
+      throw new Error(`${error.message}: ${JSON.stringify(state)}`);
+    }
     await setInputAndSend(cdp, "local send");
     await waitFor(
       () => cdp.evaluate(

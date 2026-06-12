@@ -129,7 +129,7 @@ Backend:
 - `POST /api/ask`: authenticated chat endpoint with history support.
 - `GET /api/history`: returns only the authenticated user's newest visible raw exchanges; it never returns the private summary.
 - `POST /api/conversation/clear`: summarizes all visible raw exchanges, preserves the cumulative summary, removes the raw rows, and returns the updated token balance.
-- `GET /api/files/{name}`: authenticated file access using a bearer token or citation `token` query parameter.
+- `GET /api/files/{name}`: authenticated file access using a bearer header or a short-lived filename-scoped `file_token` citation ticket.
 - `POST /api/upload`: dashboard-authorized upload and re-index.
 - `POST /api/reload`: dashboard-authorized index reload.
 
@@ -168,12 +168,13 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - OCR is configurable with `PDF_OCR_ENABLED`, `PDF_OCR_ENGINE`, `PDF_OCR_MIN_TEXT_CHARS`, `PDF_OCR_DPI`, `PDF_OCR_LANGUAGE`, and optional `TESSERACT_CMD`.
 - Chunking is content-aware and configurable with `CHUNK_MIN_SIZE`, `CHUNK_MAX_SIZE`, and `CHUNK_OVERLAP`; legacy `CHUNK_SIZE` remains the maximum-size fallback.
 - Changing chunk-size settings causes affected files to be re-indexed even when their contents are unchanged.
-- `CHAT_QUERY_MAX_LENGTH` rejects oversized `/api/ask` requests before retrieval.
+- `CHAT_QUERY_MAX_LENGTH` rejects oversized `/api/ask` requests before retrieval. The frontend also defaults its textarea to the same 4,000-character maximum, but the backend remains authoritative.
 - `CHAT_RATE_LIMIT_REQUESTS` and `CHAT_RATE_LIMIT_WINDOW_SECONDS` provide process-local per-client limits; setting requests to `0` disables the limiter.
 - `CHAT_TRUST_PROXY` is disabled by default. Enable it only behind a trusted proxy that replaces `X-Forwarded-For`.
 - `LLM_PROVIDER=openai` by default; Ollama support exists.
 - OpenAI defaults: `gpt-4o-mini`, `text-embedding-3-small`.
 - Citation URLs use `API_BASE` and default to `http://localhost:8000/api/files/{filename}` for the current local-only dashboard; page fragments are preserved where possible.
+- Citation responses receive a short-lived HMAC ticket scoped to one filename. Canonical citation URLs are stored without tickets, and the full chat JWT is never appended to citation links.
 - Adjacent-page expansion skips documents such as `.txt`, `.md`, and `.html` files when they do not have numeric page metadata.
 - `prompt.txt` is loaded fresh inside `RagPipeline.answer()` for each query.
 - Durable conversation rows and cumulative summaries share the SQLite database configured by `TOKEN_USAGE_DB`.
@@ -225,10 +226,11 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The daily balance measures estimated user-visible tokens, not exact provider billing tokens; hidden system instructions and retrieved RAG context are not currently included.
 - The webapp displays the matching estimated input budget and disables Send when the estimate exceeds its configured limit.
 - Citation normalization preserves `#page=N` after the encoded filename, including fallback `file://` and raw-filename citations.
+- File tickets default to a 900-second lifetime through `FILE_TICKET_TTL_SECONDS`. File responses use `Cache-Control: private, no-store` and `Referrer-Policy: no-referrer`.
 - The rate limiter is process-local, so each worker has a separate request bucket; a shared store is still required before scaling to multiple workers.
 - The request-rate limiter remains short-window and IP-based; the daily token quota is separately keyed by JWT user identity.
 - Daily token accounting survives restarts and is shared across workers that use the same SQLite path. A network database would still be required if the backend is later spread across multiple servers.
-- Conversation history and summaries survive restarts in the same SQLite file. Same-user summarization currently assumes one backend worker; a future multi-worker deployment should add distributed per-user locking.
+- Conversation history and summaries survive restarts in the same SQLite file. Process-local per-user locks serialize ask and clear operations for the current single PM2 worker. A future multi-process or multi-server deployment still requires distributed per-user locking.
 - Rotating `PATHWAY_RAG_JWT_SECRET` changes the HMAC-derived conversation owner key and requires a history-key migration first.
 - Admin history lookup is intentionally not exposed yet. A future dashboard endpoint can use the existing user-keyed tables after authorization and audit requirements are defined.
 - The repository does not include the WordPress token issuer, so the deployed token must be checked for one configured stable identity claim before release.
@@ -248,6 +250,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - `webapp/page-ask-ai.php` consumes `pathway_rag_mint_current_user_token()`, but the WordPress plugin that defines that function is managed outside this repository and must be verified in the deployed WordPress environment.
 - The current WordPress page and backend require `edit_posts`. Subscriber access must not be enabled until the external issuer is confirmed to mint an accepted capability for the intended subscriber accounts.
 - Hosted-chat redirect destinations are limited to HTTPS Pathway domains and local development hosts to avoid an open redirect.
+- The current tracked tree contains no public EC2 IP/hostname or tracked PEM/key file, but older Git commits contain the former server address. Removing it from GitHub requires a coordinated history rewrite and force-push; infrastructure access controls must not rely on the address being secret.
 
 ## Production Release Status
 
