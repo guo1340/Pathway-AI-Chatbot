@@ -1525,3 +1525,27 @@ Optimal result:
 - Users can read and track the current chat while waiting.
 - Send remains disabled and shows a visible, accessible loading animation.
 - Existing authentication, clear, summary, quota, citation, responsive-layout, and localhost behavior remains green.
+
+### 2026-06-13 20:09:23 +08:00 - Bold Backend Text And Pending Response Bubble
+
+Implemented:
+
+- Added safe rendering for balanced `**text**` spans without using raw HTML.
+- Added a transient AI response bubble with a loading spinner immediately after send.
+- Replaced the pending bubble in place with the complete answer when the backend responds and removed it on request failure.
+- Excluded pending placeholders from browser session persistence.
+- Verified failed requests remove the pending bubble before displaying their error dialog.
+
+Testing completed:
+
+1. Production build and JavaScript syntax checks passed.
+2. `npm.cmd run test:ui` passed 5 checks.
+3. `npm.cmd run test:frontend-priority8` passed 10 checks.
+4. `npm.cmd run test:conversation-summary` passed 3 checks.
+5. `npm.cmd run test:frontend-security` passed 21 checks.
+
+Optimal result:
+
+- Bold text and citations can coexist safely.
+- The user sees a loading AI bubble immediately, followed by the answer in the same bubble.
+- No pending placeholder survives refresh or a failed request.

@@ -185,6 +185,19 @@ const server = createServer((req, res) => {
         }));
         return;
       }
+      if (query === "formatted response") {
+        res.writeHead(200);
+        res.end(JSON.stringify({
+          answer: "Review **The Scriptures Inspired** before continuing [1].",
+          citations: [{
+            title: "Statement of Faith",
+            url: `${APP_ORIGIN}/api/files/statement.pdf?file_token=test#page=1`,
+          }],
+          conversation_id: "test-conversation",
+          remaining_tokens: 5000,
+        }));
+        return;
+      }
 
       const remaining = query === "low balance"
         ? 1000
@@ -488,6 +501,10 @@ async function runPriority8(cdp) {
     await setInputAndSend(cdp, "server failure");
     await waitForSelector(cdp, ".dialog-panel");
     assert.equal(
+      await cdp.evaluate("Boolean(document.querySelector('.response-spinner'))"),
+      false
+    );
+    assert.equal(
       await cdp.evaluate(
         "document.querySelector('.dialog-panel').textContent.includes('Temporary backend failure')"
       ),
@@ -544,6 +561,7 @@ async function runPriority8(cdp) {
   await freshIsolatedValidPage();
   await setInputAndSend(cdp, "slow response");
   await waitForSelector(cdp, ".send-spinner");
+  await waitForSelector(cdp, ".response-spinner");
   assert.deepEqual(
     await cdp.evaluate(`(() => {
       const button = document.querySelector('.send-button');
@@ -552,13 +570,23 @@ async function runPriority8(cdp) {
         button?.getAttribute('aria-label'),
         Boolean(document.querySelector('.thinking-overlay')),
         Boolean(document.querySelector('.rcb-log')),
+        document.querySelector('.rcb-msg.ai:last-child .ai-title')?.textContent,
       ];
     })()`),
-    [true, "Waiting for response", false, true]
+    [true, "Waiting for response", false, true, "Pathway's bot:"]
+  );
+  assert.equal(
+    await cdp.evaluate("sessionStorage.getItem('chat_history')?.includes('\"pending\":true')"),
+    false
   );
   await waitFor(
     () => cdp.evaluate("!document.querySelector('.send-spinner')"),
     "send spinner removal"
+  );
+  assert.equal(await cdp.evaluate("Boolean(document.querySelector('.response-spinner'))"), false);
+  assert.match(
+    await cdp.evaluate("document.querySelector('.rcb-msg.ai:last-child .ai-text')?.textContent"),
+    /Slow answer/
   );
   record("button spinner blocks duplicate sends while chat remains visible");
 
@@ -870,6 +898,28 @@ async function runUi(cdp) {
   );
   assert.equal(askBodies.length, asksBeforeQuota);
   record("known insufficient daily balance opens a dialog before an API request");
+
+  await cdp.evaluate("document.querySelector('.dialog-panel button')?.click()");
+  await freshValidPage(cdp);
+  await setInputAndSend(cdp, "formatted response");
+  await waitFor(
+    () => cdp.evaluate(
+      "document.querySelector('.rcb-msg.ai:last-child strong')?.textContent === 'The Scriptures Inspired'"
+    ),
+    "bold backend text"
+  );
+  await waitForSelector(cdp, ".rcb-msg.ai:last-child .inline-citation");
+  assert.equal(
+    await cdp.evaluate(
+      "document.querySelector('.rcb-msg.ai:last-child .ai-text')?.textContent.includes('**')"
+    ),
+    false
+  );
+  assert.match(
+    await cdp.evaluate("document.querySelector('.rcb-msg.ai:last-child .inline-citation')?.href"),
+    /statement\.pdf\?file_token=test#page=1$/
+  );
+  record("balanced double-asterisk text renders bold alongside citation links");
 }
 
 async function run() {

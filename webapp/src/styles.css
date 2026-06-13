@@ -814,6 +814,24 @@ body {
   margin-left: 0.5em;
 }
 
+.response-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 1.5rem;
+}
+
+.response-spinner {
+  width: 1rem;
+  height: 1rem;
+  box-sizing: border-box;
+  border: 2px solid rgba(43, 65, 64, .2);
+  border-top-color: #4f7a78;
+  border-radius: 50%;
+  animation: status-spin .8s linear infinite;
+}
+
 /* Inline citation styling */
 .inline-citation {
   color: #0066cc;

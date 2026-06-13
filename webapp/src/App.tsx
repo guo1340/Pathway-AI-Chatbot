@@ -96,7 +96,13 @@ async function clearRagConversation(apiBase: string, token: string): Promise<any
 
 // --- Types ---
 type Citation = { title?: string; url?: string }
-type Msg = { who: 'you' | 'ai'; text: string; citations?: Citation[]; time?: string }
+type Msg = {
+  who: 'you' | 'ai'
+  text: string
+  citations?: Citation[]
+  time?: string
+  pending?: boolean
+}
 type Notice = {
   title: string
   message: string
@@ -348,8 +354,9 @@ export default function App({
 
   // 🧠 Save messages to sessionStorage on every update
   React.useEffect(() => {
-    if (msgs.length) {
-      sessionStorage.setItem('chat_history', JSON.stringify(msgs))
+    const persistentMsgs = msgs.filter((message) => !message.pending)
+    if (persistentMsgs.length) {
+      sessionStorage.setItem('chat_history', JSON.stringify(persistentMsgs))
     } else {
       sessionStorage.removeItem('chat_history')
     }
@@ -454,8 +461,13 @@ export default function App({
       text: query,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
+    const pendingAiMsg: Msg = {
+      who: 'ai',
+      text: '',
+      pending: true,
+    }
 
-    setMsgs((m) => [...m, newUserMsg])
+    setMsgs((m) => [...m.slice(-22), newUserMsg, pendingAiMsg])
     setBusy(true)
     try {
       const data = await askRag(effectiveApiBase, authToken, {
@@ -473,36 +485,27 @@ export default function App({
       const answer = data.answer || ''
       const citations: Citation[] | undefined = data.citations
 
-      setMsgs((m) => [
-        ...m.slice(-23),
-        {
+      setMsgs((m) => {
+        const next = [...m]
+        let pendingIndex = -1
+        for (let index = next.length - 1; index >= 0; index -= 1) {
+          if (next[index].pending) {
+            pendingIndex = index
+            break
+          }
+        }
+        const answerMessage: Msg = {
           who: 'ai',
-          text: '',
+          text: answer,
           citations,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ])
-
-      // Typing animation
-      await new Promise<void>((resolve) => {
-        let i = 0
-        const step = () => {
-          i = Math.min(i + 2, answer.length)
-          setMsgs((m) => {
-            if (!m.length) return m
-            const lastIdx = m.length - 1
-            const last = m[lastIdx]
-            if (last.who !== 'ai') return m
-            const next = [...m]
-            next[lastIdx] = { ...last, text: answer.slice(0, i) }
-            return next
-          })
-          if (i < answer.length) setTimeout(step, 16)
-          else resolve()
         }
-        setTimeout(step, 16)
+        if (pendingIndex >= 0) next[pendingIndex] = answerMessage
+        else next.push(answerMessage)
+        return next.slice(-24)
       })
     } catch (e: any) {
+      setMsgs((messages) => messages.filter((message) => !message.pending))
       if (e instanceof RagApiError && (e.status === 401 || e.status === 403) && requireAuth) {
         setBusy(false)
         setNotice({
@@ -775,13 +778,15 @@ export default function App({
           msgs.map((m, i) => {
             const deduped = dedupeCitations(m.citations)
 
-            function renderWithInlineCitations(text: string, citations?: Citation[]) {
-              if (!citations?.length) return text
-              return text.split(/(\[\d+\])/g).map((part, i) => {
+            function renderMessageContent(text: string, citations?: Citation[]) {
+              return text.split(/(\[\d+\]|\*\*[^*\n]+\*\*)/g).map((part, i) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                  return <strong key={i}>{part.slice(2, -2)}</strong>
+                }
                 const match = part.match(/\[(\d+)\]/)
                 if (!match) return part
                 const idx = parseInt(match[1], 10) - 1
-                const citation = citations[idx]
+                const citation = citations?.[idx]
                 if (!citation) return part
                 const href = toHttpUrl(citation, effectiveApiBase)
                 const title =
@@ -811,13 +816,20 @@ export default function App({
                     className={m.who === 'you' ? 'user-text' : 'ai-text'}
                     style={{ whiteSpace: 'pre-wrap' }}
                   >
-                    {renderWithInlineCitations(
-                      m.text
-                        // turn leading "- " into bullets
-                        .replace(/^-+\s+/gm, '• ')
-                        // remove stray "-" before citations or EOL
-                        .replace(/\s*-\s*(?=\[\d+\]|\n|$)/g, ''),
-                      deduped
+                    {m.pending ? (
+                      <span className="response-loading" role="status" aria-live="polite">
+                        <span className="response-spinner" aria-hidden="true" />
+                        <span className="sr-only">Waiting for response</span>
+                      </span>
+                    ) : (
+                      renderMessageContent(
+                        m.text
+                          // turn leading "- " into bullets
+                          .replace(/^-+\s+/gm, '• ')
+                          // remove stray "-" before citations or EOL
+                          .replace(/\s*-\s*(?=\[\d+\]|\n|$)/g, ''),
+                        deduped
+                      )
                     )}
 
                   </div>
@@ -850,7 +862,7 @@ export default function App({
                       </ol>
                     </div>
                   )}
-                  {m.who === 'ai' && <div className="timestamp">{m.time}</div>}
+                  {m.who === 'ai' && !m.pending && <div className="timestamp">{m.time}</div>}
                 </div>
               </div>
             )

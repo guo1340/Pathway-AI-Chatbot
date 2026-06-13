@@ -1020,3 +1020,23 @@ Test correction:
 
 - The first Priority 8 run found six old helper calls that did not pass the browser handle after clear-dialog navigation was centralized.
 - Updated those test calls and reran the complete suite successfully; no application-code correction was required for that failure.
+
+## 2026-06-13 20:09:23 +08:00 - Final Priority 7 Formatting And Loading Verification
+
+- [x] Confirmed balanced backend `**text**` renders as bold without displaying the asterisks.
+- [x] Confirmed bold formatting and inline citation links render correctly in the same answer.
+- [x] Confirmed a Pathway bot bubble and loading spinner appear immediately after send.
+- [x] Confirmed the pending bubble is replaced in place by the complete returned answer instead of creating a second AI bubble.
+- [x] Confirmed pending AI placeholders are not written to `sessionStorage`.
+- [x] Frontend production build and JavaScript syntax checks passed.
+- [x] UI suite passed: 5 checks.
+- [x] Priority 8 suite passed: 10 checks.
+- [x] Conversation-summary suite passed: 3 checks.
+- [x] Complete frontend security suite passed: 21 checks.
+
+Test correction:
+
+- The first UI run detected bold content before the typing animation had reached the later citation marker.
+- Updated the test to wait for both final rendered elements. The final implementation then replaced the old typing animation with a direct pending-bubble-to-complete-answer swap, eliminating transient raw formatting markers.
+- Final diff review found pending-bubble cleanup attached to the clear-history failure path instead of the answer-request failure path.
+- Moved cleanup to the request catch block, asserted failed requests leave no response spinner, and reran the production build plus all 39 frontend checks successfully.

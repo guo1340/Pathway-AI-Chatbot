@@ -198,6 +198,8 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The composer displays the backend-provided daily `remaining_tokens` balance after successful answers and shows a dedicated quota message when the backend rejects a reservation.
 - Authentication checking and backend response waiting use separate blocking overlays.
 - Authentication checking remains a blocking full-screen state. Backend response waiting no longer covers the chat; the disabled Send button displays an accessible spinner while the existing conversation remains visible.
+- A pending AI message bubble appears immediately after send with its own spinner, is excluded from session persistence, and is replaced in place by the complete returned answer without replaying a typing animation.
+- Backend answer spans wrapped in balanced `**` markers render as escaped React `<strong>` content; citation markers continue to render as authenticated links.
 - Request failures use a dismissible notification dialog; authorization failures explain the redirect and provide an immediate login action.
 - The authorization dialog's `Go to login` control is a top-level link to `https://pathway.training/wp-login.php`, so it works from the cross-origin chat iframe.
 - The nuke button calls authenticated backend compaction. Visible raw history is removed only after it is folded into the retained private summary; daily token usage is not reset.
