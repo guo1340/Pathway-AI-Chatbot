@@ -19,6 +19,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Load dashboard deployment details from local environment configuration instead of committing the public EC2 hostname.
 - [ ] Apply the three pending Ubuntu ESM Apps security updates on the production server after checking compatibility and creating a rollback plan.
 - [x] Review, update, and lock the webapp npm toolchain; local npm audits now report zero vulnerabilities.
+- [ ] Upgrade the webapp to the patched Vite 8 toolchain and rerun all frontend suites. The 2026-06-13 audit reports three high-severity development-tool findings, and npm's fix requires a major Vite upgrade.
 - [x] Enforce a configurable estimated input-token ceiling before retrieval or LLM execution.
 - [x] Cap model response generation for both OpenAI and Ollama providers.
 - [x] Add process-local per-user daily token accounting and return `remaining_tokens` after each successful `/api/ask` response.
@@ -67,7 +68,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## In Progress
 
-- Current task: Citation visibility is corrected locally. Deploy the rebuilt frontend and backend, then verify a live WordPress-authenticated answer displays inline references and the linked Sources list.
+- Current task: All locally reproducible release tests pass. Production-only WordPress JWT/citation, public limit/rate, ESM maintenance, and EBS expansion checks remain.
 
 ## Done
 
@@ -154,6 +155,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-12 18:10:23 +08:00 - Audited infrastructure exposure, confirmed query limits, and hardened citation file access without hiding source names.
 - 2026-06-13 16:43:42 +08:00 - Recovered EC2 disk headroom, restored the saved backend process, and verified persistent PM2 startup plus local/public health.
 - 2026-06-13 16:43:42 +08:00 - Fixed missing frontend reference markers/links by preserving backend citations and rendering a linked Sources list.
+- 2026-06-13 17:30:57 +08:00 - Ran the complete local release matrix; fixed the localhost browser-test navigation dependency and passed 16 backend, 6 dashboard, 3 summary, 10 Priority 8, and 21 frontend checks.
 
 ## Steps and Instructions for Testing
 

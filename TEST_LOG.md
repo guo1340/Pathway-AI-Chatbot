@@ -963,7 +963,30 @@ Optimal result: the backend survives a reboot through systemd/PM2 and the server
 - [x] Frontend production build passed and refreshed the plugin distribution.
 - [x] Citation browser regression passed: a response with citation metadata but no inline marker displayed a linked `Sources: [1]` entry with its protected file ticket and PDF page fragment intact.
 - [x] Complete backend security suite passed: 16 tests.
-- [ ] Rerun the complete frontend security suite after resolving its final Vite localhost fixture blank-page timeout. The new citation check and the preceding 19 checks passed.
+- [x] Reran the complete frontend security suite after removing its dependency on Vite HMR page navigation: all 21 checks passed.
 - [ ] After deployment, ask a document-backed question through the WordPress page and confirm inline `[n]` references and the linked Sources list both appear and open correctly.
 
 Optimal result: retrieved sources remain visible and clickable even when the model does not emit citation markers, without exposing the reusable chat JWT.
+
+## 2026-06-13 17:30:57 +08:00 - Complete Pending Local Test Run
+
+- [x] Backend security suite passed: 16 tests.
+- [x] Dashboard security suite passed: 6 checks.
+- [x] Conversation-summary frontend suite passed: 3 checks.
+- [x] Priority 8 frontend suite passed: 10 checks.
+- [x] Complete frontend security suite passed: 21 checks.
+- [x] Citation metadata without model-generated markers displayed a protected linked Sources entry.
+- [x] Frontend production build passed and refreshed the plugin distribution.
+- [x] Python, dashboard JavaScript, frontend test JavaScript, WordPress template PHP, and plugin PHP syntax checks passed.
+- [x] `git diff --check` passed.
+- [x] The previously flaky localhost check now uses the real Vite-minted token on the stable test page and confirms an authenticated Send request.
+- [ ] npm audit currently reports three high-severity development-tool findings through `esbuild`. npm requires Vite 8.0.16; the attempted upgrade was not retained because the Windows Rolldown native binary download was repeatedly truncated and could not be tested.
+
+Production-only unchecked tests reviewed but not executable from this local workspace:
+
+- WordPress issuer secret fingerprint, live token identity/capability, intended subscriber acceptance, unauthorized-user rejection, and authenticated citation opening.
+- Public HTTPS character limit, estimated-token limit, and short-window rate-limit checks using a fresh valid WordPress token.
+- Ubuntu ESM Apps package review, maintenance approval, dry run, installation, reboot regression, and final package recording.
+- Actual EBS expansion or data-volume attachment.
+
+Optimal result: all repository-contained behavior is green; the remaining unchecked items require production credentials, AWS/Ubuntu maintenance access, or an explicit deployment change.

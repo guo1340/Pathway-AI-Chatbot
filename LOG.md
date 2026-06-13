@@ -1429,3 +1429,30 @@ Optimal result:
 - The backend returns citations even when the model initially omits markers.
 - The frontend displays linked `[n]` references and a Sources list without exposing the reusable chat JWT.
 - The backend suite passes all 16 tests. The citation browser regression passes; the complete browser suite still needs a clean rerun after its unrelated final Vite localhost fixture timeout.
+
+### 2026-06-13 17:30:57 +08:00 - Complete Local Release Verification
+
+Implemented:
+
+- Ran every unchecked test that can be reproduced without EC2, AWS, Nginx, or a genuine WordPress JWT.
+- Changed the final frontend security check to use the real Vite-minted local token on the stable test page instead of depending on cross-origin Vite HMR page navigation.
+- Audited the current npm dependency tree. npm now reports three high-severity development-tool findings and requires a Vite 8 major upgrade.
+- Attempted the Vite 8 upgrade, but did not retain it because the required Windows Rolldown binary was repeatedly truncated during download and the dev server could not be verified.
+
+Testing steps:
+
+1. From `rag-backend`, run `..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v`.
+2. From `dashboard`, run `npm.cmd run test:security`.
+3. From `webapp`, run `npm.cmd run test:conversation-summary`.
+4. From `webapp`, run `npm.cmd run test:frontend-priority8`.
+5. From `webapp`, run `npm.cmd run test:frontend-security`.
+6. From `webapp`, run `npm.cmd run build`.
+7. Run the Python, JavaScript, and PHP syntax checks documented in `TEST_LOG.md`.
+8. Run `npm.cmd audit --audit-level=moderate` and track the Vite 8 migration separately.
+9. Run `git diff --check`.
+
+Optimal result:
+
+- 16 backend tests, 6 dashboard checks, 3 summary checks, 10 Priority 8 checks, and 21 frontend security checks pass.
+- The production build and all syntax checks pass.
+- Remaining unchecked tests are limited to genuine production authentication, public API controls, Ubuntu maintenance, EBS capacity, and the separately tracked Vite 8 upgrade.

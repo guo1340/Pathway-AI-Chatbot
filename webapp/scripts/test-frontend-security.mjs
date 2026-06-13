@@ -1051,7 +1051,7 @@ async function run() {
     assert.ok(localPayload.exp > Math.floor(Date.now() / 1000) + 28000);
     record("Vite mints a short-lived loopback-only local user token");
 
-    await navigate(cdp, `http://127.0.0.1:${VITE_PORT}/`, false);
+    await navigate(cdp, pageUrl({ token: localConfig.token }));
     try {
       await waitFor(
         () => cdp.evaluate(

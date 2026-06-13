@@ -236,7 +236,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - Admin history lookup is intentionally not exposed yet. A future dashboard endpoint can use the existing user-keyed tables after authorization and audit requirements are defined.
 - The repository does not include the WordPress token issuer, so the deployed token must be checked for one configured stable identity claim before release.
 - A user who passes `page-ask-ai.php`'s `current_user_can('edit_posts')` check and then receives HTTP 401 from `/api/ask` is not being rejected by the backend role check. Compare hashes of the issuer and backend signing secrets without printing either secret, then check token expiry.
-- The webapp npm toolchain is locked to audited versions including Vite 6.4.3, Rollup 4.61.1, Picomatch 4.0.4, and PostCSS 8.5.15.
+- The webapp currently uses Vite 6.4.3. A 2026-06-13 npm audit reports three high-severity development-tool findings through `esbuild`; npm's available fix upgrades to Vite 8.0.16. That major upgrade remains pending because its Windows Rolldown native binding could not be downloaded intact in the current environment.
 - The separate three pending Ubuntu ESM Apps operating-system updates have not been applied on EC2.
 - Real `.env`, vector store, docs, node_modules, and generated files exist locally; avoid committing secrets or generated state.
 - Production EC2 is deployed from branch `Sal` at commit `f60e63f`, which includes indexing/OCR commit `4a82300`.
