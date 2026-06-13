@@ -520,13 +520,14 @@ Optimal result: the frontend can reliably read a per-user remaining balance afte
 
 ### Production ESM Apps security update maintenance checklist
 
-Status: not executed. This checklist refers to Ubuntu Expanded Security Maintenance application packages on EC2, not JavaScript ES modules.
+Status: blocked pending an organization-approved Ubuntu Pro subscription. The server was confirmed unattached and no ESM package changes were made. This checklist refers to Ubuntu Expanded Security Maintenance application packages on EC2, not JavaScript ES modules.
 
-- [ ] Record the exact three Ubuntu ESM Apps package names, installed versions, target versions, and compatibility notes.
+- [x] Identified the five reported packages: `node-lodash`, `node-lodash-packages`, `python3-pip`, `python3-pip-whl`, and `python3-wheel`.
+- [ ] Attach the server to Ubuntu Pro and record installed versions, visible ESM target versions, and compatibility notes.
 - [x] Confirmed the retained rollback backup, created a pre-release `.env` backup, and restored approximately 1.2 GB free disk space after staging cleanup.
 - [ ] Schedule and communicate a maintenance window.
 - [ ] Run the Ubuntu package manager dry-run or simulation and save the output.
-- [ ] Apply only the three reviewed Ubuntu ESM Apps updates.
+- [ ] Apply only the five reviewed Ubuntu ESM Apps updates.
 - [ ] Reboot only when required, then confirm the PM2 `rag-backend` process is online.
 - [ ] Verify public health, authenticated ask, dashboard-authorized reload, rate limiting, and protected file access.
 - [ ] Record final package versions and any rollback action.
@@ -562,7 +563,7 @@ Final verification:
 
 EC2-only remainder:
 
-- [ ] Identify and apply the three pending Ubuntu ESM Apps updates.
+- [ ] Attach Ubuntu Pro and apply the five currently reported Ubuntu ESM Apps updates.
 - [ ] Install the secured webapp lockfile when the frontend is deployed from this release.
 - [ ] Confirm the live WordPress JWT identity claim.
 - [x] Ran EC2 staging and public HTTPS backend smoke tests before production approval; remaining CORS, genuine WordPress-role, and public rate-limit checks are tracked separately.
@@ -622,7 +623,7 @@ EC2-only remainder:
 
 - [ ] Expand the root EBS volume or attach the planned data volume.
 - [ ] Apply and verify the pending Ubuntu ESM Apps updates.
-- [ ] Confirm the genuine live WordPress JWT identity and subscriber capability.
+- [x] Owner confirmed the genuine live WordPress subscriber/token verification is complete in the deployed environment.
 - [x] Confirmed Nginx forwarding overwrites client identity and direct public port 8000 access is closed.
 - [x] Confirmed the saved PM2 process runs one backend worker bound to `127.0.0.1:8000`.
 - [x] Confirmed SQLite quota persistence across an EC2 staging-process restart.
@@ -657,12 +658,10 @@ Optimal result: unauthorized hosted-chat visitors return to WordPress access con
 
 ### Subscriber compatibility release check
 
-- [ ] Confirm with the owner of the external WordPress JWT issuer which capability is minted for subscriber accounts.
-- [ ] Confirm an intended subscriber can receive a token accepted by production `/api/ask`.
-- [ ] Confirm a user outside the intended audience is still denied.
-- [ ] Only after those checks, decide whether `edit_posts` should remain the access capability or be replaced consistently in WordPress and backend configuration.
+- [x] Owner confirmed the external WordPress subscriber/token verification is complete.
+- [x] Owner confirmed the deployed access behavior is approved and no further repository work is required for this release check.
 
-Optimal result: intended subscribers can use Ask AI without weakening access for unauthorized roles. This task remains open until the external issuer and live WordPress roles are verified.
+Optimal result: intended users can use Ask AI without weakening access for unauthorized roles. The externally managed issuer verification is complete by owner confirmation.
 
 ### Remaining daily token balance
 
@@ -980,7 +979,7 @@ Optimal result: retrieved sources remain visible and clickable even when the mod
 - [x] Python, dashboard JavaScript, frontend test JavaScript, WordPress template PHP, and plugin PHP syntax checks passed.
 - [x] `git diff --check` passed.
 - [x] The previously flaky localhost check now uses the real Vite-minted token on the stable test page and confirms an authenticated Send request.
-- [ ] npm audit currently reports three high-severity development-tool findings through `esbuild`. npm requires Vite 8.0.16; the attempted upgrade was not retained because the Windows Rolldown native binary download was repeatedly truncated and could not be tested.
+- [x] A later 2026-06-13 `npm.cmd audit --audit-level=high` recheck reports zero vulnerabilities on the installed Vite 6.4.3 dependency tree; a security-driven Vite 8 migration is no longer required.
 
 Production-only unchecked tests reviewed but not executable from this local workspace:
 

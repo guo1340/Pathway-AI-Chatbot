@@ -243,8 +243,10 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - Admin history lookup is intentionally not exposed yet. A future dashboard endpoint can use the existing user-keyed tables after authorization and audit requirements are defined.
 - The repository does not include the WordPress token issuer, so the deployed token must be checked for one configured stable identity claim before release.
 - A user who passes `page-ask-ai.php`'s `current_user_can('edit_posts')` check and then receives HTTP 401 from `/api/ask` is not being rejected by the backend role check. Compare hashes of the issuer and backend signing secrets without printing either secret, then check token expiry.
-- The webapp currently uses Vite 6.4.3. A 2026-06-13 npm audit reports three high-severity development-tool findings through `esbuild`; npm's available fix upgrades to Vite 8.0.16. That major upgrade remains pending because its Windows Rolldown native binding could not be downloaded intact in the current environment.
-- The separate three pending Ubuntu ESM Apps operating-system updates have not been applied on EC2.
+- The owner confirmed on 2026-06-13 that live WordPress subscriber/token verification is complete; no further repository change is pending for that release check.
+- The webapp currently uses Vite 6.4.3. A later 2026-06-13 re-audit reports zero vulnerabilities, so the previously suggested security-driven Vite 8 migration is no longer required. Treat a future Vite major upgrade as normal planned maintenance.
+- Production currently reports five pending Ubuntu ESM Apps updates: `node-lodash`, `node-lodash-packages`, `python3-pip`, `python3-pip-whl`, and `python3-wheel`. The server is not attached to Ubuntu Pro, so target versions, simulation, and installation remain pending.
+- Older Git commits contain the former EC2 address, but the current tree contains no known private key or credential. Repository privacy does not revoke existing copies; because the address is public infrastructure metadata, a disruptive history rewrite is optional unless a real secret is discovered.
 - Real `.env`, vector store, docs, node_modules, and generated files exist locally; avoid committing secrets or generated state.
 - Production EC2 is deployed from branch `Sal` at commit `f60e63f`, which includes indexing/OCR commit `4a82300`.
 - Production PM2 runs `rag-backend/.venv-release-test/bin/python` with Uvicorn bound to `127.0.0.1:8000`.

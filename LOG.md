@@ -921,7 +921,7 @@ Remaining EC2 procedure:
 
 1. Back up the current release and confirm disk space.
 2. Pull the reviewed commit.
-3. Identify, simulate, and apply the three Ubuntu ESM Apps package updates.
+3. Identify, simulate, and apply the pending Ubuntu ESM Apps package updates.
 4. Run `npm ci` in `webapp` when deploying the frontend lockfile.
 5. Confirm the installed package versions and zero-vulnerability npm audit.
 6. Verify the WordPress JWT identity claim and SQLite quota persistence.
@@ -930,7 +930,7 @@ Remaining EC2 procedure:
 Expected result:
 
 - Priority 2 repository changes are complete.
-- The only remaining Priority 2 checkbox is the three Ubuntu ESM Apps updates and release verification on EC2.
+- The only remaining Priority 2 checkbox is the Ubuntu ESM Apps updates and release verification on EC2.
 
 ### 2026-06-07 13:28:47 +08:00 - Server-Side Conversation Continuity
 
@@ -1003,7 +1003,7 @@ Final verification:
 Remaining production-only work:
 
 - Expand or attach EC2 storage before substantial document growth.
-- Apply and verify the three reviewed Ubuntu ESM Apps updates.
+- Apply and verify the reviewed Ubuntu ESM Apps updates.
 - Run the documented EC2 staging, WordPress JWT, Nginx, PM2, quota-persistence, and public HTTPS smoke tests.
 
 Optimal result:
@@ -1549,3 +1549,61 @@ Optimal result:
 - Bold text and citations can coexist safely.
 - The user sees a loading AI bubble immediately, followed by the answer in the same bubble.
 - No pending placeholder survives refresh or a failed request.
+
+### 2026-06-13 21:51:18 +08:00 - Non-Dashboard Task Audit
+
+Reviewed every unchecked `TASKS.md` item outside Priority 6 against the current source, Git history, test records, production notes, and dependency audit.
+
+Closed:
+
+- Rechecked the webapp dependency tree with `npm.cmd audit --audit-level=high`.
+- The installed Vite 6.4.3 tree now reports zero vulnerabilities.
+- The earlier security-driven Vite 8 migration is no longer necessary; a future major upgrade is ordinary maintenance rather than an active security task.
+
+Still open:
+
+- Ubuntu ESM Apps updates require live package/advisory review, rollback preparation, a maintenance window, and production verification.
+- Git history still contains the former EC2 address. Removal requires coordinated force-pushes and collaborator resets; cleaning the current tree did not rewrite prior commits.
+- Hosted WordPress access control exists for `edit_posts`, but intended subscriber capability and token acceptance remain unverified because the issuer is external to this repository.
+
+Optimal result:
+
+- Only tasks with current implementation or direct verification evidence are checked.
+- External and destructive operational work remains explicitly open.
+
+### 2026-06-13 22:00:10 +08:00 - External Security Task Follow-Up
+
+- Recorded the owner's confirmation that live WordPress subscriber/token verification is complete.
+- Clarified that making the GitHub repository private does not remove existing clones, forks, or cached history.
+- Retained the Git-history item as an optional decision because the old EC2 address is public metadata and no tracked private key or credential was found.
+- Kept Ubuntu ESM Apps maintenance open because it requires authenticated production shell access, package-specific review, and a rollback window.
+
+Optimal result:
+
+- The WordPress verification task is closed without inventing external issuer details.
+- Git history is rewritten only if a real secret is discovered or the team accepts the collaboration disruption.
+- The Ubuntu ESM Apps updates are applied manually on EC2 after a snapshot and dry run, then production health is verified.
+
+### 2026-06-13 22:06:49 +08:00 - Ubuntu ESM Package Discovery
+
+Reviewed the production terminal transcript.
+
+- Root storage has 1.2 GB available at 83% usage.
+- Ubuntu Pro is available but the instance is not attached to a subscription.
+- `pro security-status --esm-apps` reports five pending updates rather than the previously recorded three.
+- The reported packages are `node-lodash`, `node-lodash-packages`, `python3-pip`, `python3-pip-whl`, and `python3-wheel`.
+- A normal `apt update` succeeded and reported 69 total upgradable packages; a broad `apt upgrade` is outside this focused maintenance task.
+- Installation remains pending until Ubuntu Pro is attached, ESM target versions become visible, and a package-specific simulation is reviewed.
+
+Optimal result:
+
+- Attach Ubuntu Pro without exposing the subscription token in project logs.
+- Simulate and install only the five reviewed ESM packages.
+- Reboot only if required and verify PM2 plus local/public backend health afterward.
+
+Follow-up:
+
+- `sudo pro status` confirmed that the production instance remains unattached.
+- The interactive attachment was canceled because no organization-approved Ubuntu Pro account is currently available.
+- No Ubuntu Pro service or ESM package was enabled, installed, or changed.
+- Maintenance is deferred until Pathway provides or approves the subscription.

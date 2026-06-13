@@ -17,19 +17,19 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Reject oversized chat queries before retrieval or LLM processing.
 - [x] Require authenticated header or citation-query JWT access for `/api/files/{name}`.
 - [x] Load dashboard deployment details from local environment configuration instead of committing the public EC2 hostname.
-- [ ] Apply the three pending Ubuntu ESM Apps security updates on the production server after checking compatibility and creating a rollback plan.
+- [ ] Blocked: obtain an organization-approved Ubuntu Pro subscription, then attach the production server and apply the five reported ESM Apps security updates (`node-lodash`, `node-lodash-packages`, `python3-pip`, `python3-pip-whl`, and `python3-wheel`) after a package simulation and rollback snapshot. The server was confirmed unattached on 2026-06-13; no ESM packages were changed.
 - [x] Review, update, and lock the webapp npm toolchain; local npm audits now report zero vulnerabilities.
-- [ ] Upgrade the webapp to the patched Vite 8 toolchain and rerun all frontend suites. The 2026-06-13 audit reports three high-severity development-tool findings, and npm's fix requires a major Vite upgrade.
+- [x] Re-audit the webapp toolchain and determine whether a Vite 8 migration is still required. The current 2026-06-13 audit reports zero vulnerabilities on Vite 6.4.3, so no security-driven major upgrade is needed now.
 - [x] Enforce a configurable estimated input-token ceiling before retrieval or LLM execution.
 - [x] Cap model response generation for both OpenAI and Ollama providers.
 - [x] Add process-local per-user daily token accounting and return `remaining_tokens` after each successful `/api/ask` response.
 - [x] Move per-user daily token accounting to durable SQLite storage so balances survive restarts and remain atomic across multiple workers on one server.
 - [x] Replace full JWT citation query parameters with short-lived filename-scoped file tickets while keeping source titles and filenames visible.
-- [ ] Coordinate and perform a Git history rewrite to remove the former EC2 IP/hostname from old commits, then force-push affected branches/tags and have collaborators re-clone or reset. The current tracked tree is already clean.
+- [ ] Decide whether to coordinate a Git history rewrite for the former EC2 IP/hostname. Making the repository private limits future access but does not erase existing clones, forks, or cached history. Because the address is public metadata rather than a credential and the current tracked tree is clean, rewriting history is optional unless an actual secret is found.
 
 ## Priority 3: Frontend Security
 
-- [ ] Restore login-based access control for `chat.pathway.training`. First confirm with the other developer that WordPress token injection works for subscriber accounts so legitimate users are not locked out.
+- [x] Restore login-based access control for `chat.pathway.training`. First confirm with the other developer that WordPress token injection works for subscriber accounts so legitimate users are not locked out.
 - [x] Redirect tokenless, expired-token, and incompatible-role visitors from `chat.pathway.training` to the Pathway WordPress login/access page instead of showing a backend authorization error.
 
 ## Priority 4: Backend
@@ -50,6 +50,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Lock remote dashboard operations and explain the deployment-testing limitation in a dismissible dialog.
 - [ ] Re-enable live environment controls after the updated backend and indexing workflow are approved for deployment.
 - [ ] Replace SSH-based document management, prompt synchronization, and backend restart operations with authenticated HTTPS backend APIs so dashboard access does not depend on the operator's IP address.
+- [ ] Add an option to restart pm2 on ec2 with a button.
 - [ ] Add dashboard authentication before allowing access beyond the current local machine. The dashboard can upload and delete documents, edit prompts, and run git commands.
 
 ## Priority 7: UI
@@ -74,7 +75,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## In Progress
 
-- Current task: Final Priority 7 bold-text and inline response-placeholder changes are complete and verified.
+- Current task: Live WordPress subscriber/token verification is complete. Ubuntu ESM maintenance still requires production shell access; Git history rewriting is optional unless an actual secret is discovered.
 
 ## Done
 
@@ -115,6 +116,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Confirmed chat queries have backend character/token limits, added the matching frontend character cap, and replaced reusable JWT citation links with scoped file tickets.
 - [x] Recovered EC2 root capacity to approximately 1.3 GB free, restored the backend after reboot, and enabled the saved PM2 process through `pm2-ubuntu` systemd startup.
 - [x] Preserved citations when model answers omit inline markers and added a linked frontend Sources list as a reliable fallback.
+- [x] Re-audited the webapp after the earlier Vite advisory report; the current installed Vite 6.4.3 tree reports zero vulnerabilities, so the forced Vite 8 migration is no longer required.
 
 ## Notes for Codex
 
@@ -165,6 +167,10 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-13 18:39:34 +08:00 - Completed the Priority 7 responsive layout, information dialog, nested clear confirmation, and proactive daily-token warning; generated UI browser checks remain pending.
 - 2026-06-13 19:11:14 +08:00 - Replaced the response overlay with an inline Send spinner and passed 4 UI, 10 Priority 8, 3 summary, and 21 frontend security checks.
 - 2026-06-13 20:09:23 +08:00 - Added safe bold answer rendering and an in-place loading response bubble; passed 5 UI, 10 Priority 8, 3 summary, and 21 frontend security checks.
+- 2026-06-13 21:51:18 +08:00 - Audited all unchecked non-dashboard tasks; closed the stale Vite 8 security migration after a zero-vulnerability re-audit and retained the three external/operational tasks.
+- 2026-06-13 22:00:10 +08:00 - Recorded owner confirmation that live WordPress subscriber/token verification is complete and clarified the optional Git-history rewrite plus manual Ubuntu ESM maintenance boundary.
+- 2026-06-13 22:06:49 +08:00 - Reviewed the production Ubuntu transcript; identified five ESM Apps updates and confirmed installation is blocked until the server is attached to Ubuntu Pro.
+- 2026-06-13 - Confirmed the production server remains unattached to Ubuntu Pro and deferred ESM installation pending an organization-approved subscription.
 
 ## Steps and Instructions for Testing
 
