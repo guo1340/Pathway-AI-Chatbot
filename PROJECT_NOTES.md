@@ -197,9 +197,14 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The floating widget is left-side oriented in `Widget.tsx`/CSS and sends parent `postMessage` resize events.
 - The composer displays the backend-provided daily `remaining_tokens` balance after successful answers and shows a dedicated quota message when the backend rejects a reservation.
 - Authentication checking and backend response waiting use separate blocking overlays.
+- Authentication checking remains a blocking full-screen state. Backend response waiting no longer covers the chat; the disabled Send button displays an accessible spinner while the existing conversation remains visible.
 - Request failures use a dismissible notification dialog; authorization failures explain the redirect and provide an immediate login action.
 - The authorization dialog's `Go to login` control is a top-level link to `https://pathway.training/wp-login.php`, so it works from the cross-origin chat iframe.
 - The nuke button calls authenticated backend compaction. Visible raw history is removed only after it is folded into the retained private summary; daily token usage is not reset.
+- The header now uses an information button. Its dialog contains answer guidance, current input/max-response token details, the known daily balance, and the clear-history action.
+- The clear confirmation intentionally layers above the information dialog. Canceling clear returns to information; successful clear closes both dialogs.
+- The composer no longer uses a fixed 900-pixel minimum width or `100vw` root sizing, preventing page-level horizontal overflow at intermediate viewport sizes.
+- When the frontend knows the remaining daily balance and the estimated input-plus-output reservation exceeds it, Send opens a warning dialog without making the API request.
 
 ## Known Issues / Risks
 

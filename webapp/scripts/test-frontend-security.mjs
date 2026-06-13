@@ -23,6 +23,7 @@ const results = [];
 const askBodies = [];
 const priority8Only = process.argv.includes("--priority8");
 const conversationSummaryOnly = process.argv.includes("--conversation-summary");
+const uiOnly = process.argv.includes("--ui");
 let mockHistoryMessages = [];
 let clearConversationCalls = 0;
 let clearConversationShouldFail = false;
@@ -383,6 +384,19 @@ async function clickText(cdp, selector, text) {
   })()`);
 }
 
+async function openInfoDialog(cdp) {
+  if (!await cdp.evaluate("Boolean(document.querySelector('#info-dialog-title'))")) {
+    await cdp.evaluate("document.querySelector('.info-btn').click()");
+  }
+  await waitForSelector(cdp, "#info-dialog-title");
+}
+
+async function openClearDialog(cdp) {
+  await openInfoDialog(cdp);
+  await clickText(cdp, ".info-dialog button", "Clear chat history");
+  await waitForSelector(cdp, "#clear-dialog-title");
+}
+
 async function runPriority8(cdp) {
   const freshIsolatedValidPage = async () => {
     await cdp.evaluate("try { sessionStorage.clear(); } catch {}");
@@ -529,39 +543,40 @@ async function runPriority8(cdp) {
 
   await freshIsolatedValidPage();
   await setInputAndSend(cdp, "slow response");
-  await waitForSelector(cdp, ".thinking-overlay");
+  await waitForSelector(cdp, ".send-spinner");
   assert.deepEqual(
     await cdp.evaluate(`(() => {
-      const overlay = document.querySelector('.thinking-overlay');
+      const button = document.querySelector('.send-button');
       return [
-        document.querySelector('.send-button')?.disabled,
-        overlay?.getAttribute('role'),
-        overlay?.getAttribute('aria-live'),
+        button?.disabled,
+        button?.getAttribute('aria-label'),
+        Boolean(document.querySelector('.thinking-overlay')),
+        Boolean(document.querySelector('.rcb-log')),
       ];
     })()`),
-    [true, "status", "polite"]
+    [true, "Waiting for response", false, true]
   );
   await waitFor(
-    () => cdp.evaluate("!document.querySelector('.thinking-overlay')"),
-    "backend waiting overlay removal"
+    () => cdp.evaluate("!document.querySelector('.send-spinner')"),
+    "send spinner removal"
   );
-  record("backend waiting overlay blocks duplicate sends and clears after completion");
+  record("button spinner blocks duplicate sends while chat remains visible");
 
   await freshIsolatedValidPage();
   await setInputAndSend(cdp, "balance one");
   await waitFor(
     () => cdp.evaluate(
-      "document.querySelector('.token-estimate')?.textContent.includes('5,000 daily tokens remaining')"
+      "document.querySelector('.rcb-msg.ai:last-child')?.textContent.includes('Answer for balance one')"
     ),
     "balance before clear dialog"
   );
+  await openInfoDialog(cdp);
+  assert.match(
+    await cdp.evaluate("document.querySelector('.info-dialog').textContent"),
+    /5,000 daily tokens remaining/
+  );
 
-  const openClearDialog = async () => {
-    await cdp.evaluate("document.querySelector('.clear-btn').click()");
-    await waitForSelector(cdp, "#clear-dialog-title");
-  };
-
-  await openClearDialog();
+  await openClearDialog(cdp);
   assert.equal(
     await cdp.evaluate("document.querySelectorAll('.rcb-msg.you').length"),
     1
@@ -571,15 +586,16 @@ async function runPriority8(cdp) {
     await cdp.evaluate("document.querySelectorAll('.rcb-msg.you').length"),
     1
   );
+  await cdp.evaluate("document.querySelector('.info-dialog .dialog-close').click()");
   record("clear confirmation Cancel preserves chat history");
 
-  await openClearDialog();
-  await cdp.evaluate("document.querySelector('.dialog-close').click()");
-  await openClearDialog();
+  await openClearDialog(cdp);
+  await cdp.evaluate("document.querySelector('#clear-dialog-title').parentElement.querySelector('.dialog-close').click()");
+  await openClearDialog(cdp);
   await cdp.evaluate(
-    "document.querySelector('.dialog-backdrop').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))"
+    "document.querySelector('.dialog-backdrop-nested').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))"
   );
-  await openClearDialog();
+  await openClearDialog(cdp);
   await cdp.evaluate(
     "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))"
   );
@@ -587,6 +603,7 @@ async function runPriority8(cdp) {
     await cdp.evaluate("document.querySelectorAll('.rcb-msg.you').length"),
     1
   );
+  await cdp.evaluate("document.querySelector('.info-dialog .dialog-close').click()");
   record("clear confirmation close, backdrop, and Escape preserve chat history");
 
   await setInputAndSend(cdp, "quota warning");
@@ -602,7 +619,7 @@ async function runPriority8(cdp) {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   })()`);
 
-  await openClearDialog();
+  await openClearDialog(cdp);
   assert.match(
     await cdp.evaluate("document.querySelector('.dialog-panel').textContent"),
     /summarizes the visible chat/
@@ -619,12 +636,14 @@ async function runPriority8(cdp) {
   assert.equal(await cdp.evaluate("sessionStorage.getItem('chat_history')"), null);
   assert.equal(await cdp.evaluate("document.querySelector('#message').value"), "");
   assert.equal(await cdp.evaluate("Boolean(document.querySelector('.quota-alert'))"), false);
+  await openInfoDialog(cdp);
   assert.equal(
     await cdp.evaluate(
-      "document.querySelector('.token-estimate').textContent.includes('5,000 daily tokens remaining')"
+      "document.querySelector('.info-dialog').textContent.includes('5,000 daily tokens remaining')"
     ),
     true
   );
+  await cdp.evaluate("document.querySelector('.info-dialog .dialog-close').click()");
   await setInputAndSend(cdp, "after clear");
   await waitFor(
     () => cdp.evaluate(
@@ -666,7 +685,7 @@ async function runPriority8(cdp) {
   assert.ok(mobileAuthLayout.left >= 0 && mobileAuthLayout.right <= mobileAuthLayout.innerWidth);
   assert.ok(mobileAuthLayout.top >= 0 && mobileAuthLayout.bottom <= mobileAuthLayout.innerHeight);
   await freshIsolatedValidPage();
-  await openClearDialog();
+  await openClearDialog(cdp);
   const mobileLayout = await cdp.evaluate(`(() => {
     const panel = document.querySelector('.dialog-panel').getBoundingClientRect();
     return {
@@ -684,9 +703,9 @@ async function runPriority8(cdp) {
   assert.ok(mobileLayout.top >= 0 && mobileLayout.bottom <= mobileLayout.innerHeight);
   await clickText(cdp, ".dialog-actions button", "Cancel");
   await setInputAndSend(cdp, "slow response");
-  await waitForSelector(cdp, ".thinking-overlay");
+  await waitForSelector(cdp, ".send-spinner");
   const mobileWaitingLayout = await cdp.evaluate(`(() => {
-    const overlay = document.querySelector('.thinking-overlay').getBoundingClientRect();
+    const overlay = document.querySelector('.send-button').getBoundingClientRect();
     return {
       innerWidth,
       innerHeight,
@@ -736,8 +755,7 @@ async function runConversationSummary(cdp) {
   );
   record("authenticated user loads only the 12 visible exchanges");
 
-  await cdp.evaluate("document.querySelector('.clear-btn').click()");
-  await waitForSelector(cdp, "#clear-dialog-title");
+  await openClearDialog(cdp);
   const warning = await cdp.evaluate(
     "document.querySelector('.dialog-panel').textContent"
   );
@@ -761,7 +779,7 @@ async function runConversationSummary(cdp) {
     () => cdp.evaluate("document.querySelectorAll('.rcb-msg.you').length === 1"),
     "history before failed clear"
   );
-  await cdp.evaluate("document.querySelector('.clear-btn').click()");
+  await openClearDialog(cdp);
   await clickText(cdp, ".dialog-actions button", "Clear chat");
   await waitFor(
     () => cdp.evaluate(
@@ -774,6 +792,84 @@ async function runConversationSummary(cdp) {
     1
   );
   record("failed summarization keeps visible history");
+}
+
+async function runUi(cdp) {
+  for (const viewport of [
+    { width: 1024, height: 768 },
+    { width: 1366, height: 768 },
+    { width: 390, height: 844 },
+  ]) {
+    await cdp.send("Emulation.setDeviceMetricsOverride", {
+      ...viewport,
+      deviceScaleFactor: 1,
+      mobile: viewport.width < 600,
+    });
+    await freshValidPage(cdp);
+    const layout = await cdp.evaluate(`(() => {
+      const row = document.querySelector('.rcb-row').getBoundingClientRect();
+      return {
+        innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        rowLeft: row.left,
+        rowRight: row.right,
+      };
+    })()`);
+    assert.ok(layout.scrollWidth <= layout.innerWidth);
+    assert.ok(layout.rowLeft >= 0 && layout.rowRight <= layout.innerWidth);
+  }
+  record("composer has no horizontal page overflow at desktop threshold or mobile widths");
+
+  await freshValidPage(cdp);
+  assert.equal(
+    await cdp.evaluate("Boolean(document.querySelector('.chat-disclaimer, .token-estimate'))"),
+    false
+  );
+  await openInfoDialog(cdp);
+  assert.equal(
+    await cdp.evaluate("document.querySelectorAll('.info-dialog-section').length"),
+    3
+  );
+  assert.equal(
+    await cdp.evaluate("document.querySelectorAll('.token-grid > *').length"),
+    4
+  );
+  assert.match(
+    await cdp.evaluate("document.querySelector('.info-dialog').textContent"),
+    /This bot can make mistakes/
+  );
+  record("info dialog contains guidance, 2x2 token details, and clear action");
+
+  await clickText(cdp, ".info-dialog button", "Clear chat history");
+  await waitForSelector(cdp, "#clear-dialog-title");
+  const dialogLayers = await cdp.evaluate(`(() => {
+    const info = document.querySelector('.info-dialog').closest('.dialog-backdrop');
+    const clear = document.querySelector('#clear-dialog-title').closest('.dialog-backdrop');
+    return [Number(getComputedStyle(info).zIndex), Number(getComputedStyle(clear).zIndex)];
+  })()`);
+  assert.ok(dialogLayers[1] > dialogLayers[0]);
+  await clickText(cdp, ".dialog-actions button", "Cancel");
+  assert.equal(await cdp.evaluate("Boolean(document.querySelector('#info-dialog-title'))"), true);
+  record("clear confirmation layers above and returns to the info dialog");
+
+  await cdp.evaluate("document.querySelector('.dialog-close').click()");
+  await setInputAndSend(cdp, "low balance");
+  await waitFor(
+    () => cdp.evaluate(
+      "document.querySelector('.info-btn') && !document.querySelector('.send-spinner')"
+    ),
+    "low balance response"
+  );
+  const asksBeforeQuota = askBodies.length;
+  await setInputAndSend(cdp, "request over remaining daily balance");
+  await waitFor(
+    () => cdp.evaluate(
+      "document.querySelector('.dialog-panel')?.textContent.includes('Daily token limit')"
+    ),
+    "proactive daily quota dialog"
+  );
+  assert.equal(askBodies.length, asksBeforeQuota);
+  record("known insufficient daily balance opens a dialog before an API request");
 }
 
 async function run() {
@@ -813,6 +909,11 @@ async function run() {
     if (conversationSummaryOnly) {
       await runConversationSummary(cdp);
       console.log(`\n${results.length} conversation summary frontend checks passed.`);
+      return;
+    }
+    if (uiOnly) {
+      await runUi(cdp);
+      console.log(`\n${results.length} UI checks passed.`);
       return;
     }
 
@@ -861,19 +962,31 @@ async function run() {
     await setInputAndSend(cdp, "balance one");
     await waitFor(
       () => cdp.evaluate(
-        "document.querySelector('.token-estimate')?.textContent.includes('5,000 daily tokens remaining')"
+        "document.querySelector('.rcb-msg.ai:last-child')?.textContent.includes('Answer for balance one')"
       ),
       "first remaining balance"
     );
+    await openInfoDialog(cdp);
+    assert.match(
+      await cdp.evaluate("document.querySelector('.info-dialog').textContent"),
+      /5,000 daily tokens remaining/
+    );
+    await cdp.evaluate("document.querySelector('.info-dialog .dialog-close').click()");
     record("valid JWT calls ask and displays remaining balance");
 
     await setInputAndSend(cdp, "balance two");
     await waitFor(
       () => cdp.evaluate(
-        "document.querySelector('.token-estimate')?.textContent.includes('3,000 daily tokens remaining')"
+        "document.querySelector('.rcb-msg.ai:last-child')?.textContent.includes('Answer for balance two')"
       ),
       "updated remaining balance"
     );
+    await openInfoDialog(cdp);
+    assert.match(
+      await cdp.evaluate("document.querySelector('.info-dialog').textContent"),
+      /3,000 daily tokens remaining/
+    );
+    await cdp.evaluate("document.querySelector('.info-dialog .dialog-close').click()");
     record("later success replaces remaining balance");
 
     await freshValidPage(cdp);
@@ -930,15 +1043,16 @@ async function run() {
 
     await freshValidPage(cdp);
     await setInputAndSend(cdp, "low balance");
+    const asksBeforeBlockedRequest = askBodies.length;
+    await setInputAndSend(cdp, "request over remaining daily balance");
     await waitFor(
-      () => cdp.evaluate("document.querySelector('.send-button')?.disabled === true"),
-      "send disabled for low balance"
+      () => cdp.evaluate(
+        "document.querySelector('.dialog-panel')?.textContent.includes('Daily token limit')"
+      ),
+      "daily balance dialog"
     );
-    assert.equal(
-      await cdp.evaluate("document.querySelector('.token-estimate')?.dataset.overLimit"),
-      "true"
-    );
-    record("known insufficient balance disables Send");
+    assert.equal(askBodies.length, asksBeforeBlockedRequest);
+    record("known insufficient balance opens a dialog before sending");
 
     await freshValidPage(cdp);
     await setInputAndSend(cdp, "quota zero");
@@ -1070,9 +1184,14 @@ async function run() {
     await setInputAndSend(cdp, "local send");
     await waitFor(
       () => cdp.evaluate(
-        "document.querySelector('.token-estimate')?.textContent.includes('5,000 daily tokens remaining')"
+        "document.querySelector('.rcb-msg.ai:last-child')?.textContent.includes('Answer for local send')"
       ),
       "localhost request reaches configured local API"
+    );
+    await openInfoDialog(cdp);
+    assert.match(
+      await cdp.evaluate("document.querySelector('.info-dialog').textContent"),
+      /5,000 daily tokens remaining/
     );
     record("localhost Send button submits an authenticated local request");
 

@@ -1456,3 +1456,72 @@ Optimal result:
 - 16 backend tests, 6 dashboard checks, 3 summary checks, 10 Priority 8 checks, and 21 frontend security checks pass.
 - The production build and all syntax checks pass.
 - Remaining unchecked tests are limited to genuine production authentication, public API controls, Ubuntu maintenance, EBS capacity, and the separately tracked Vite 8 upgrade.
+
+### 2026-06-13 18:39:34 +08:00 - Responsive Chat Layout
+
+Implemented:
+
+- Replaced viewport-width root sizing and the fixed 900-pixel composer minimum with width-constrained flex sizing.
+- Kept the chat log as the internal scroll area so intermediate desktop dimensions do not create a page-level horizontal scrollbar.
+
+Testing steps:
+
+1. From `webapp`, run `npm.cmd run test:ui`.
+2. Inspect 1024 x 768, 1366 x 768, and 390 x 844 viewports.
+
+Optimal result: document width never exceeds viewport width and the composer remains fully visible.
+
+### 2026-06-13 18:39:34 +08:00 - Chat Information And Clear Controls
+
+Implemented:
+
+- Replaced the header nuke icon with an accessible information icon.
+- Moved answer guidance and token usage into a three-section information dialog.
+- Added a 2x2 token grid and retained the known daily balance as supporting information.
+- Moved clear history into a full-width red action and layered its existing confirmation above the information dialog.
+
+Testing steps:
+
+1. Open the information icon and inspect all three sections.
+2. Select Clear chat history, then test Cancel, close, backdrop, Escape, and successful confirmation.
+3. Confirm Cancel returns to information and successful clear closes both dialogs.
+
+Optimal result: the destructive action is no longer exposed as an unexplained header icon, and both dialogs remain accessible and correctly layered.
+
+### 2026-06-13 18:39:34 +08:00 - Proactive Daily Token Warning
+
+Implemented:
+
+- Kept Send available when a daily balance is known, then intercepted the action before `/api/ask` when the estimated input-plus-output reservation exceeds that balance.
+- Added a dialog showing the estimated reservation and remaining balance, with guidance to shorten the request or wait for reset.
+
+Testing steps:
+
+1. Establish a remaining balance below the current estimated reservation.
+2. Enter a message and select Send.
+3. Confirm the daily-limit dialog opens and no `/api/ask` request is made.
+
+Optimal result: the user receives a clear warning before network transmission and the message remains available to shorten.
+
+### 2026-06-13 19:11:14 +08:00 - Inline Response Loading State And UI Regression Run
+
+Implemented:
+
+- Removed the full-screen response waiting overlay while preserving the separate authentication-checking screen.
+- Replaced animated Thinking text with a compact spinner inside the disabled Send button.
+- Added an accessible `Waiting for response` label and kept the Send button width stable.
+- Updated browser checks to confirm the chat remains visible, duplicate sends remain blocked, and the spinner clears after completion.
+
+Testing completed:
+
+1. `npm.cmd run build` passed.
+2. `npm.cmd run test:ui` passed 4 checks.
+3. `npm.cmd run test:frontend-priority8` passed 10 checks after correcting old helper call signatures.
+4. `npm.cmd run test:conversation-summary` passed 3 checks.
+5. `npm.cmd run test:frontend-security` passed 21 checks.
+
+Optimal result:
+
+- Users can read and track the current chat while waiting.
+- Send remains disabled and shows a visible, accessible loading animation.
+- Existing authentication, clear, summary, quota, citation, responsive-layout, and localhost behavior remains green.

@@ -54,7 +54,11 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## Priority 7: UI
 
-- [ ] Optimize the chatbot UI across desktop and mobile, including layout density, visual hierarchy, interaction feedback, accessibility, and consistency with the existing Pathway design.
+- [x] Optimize the chatbot UI across desktop and mobile, including layout density, visual hierarchy, interaction feedback, accessibility, and consistency with the existing Pathway design.
+- [x] Remove the page-level horizontal scrollbar that appeared at intermediate width/height thresholds while preserving responsive desktop and mobile layout.
+- [x] Replace the nuke header control with an information dialog containing answer guidance, a 2x2 token-usage grid, and a red clear-history action whose confirmation dialog layers above the information dialog.
+- [x] Show a proactive dialog before sending when the estimated request reservation would exceed the known remaining daily token balance.
+- [x] Replace the full-screen response waiting overlay with a disabled Send button spinner so users can continue reading the chat while the answer is generated.
 
 ## Priority 8: Next-Stage Development.
 
@@ -68,7 +72,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## In Progress
 
-- Current task: All locally reproducible release tests pass. Production-only WordPress JWT/citation, public limit/rate, ESM maintenance, and EBS expansion checks remain.
+- Current task: Priority 7 UI implementation and all generated frontend regression checks are complete.
 
 ## Done
 
@@ -156,6 +160,8 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-13 16:43:42 +08:00 - Recovered EC2 disk headroom, restored the saved backend process, and verified persistent PM2 startup plus local/public health.
 - 2026-06-13 16:43:42 +08:00 - Fixed missing frontend reference markers/links by preserving backend citations and rendering a linked Sources list.
 - 2026-06-13 17:30:57 +08:00 - Ran the complete local release matrix; fixed the localhost browser-test navigation dependency and passed 16 backend, 6 dashboard, 3 summary, 10 Priority 8, and 21 frontend checks.
+- 2026-06-13 18:39:34 +08:00 - Completed the Priority 7 responsive layout, information dialog, nested clear confirmation, and proactive daily-token warning; generated UI browser checks remain pending.
+- 2026-06-13 19:11:14 +08:00 - Replaced the response overlay with an inline Send spinner and passed 4 UI, 10 Priority 8, 3 summary, and 21 frontend security checks.
 
 ## Steps and Instructions for Testing
 

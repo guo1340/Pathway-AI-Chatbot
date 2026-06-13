@@ -1,6 +1,5 @@
 import React from 'react'
-import { GiNuclearBomb } from "react-icons/gi";
-import { IoClose } from "react-icons/io5";
+import { IoClose, IoInformationCircleOutline } from "react-icons/io5";
 
 const WORDPRESS_LOGIN_URL = 'https://pathway.training/wp-login.php'
 
@@ -162,13 +161,12 @@ export default function App({
   const [msgs, setMsgs] = React.useState<Msg[]>([])
   const [q, setQ] = React.useState('')
   const [busy, setBusy] = React.useState(false)
-  const [thinkingDots, setThinkingDots] = React.useState('');
-  const longestText = 'Thinking...';
   const [convId, setConvId] = React.useState<string | undefined>(undefined)
   const [remainingTokens, setRemainingTokens] = React.useState<number | null>(null)
   const [quotaMessage, setQuotaMessage] = React.useState('')
   const [authChecking, setAuthChecking] = React.useState(true)
   const [notice, setNotice] = React.useState<Notice | null>(null)
+  const [infoDialogOpen, setInfoDialogOpen] = React.useState(false)
   const [clearDialogOpen, setClearDialogOpen] = React.useState(false)
   const [localAuth, setLocalAuth] = React.useState<{
     apiBase: string
@@ -324,15 +322,16 @@ export default function App({
   ])
 
   React.useEffect(() => {
-    if (!clearDialogOpen && !notice) return
+    if (!clearDialogOpen && !infoDialogOpen && !notice) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       if (clearDialogOpen) setClearDialogOpen(false)
+      else if (infoDialogOpen) setInfoDialogOpen(false)
       else if (!notice?.redirecting) setNotice(null)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [clearDialogOpen, notice])
+  }, [clearDialogOpen, infoDialogOpen, notice])
 
   // 🧠 Load conversation from sessionStorage on mount
   React.useEffect(() => {
@@ -376,23 +375,6 @@ export default function App({
       active = false
     }
   }, [authChecking, authReady, authToken, effectiveApiBase])
-
-  // Animate "Thinking..." dots while busy
-  React.useEffect(() => {
-    if (!busy) {
-      setThinkingDots('');
-      return;
-    }
-
-    let count = 0;
-    const interval = setInterval(() => {
-      count = (count + 1) % 4; // cycles 0→1→2→3→0
-      setThinkingDots('.'.repeat(count));
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, [busy]);
-
 
   // ---- helpers ----
   function basenameFromUrl(u?: string) {
@@ -453,7 +435,16 @@ export default function App({
     if (!authReady || !authToken) return
 
     const query = q.trim()
-    if (!query || busy || exceedsInputTokenLimit || exceedsRemainingBalance) return
+    if (!query || busy || exceedsInputTokenLimit) return
+    if (exceedsRemainingBalance) {
+      const message = `This request may use approximately ${estimatedReservation.toLocaleString()} tokens, but your remaining daily balance is ${remainingTokens?.toLocaleString() || 0}. Shorten the message or try again after the daily reset.`
+      setQuotaMessage(message)
+      setNotice({
+        title: 'Daily token limit',
+        message,
+      })
+      return
+    }
     setQ('')
     setQuotaMessage('')
     if (inputRef.current) inputRef.current.style.height = 'auto'
@@ -579,11 +570,14 @@ export default function App({
       )
       setQuotaMessage('')
       setClearDialogOpen(false)
+      setInfoDialogOpen(false)
       sessionStorage.removeItem('chat_history')
     } catch (e: any) {
       if (e instanceof RagApiError && e.remainingTokens !== undefined) {
         setRemainingTokens(Math.max(0, e.remainingTokens))
       }
+      setClearDialogOpen(false)
+      setInfoDialogOpen(false)
       setNotice({
         title: 'Chat could not be cleared',
         message:
@@ -627,13 +621,6 @@ export default function App({
 
   return (
     <div className="rcb-card" role="complementary" aria-label="RAG Chatbot">
-      {busy && (
-        <div className="thinking-overlay" role="status" aria-live="polite">
-          <div className="status-spinner" aria-hidden="true" />
-          <span>Waiting for Pathway's bot...</span>
-        </div>
-      )}
-
       {notice && (
         <div
           className="dialog-backdrop"
@@ -672,7 +659,7 @@ export default function App({
 
       {clearDialogOpen && (
         <div
-          className="dialog-backdrop"
+          className="dialog-backdrop dialog-backdrop-nested"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setClearDialogOpen(false)
           }}
@@ -701,6 +688,55 @@ export default function App({
         </div>
       )}
 
+      {infoDialogOpen && (
+        <div
+          className="dialog-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setInfoDialogOpen(false)
+          }}
+        >
+          <div className="dialog-panel info-dialog" role="dialog" aria-modal="true" aria-labelledby="info-dialog-title">
+            <button
+              type="button"
+              className="dialog-close"
+              onClick={() => setInfoDialogOpen(false)}
+              aria-label="Close chat information"
+              title="Close"
+            >
+              <IoClose />
+            </button>
+            <h2 id="info-dialog-title">Chat information</h2>
+            <section className="info-dialog-section">
+              <h3>Answer guidance</h3>
+              <p>This bot can make mistakes — please check the sources given at the end of each answer.</p>
+            </section>
+            <section className="info-dialog-section">
+              <h3>Token usage</h3>
+              <dl className="token-grid" data-over-limit={exceedsInputTokenLimit || exceedsRemainingBalance}>
+                <dt>Input tokens</dt>
+                <dt>Max response</dt>
+                <dd>~{estimatedInputTokens.toLocaleString()} / {inputTokenLimit.toLocaleString()}</dd>
+                <dd>{maxOutputTokens.toLocaleString()}</dd>
+              </dl>
+              {remainingTokens !== null && (
+                <p className="remaining-token-note">
+                  {remainingTokens.toLocaleString()} daily tokens remaining
+                </p>
+              )}
+            </section>
+            <section className="info-dialog-section info-dialog-danger">
+              <button
+                type="button"
+                className="dialog-danger"
+                onClick={() => setClearDialogOpen(true)}
+              >
+                Clear chat history
+              </button>
+            </section>
+          </div>
+        </div>
+      )}
+
       <div className="rcb-head">
         {/* {title || 'Pathway Chatbot (Beta)'} */}
         <a href="https://pathway.training/" target="_top" rel="noreferrer">
@@ -716,16 +752,15 @@ export default function App({
         <button
           onClick={(e) => {
             handleRipple(e);
-            setClearDialogOpen(true);
+            setInfoDialogOpen(true);
           }
           }
-          className="clear-btn"
-          title="Clear chat history"
-          aria-label="Clear chat history"
+          className="info-btn"
+          title="Chat information"
+          aria-label="Open chat information"
         >
-          <GiNuclearBomb />
+          <IoInformationCircleOutline />
         </button>
-        {/* this needs a better icon */}
       </div>
 
       <div className="rcb-log" id="rcb-log" ref={logRef}>
@@ -823,27 +858,8 @@ export default function App({
         )}
       </div>
 
-      <div className="chat-disclaimer-wrap">
-        <div className="chat-disclaimer">
-          ⚠️ This bot can make mistakes — please check the sources given at the end of each answer.
-        </div>
-      </div>
       <div className='question-container'>
         <div className="composer">
-          <div
-            className="token-estimate"
-            data-over-limit={exceedsInputTokenLimit || exceedsRemainingBalance}
-          >
-            ~{estimatedInputTokens.toLocaleString()} / {inputTokenLimit.toLocaleString()} input tokens
-            {' · '}
-            {maxOutputTokens.toLocaleString()} max response
-            {remainingTokens !== null && (
-              <>
-                {' / '}
-                {remainingTokens.toLocaleString()} daily tokens remaining
-              </>
-            )}
-          </div>
           {msgs.length >= 24 && (
             <div className="summary-token-notice" role="status">
               Your next message may summarize older chat and use additional daily tokens.
@@ -881,12 +897,18 @@ export default function App({
               disabled={
                 busy ||
                 !authToken ||
-                exceedsInputTokenLimit ||
-                exceedsRemainingBalance
+                exceedsInputTokenLimit
               }
-              style={busy ? { minWidth: `${longestText.length + 2}ch`, textAlign: 'center' } : {}}
+              aria-label={busy ? 'Waiting for response' : 'Send message'}
             >
-              {busy ? `Thinking${thinkingDots}` : 'Send'}
+              {busy ? (
+                <>
+                  <span className="send-spinner" aria-hidden="true" />
+                  <span className="sr-only" role="status" aria-live="polite">
+                    Waiting for response
+                  </span>
+                </>
+              ) : 'Send'}
             </button>
           </div>
         </div>

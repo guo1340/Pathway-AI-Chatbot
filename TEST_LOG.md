@@ -990,3 +990,33 @@ Production-only unchecked tests reviewed but not executable from this local work
 - Actual EBS expansion or data-volume attachment.
 
 Optimal result: all repository-contained behavior is green; the remaining unchecked items require production credentials, AWS/Ubuntu maintenance access, or an explicit deployment change.
+
+## 2026-06-13 18:39:34 +08:00 - Pending Priority 7 UI Verification
+
+Executed:
+
+- [x] `npm.cmd run test:ui` passed all 4 checks.
+- [x] Confirmed the composer and page have no horizontal overflow at 1024 x 768, 1366 x 768, and 390 x 844.
+- [x] Confirmed the header information button opens a three-section dialog.
+- [x] Confirmed the disclaimer is shown in the information dialog and no longer consumes permanent composer space.
+- [x] Confirmed the token section is a stable 2x2 grid showing input usage and maximum response.
+- [x] Confirmed the red clear-history action opens the existing confirmation above the information dialog.
+- [x] Confirmed Cancel returns to the information dialog.
+- [x] Confirmed an estimated request above the known remaining daily balance opens a warning without sending `/api/ask`.
+- [x] `npm.cmd run test:frontend-priority8` passed all 10 checks.
+- [x] `npm.cmd run test:conversation-summary` passed all 3 checks.
+- [x] `npm.cmd run test:frontend-security` passed all 21 checks.
+- [x] Confirmed response waiting disables Send, displays an accessible spinner at the button location, prevents duplicate submission, and leaves the chat visible.
+
+Already completed during implementation:
+
+- [x] Frontend production build passed and refreshed the plugin distribution.
+- [x] Frontend browser-test script syntax passed.
+- [x] `git diff --check` passed.
+
+Optimal result: there is no page-level horizontal scrollbar, the information and clear dialogs layer correctly on desktop/mobile, and requests above the known daily balance are stopped with a clear explanation before network transmission.
+
+Test correction:
+
+- The first Priority 8 run found six old helper calls that did not pass the browser handle after clear-dialog navigation was centralized.
+- Updated those test calls and reran the complete suite successfully; no application-code correction was required for that failure.
