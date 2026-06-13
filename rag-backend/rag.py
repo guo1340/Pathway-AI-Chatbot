@@ -794,21 +794,22 @@ or source citation numbers. Do not invent facts.
             found_indices = sorted({int(n) for n in re.findall(r"\[(\d+)\]", text)})
 
             # 3) Rebuild mapping 1→N based on available citations
-            max_n = min(len(found_indices), len(citations))
-            mapping = {old: new for new, old in enumerate(found_indices[:max_n], start=1)}
+            if found_indices:
+                max_n = min(len(found_indices), len(citations))
+                mapping = {old: new for new, old in enumerate(found_indices[:max_n], start=1)}
 
-            def _renumber_final(match):
-                old = int(match.group(1))
-                return f"[{mapping.get(old, len(mapping))}]"
+                def _renumber_final(match):
+                    old = int(match.group(1))
+                    return f"[{mapping.get(old, len(mapping))}]"
 
-            # 4) Apply clean numbering
-            text = re.sub(r"\[(\d+)\]", _renumber_final, text)
+                # 4) Apply clean numbering
+                text = re.sub(r"\[(\d+)\]", _renumber_final, text)
 
-            # 5) Collapse duplicate inline markers like [5][5][5]
-            text = re.sub(r"(\[\d+\])(?:\1)+", r"\1", text)
+                # 5) Collapse duplicate inline markers like [5][5][5]
+                text = re.sub(r"(\[\d+\])(?:\1)+", r"\1", text)
 
-            # 6) Trim citation list to match remapped range
-            citations = citations[: len(mapping)]
+                # 6) Trim citation list to match remapped range
+                citations = citations[: len(mapping)]
 
         # detect refusal phrases
         refusal_detected = any(

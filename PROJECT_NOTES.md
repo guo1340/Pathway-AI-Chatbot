@@ -226,6 +226,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The daily balance measures estimated user-visible tokens, not exact provider billing tokens; hidden system instructions and retrieved RAG context are not currently included.
 - The webapp displays the matching estimated input budget and disables Send when the estimate exceeds its configured limit.
 - Citation normalization preserves `#page=N` after the encoded filename, including fallback `file://` and raw-filename citations.
+- Backend citation finalization preserves retrieved source metadata when the model omits inline `[n]` markers, allowing fallback markers to be added. The frontend also renders a linked Sources list whenever citation metadata is present.
 - File tickets default to a 900-second lifetime through `FILE_TICKET_TTL_SECONDS`. File responses use `Cache-Control: private, no-store` and `Referrer-Policy: no-referrer`.
 - The rate limiter is process-local, so each worker has a separate request bucket; a shared store is still required before scaling to multiple workers.
 - The request-rate limiter remains short-window and IP-based; the daily token quota is separately keyed by JWT user identity.
@@ -239,7 +240,9 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The separate three pending Ubuntu ESM Apps operating-system updates have not been applied on EC2.
 - Real `.env`, vector store, docs, node_modules, and generated files exist locally; avoid committing secrets or generated state.
 - Production EC2 is deployed from branch `Sal` at commit `f60e63f`, which includes indexing/OCR commit `4a82300`.
-- Production PM2 runs `rag-backend/.venv-release-test/bin/python` with Uvicorn on port 8000.
+- Production PM2 runs `rag-backend/.venv-release-test/bin/python` with Uvicorn bound to `127.0.0.1:8000`.
+- On 2026-06-13, EC2 cleanup reduced root usage from 98% to 81% and restored approximately 1.3 GB free space. The root EBS volume is still 8 GB, so expansion remains the long-term capacity recommendation.
+- The `pm2-ubuntu` systemd service is enabled and active. It successfully resurrects the saved `rag-backend` process after PM2 is stopped, and both loopback and public HTTPS health checks return `{"status":"ok"}`.
 - Production `.env` must define `API_BASE=https://api.chat.pathway.training` so citation links remain public.
 - The production root filesystem is only 6.8 GB. Cleanup recovered temporary test space but cannot provide enough headroom for 500+ source documents and a growing Chroma index.
 - Before significant document growth, expand the root EBS volume to at least 20 GB. A cleaner alternative is a dedicated expandable EBS data volume with `DOCS_DIR`, `CHROMA_DIR`, and optionally `TOKEN_USAGE_DB` pointed at mounted paths.

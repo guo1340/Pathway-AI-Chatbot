@@ -171,6 +171,19 @@ const server = createServer((req, res) => {
         }, 800);
         return;
       }
+      if (query === "citation list") {
+        res.writeHead(200);
+        res.end(JSON.stringify({
+          answer: "Answer without an inline citation marker.",
+          citations: [{
+            title: "Reference Guide p.2",
+            url: `${APP_ORIGIN}/api/files/reference.pdf?file_token=test#page=2`,
+          }],
+          conversation_id: "test-conversation",
+          remaining_tokens: 5000,
+        }));
+        return;
+      }
 
       const remaining = query === "low balance"
         ? 1000
@@ -862,6 +875,19 @@ async function run() {
       "updated remaining balance"
     );
     record("later success replaces remaining balance");
+
+    await freshValidPage(cdp);
+    await setInputAndSend(cdp, "citation list");
+    await waitForSelector(cdp, ".rcb-cite");
+    assert.match(
+      await cdp.evaluate("document.querySelector('.rcb-cite')?.textContent"),
+      /Sources:\s*\[1\] Reference Guide p\.2/
+    );
+    assert.match(
+      await cdp.evaluate("document.querySelector('.rcb-cite a')?.href"),
+      /\/api\/files\/reference\.pdf\?file_token=test#page=2$/
+    );
+    record("citation list remains visible without inline answer markers");
 
     for (const status of [401, 403]) {
       await freshValidPage(cdp);

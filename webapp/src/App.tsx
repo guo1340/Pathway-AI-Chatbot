@@ -786,6 +786,35 @@ export default function App({
                     )}
 
                   </div>
+                  {m.who === 'ai' && deduped.length > 0 && (
+                    <div className="rcb-cite" aria-label="Sources">
+                      <div className="rcb-cite-label">Sources:</div>
+                      <ol className="rcb-cite-list">
+                        {deduped.map((citation, citationIndex) => {
+                          const href = toHttpUrl(citation, effectiveApiBase)
+                          const title =
+                            citation.title ||
+                            basenameFromUrl(citation.url) ||
+                            `Source ${citationIndex + 1}`
+                          return (
+                            <li className="rcb-cite-item" key={`${title}-${citationIndex}`}>
+                              {href ? (
+                                <a
+                                  href={href}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  [{citationIndex + 1}] {title}
+                                </a>
+                              ) : (
+                                <span>[{citationIndex + 1}] {title}</span>
+                              )}
+                            </li>
+                          )
+                        })}
+                      </ol>
+                    </div>
+                  )}
                   {m.who === 'ai' && <div className="timestamp">{m.time}</div>}
                 </div>
               </div>

@@ -944,3 +944,26 @@ Optimal result:
 - Users can see and open cited source files without exposing a reusable chat credential.
 - Database citation rows contain only normal citation metadata, not secrets or expiring access tokens.
 - Deployment identifiers remain absent from the current tree, and history removal is handled as a deliberate repository migration.
+
+## 2026-06-13 16:43:42 +08:00 - EC2 Storage And PM2 Recovery
+
+- [x] Root usage was reduced from 98% to 81%, leaving approximately 1.3 GB available.
+- [x] Obsolete and incomplete VS Code Server files, package cache, and old journal data were cleaned up.
+- [x] Confirmed the current 8 GB EBS volume had not been expanded, so `growpart` correctly reported no available growth.
+- [x] Saved and resurrected the `rag-backend` PM2 process.
+- [x] Enabled and started `pm2-ubuntu.service`.
+- [x] Confirmed PM2 runs one backend process on `127.0.0.1:8000`.
+- [x] Confirmed local and public `/api/health` endpoints return `{"status":"ok"}`.
+
+Optimal result: the backend survives a reboot through systemd/PM2 and the server has immediate working headroom, while EBS expansion remains the durable capacity fix.
+
+## 2026-06-13 16:43:42 +08:00 - Citation Visibility Regression
+
+- [x] Python syntax compilation passed for `rag.py` and `main.py`.
+- [x] Frontend production build passed and refreshed the plugin distribution.
+- [x] Citation browser regression passed: a response with citation metadata but no inline marker displayed a linked `Sources: [1]` entry with its protected file ticket and PDF page fragment intact.
+- [x] Complete backend security suite passed: 16 tests.
+- [ ] Rerun the complete frontend security suite after resolving its final Vite localhost fixture blank-page timeout. The new citation check and the preceding 19 checks passed.
+- [ ] After deployment, ask a document-backed question through the WordPress page and confirm inline `[n]` references and the linked Sources list both appear and open correctly.
+
+Optimal result: retrieved sources remain visible and clickable even when the model does not emit citation markers, without exposing the reusable chat JWT.

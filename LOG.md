@@ -1383,3 +1383,49 @@ Optimal result:
 - Expired or altered file tickets return HTTP 401.
 - The current tracked source contains no public deployment address or private key.
 - Git history scrubbing is performed only after collaborator coordination and a backup.
+
+### 2026-06-13 16:43:42 +08:00 - EC2 Storage And Persistent PM2 Recovery
+
+Implemented:
+
+- Removed obsolete and incomplete VS Code Server data plus safe package and journal caches, reducing root usage from 98% to 81% and restoring approximately 1.3 GB free space.
+- Confirmed the EBS device remains 8 GB and cannot be grown until the AWS volume is expanded.
+- Restored the saved `rag-backend` PM2 process after reboot.
+- Enabled and started `pm2-ubuntu.service` so the saved process is resurrected during system startup.
+
+Testing steps:
+
+1. Run `df -h /` and confirm approximately 1.3 GB remains available.
+2. Run `systemctl is-enabled pm2-ubuntu` and `systemctl is-active pm2-ubuntu`.
+3. Run `pm2 status` and confirm one `rag-backend` process is online.
+4. Run `curl -fsS http://127.0.0.1:8000/api/health`.
+5. Run `curl -fsS https://api.chat.pathway.training/api/health`.
+
+Optimal result:
+
+- The service is enabled and active, the backend is online on loopback, and both health requests return `{"status":"ok"}`.
+- Root usage remains below the emergency threshold; expand the EBS volume before substantial document growth.
+
+### 2026-06-13 16:43:42 +08:00 - Reliable Citation Markers And Source Links
+
+Implemented:
+
+- Fixed backend citation finalization so retrieved citations are not trimmed to an empty list when the model omits inline `[n]` markers.
+- Retained the existing backend fallback that adds citation markers to factual sentences.
+- Added a visible linked Sources list below every AI answer that contains citation metadata.
+- Added a browser regression for an answer that returns a protected PDF citation without an inline marker.
+
+Testing steps:
+
+1. From `rag-backend`, run `python -m py_compile rag.py main.py`.
+2. From `rag-backend`, run `..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v`.
+3. From `webapp`, run `npm.cmd run build`.
+4. From `webapp`, run `npm.cmd run test:frontend-security`.
+5. After deployment, ask a question that retrieves a source document and inspect the answer plus Sources list.
+6. Open the source link and confirm the filename is visible, the URL uses a short-lived `file_token`, and any `#page=N` fragment is preserved.
+
+Optimal result:
+
+- The backend returns citations even when the model initially omits markers.
+- The frontend displays linked `[n]` references and a Sources list without exposing the reusable chat JWT.
+- The backend suite passes all 16 tests. The citation browser regression passes; the complete browser suite still needs a clean rerun after its unrelated final Vite localhost fixture timeout.

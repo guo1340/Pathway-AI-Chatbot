@@ -67,7 +67,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## In Progress
 
-- Current task: Citation access hardening and current-tree infrastructure review are complete. Git history scrubbing and live WordPress signing-secret verification remain separately pending.
+- Current task: Citation visibility is corrected locally. Deploy the rebuilt frontend and backend, then verify a live WordPress-authenticated answer displays inline references and the linked Sources list.
 
 ## Done
 
@@ -106,6 +106,8 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Counted automatic and clear-triggered summarization against daily token usage and added transparent clear-dialog wording.
 - [x] Audited the durable summary/history changes, serialized same-user ask/clear operations, and passed 16 backend, 3 summary frontend, 10 Priority 8, and 20 frontend security checks.
 - [x] Confirmed chat queries have backend character/token limits, added the matching frontend character cap, and replaced reusable JWT citation links with scoped file tickets.
+- [x] Recovered EC2 root capacity to approximately 1.3 GB free, restored the backend after reboot, and enabled the saved PM2 process through `pm2-ubuntu` systemd startup.
+- [x] Preserved citations when model answers omit inline markers and added a linked frontend Sources list as a reliable fallback.
 
 ## Notes for Codex
 
@@ -150,6 +152,8 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-10 23:49:02 +08:00 - Ran and fixed the durable summary/history tests; all focused and regression suites passed.
 - 2026-06-12 17:45:11 +08:00 - Audited the summary/history release, fixed same-user request concurrency, and reran the complete local regression matrix.
 - 2026-06-12 18:10:23 +08:00 - Audited infrastructure exposure, confirmed query limits, and hardened citation file access without hiding source names.
+- 2026-06-13 16:43:42 +08:00 - Recovered EC2 disk headroom, restored the saved backend process, and verified persistent PM2 startup plus local/public health.
+- 2026-06-13 16:43:42 +08:00 - Fixed missing frontend reference markers/links by preserving backend citations and rendering a linked Sources list.
 
 ## Steps and Instructions for Testing
 
