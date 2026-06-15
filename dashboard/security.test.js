@@ -15,7 +15,7 @@ function loadServer(envFile, environment = {}) {
 
   const instrumented = source.replace(
     /app\.listen\(PORT,[\s\S]*$/,
-    'module.exports = { SSH_HOST, SSH_USER, REMOTE_ROOT, localBackendToken, createSSHClient, remoteLocked };'
+    'module.exports = { SSH_HOST, SSH_USER, REMOTE_ROOT, localBackendToken, createSSHClient, remoteLocked, documentTarget, validDocumentName, validLocalService };'
   );
   const sandboxProcess = Object.create(process);
   sandboxProcess.env = { ...environment };
@@ -94,7 +94,19 @@ async function run() {
   assert.match(response.body.error, /locked/i);
   assert.strictEqual(nextCalled, false);
 
-  console.log('Dashboard security configuration: 6 checks passed');
+  assert.strictEqual(locked.documentTarget({ query: {} }), 'local');
+  assert.strictEqual(locked.documentTarget({ query: { target: 'ec2' } }), 'ec2');
+  assert.strictEqual(locked.documentTarget({ query: { target: 'production' } }), null);
+
+  assert.strictEqual(locked.validDocumentName('guide.pdf'), true);
+  assert.strictEqual(locked.validDocumentName('../guide.pdf'), false);
+  assert.strictEqual(locked.validDocumentName('script.exe'), false);
+
+  assert.strictEqual(locked.validLocalService('backend'), true);
+  assert.strictEqual(locked.validLocalService('frontend'), true);
+  assert.strictEqual(locked.validLocalService('database'), false);
+
+  console.log('Dashboard security configuration: 9 checks passed');
 }
 
 run().catch((error) => {

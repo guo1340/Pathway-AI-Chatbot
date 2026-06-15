@@ -147,17 +147,92 @@ define('RAG_CHATBOT_DEV_SERVER', 'http://localhost:5173');
 
 ---
 
-## 5) Troubleshooting
+## 5) Local Operations Dashboard
+
+The dashboard runs locally at `http://localhost:3131`. Local document operations
+do not require SSH. Selecting the EC2 document target requires a local
+`dashboard/.env` file containing the server connection settings.
+
+### Configure EC2 SSH access
+
+From the repository root on Windows PowerShell:
+
+```powershell
+Copy-Item dashboard/.env.example dashboard/.env
+notepad dashboard/.env
+```
+
+On macOS or Linux:
+
+```bash
+cp dashboard/.env.example dashboard/.env
+```
+
+Set the local values:
+
+```dotenv
+PATHWAY_SSH_HOST=your-ec2-public-ip-or-dns-name
+PATHWAY_SSH_USER=ubuntu
+PATHWAY_SSH_KEY_PATH=C:/full/path/to/Pathway-Backend-Key.pem
+PATHWAY_REMOTE_ROOT=/home/ubuntu/Pathway-AI-Chatbot
+```
+
+Notes:
+
+- Forward slashes work well in Windows paths.
+- `PATHWAY_SSH_KEY_PATH` must point to the PEM file on the computer running the dashboard.
+- `dashboard/.env` and `*.pem` are ignored by Git and must not be committed.
+- Restart the dashboard after changing `.env`.
+
+Start the dashboard:
+
+```powershell
+cd dashboard
+npm install
+npm start
+```
+
+Open `http://localhost:3131`, then use the Local/EC2 control in the Documents
+card. EC2 upload and deletion use SSH/SFTP and restart the remote
+`rag-backend` PM2 process so its index reloads.
+
+### Verify SSH settings
+
+In PowerShell, confirm the configuration exists without printing its values:
+
+```powershell
+Test-Path dashboard/.env
+Select-String -Path dashboard/.env -Pattern '^PATHWAY_SSH_(HOST|USER|KEY_PATH)='
+```
+
+Test the same SSH key and host directly:
+
+```powershell
+ssh -i "C:\full\path\to\Pathway-Backend-Key.pem" ubuntu@your-ec2-public-ip-or-dns-name
+```
+
+If the dashboard reports `PATHWAY_SSH_HOST is not configured`, confirm that:
+
+1. The file is named exactly `.env`, not `.env.txt`.
+2. It is inside the `dashboard` directory.
+3. `PATHWAY_SSH_HOST` has a non-empty value.
+4. The dashboard was restarted after the file was created or changed.
+
+---
+
+## 6) Troubleshooting
 
 - Widget not visible in WP:
   - Ensure plugin is activated and `plugin/dist/` exists (`npm run build`).
   - Verify `RAG_CHATBOT_API_BASE` points to your reachable backend.
 - CORS errors: update `CORS_ORIGINS` in `rag-backend/main.py` or set env var.
 - Duplicate widget: avoid using shortcode and site‑wide at the same time on the same page (site‑wide auto‑suppresses when shortcode is present).
+- Dashboard EC2 documents show `PATHWAY_SSH_HOST is not configured`: create
+  `dashboard/.env` from `.env.example`, fill in its SSH values, and restart the dashboard.
 
 ---
 
-## 6) Deploy
+## 7) Deploy
 
 - Backend: deploy FastAPI behind a reverse proxy; set `RAG_CHATBOT_API_BASE` to its public URL.
 - WordPress: run `npm run build`, deploy `plugin/` to the server, activate.

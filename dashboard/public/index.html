@@ -63,6 +63,7 @@
     }
     .service-link { color: var(--accent); font-size: 0.8rem; text-decoration: none; }
     .service-link.disabled { color: var(--muted); pointer-events: none; }
+    .service-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
     /* ── Buttons ── */
     button {
@@ -113,6 +114,26 @@
     .doc-size { font-size: 0.75rem; color: var(--muted); flex-shrink: 0; margin-left: 6px; }
     .doc-list-empty { color: var(--muted); text-align: center; padding: 20px 0; font-size: 0.875rem; }
     .doc-list-footer { display: flex; justify-content: flex-end; margin-top: 12px; }
+    .document-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin-bottom: 18px;
+    }
+    .document-head .card-title { margin-bottom: 0; }
+    .target-toggle {
+      display: inline-flex; padding: 3px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--bg);
+    }
+    .target-toggle button {
+      padding: 6px 12px; border-radius: 6px; background: transparent;
+      color: var(--muted); font-size: 0.78rem;
+    }
+    .target-toggle button.active { background: var(--accent); color: #fff; }
+    .document-search {
+      width: 100%; margin-bottom: 14px; padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: var(--bg); color: var(--text); font: inherit;
+    }
+    .document-search:focus { border-color: var(--accent); outline: none; }
 
     /* ── Log output ── */
     .log {
@@ -144,29 +165,11 @@
     #toast.ok     { border-color: var(--success); }
     #toast.err    { border-color: var(--danger); }
 
-    .modal-backdrop {
-      position: fixed; inset: 0; z-index: 1000; display: none;
-      align-items: center; justify-content: center; padding: 24px;
-      background: rgba(5, 7, 12, 0.78);
-    }
-    .modal-backdrop.show { display: flex; }
-    .modal {
-      width: min(460px, 100%); background: var(--surface);
-      border: 1px solid var(--border); border-radius: 12px; padding: 22px;
-      box-shadow: 0 24px 70px rgba(0,0,0,0.45);
-    }
-    .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-    .modal-head h2 { font-size: 1.05rem; }
-    .modal-close {
-      width: 34px; height: 34px; padding: 0; justify-content: center;
-      background: transparent; color: var(--muted); font-size: 1.25rem;
-    }
-    .modal p { color: var(--muted); font-size: 0.9rem; line-height: 1.55; margin: 14px 0 20px; }
-    .modal-actions { display: flex; justify-content: flex-end; }
-
     @media (max-width: 680px) {
       .service-grid { grid-template-columns: 1fr; }
       .service-row { align-items: flex-start; flex-direction: column; }
+      .service-actions { width: 100%; }
+      .service-actions button { flex: 1; justify-content: center; }
       header { padding: 16px 20px; }
       main { padding: 20px 14px; }
       .card { padding: 20px 16px; }
@@ -201,7 +204,10 @@
             </a>
           </div>
         </div>
-        <button class="btn-primary" id="startBackendBtn" onclick="startService('backend')">Launch Backend</button>
+        <div class="service-actions">
+          <button class="btn-primary" id="startBackendBtn" onclick="startService('backend')">Launch Backend</button>
+          <button class="btn-danger" id="stopBackendBtn" onclick="stopService('backend')" disabled>Stop</button>
+        </div>
       </div>
       <div class="service-row">
         <div class="mode-info">
@@ -213,21 +219,45 @@
             </a>
           </div>
         </div>
-        <button class="btn-primary" id="startFrontendBtn" onclick="startService('frontend')">Launch Frontend</button>
+        <div class="service-actions">
+          <button class="btn-primary" id="startFrontendBtn" onclick="startService('frontend')">Launch Frontend</button>
+          <button class="btn-danger" id="stopFrontendBtn" onclick="stopService('frontend')" disabled>Stop</button>
+        </div>
       </div>
     </div>
     <div id="backendLogWrap">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
         <span style="font-size:0.75rem;color:var(--muted)">Local backend output</span>
-        <button class="btn-ghost" style="padding:4px 10px;font-size:0.75rem" onclick="loadBackendLogs()">↻</button>
+        <button class="btn-ghost" style="padding:4px 10px;font-size:0.75rem" onclick="loadLocalLogs()">↻</button>
       </div>
       <div class="log" id="backendLog" style="max-height:180px;user-select:text;cursor:text">Waiting for output…</div>
+    </div>
+    <div id="frontendLogWrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+        <span style="font-size:0.75rem;color:var(--muted)">Local frontend output</span>
+        <button class="btn-ghost" style="padding:4px 10px;font-size:0.75rem" onclick="loadLocalLogs()">↻</button>
+      </div>
+      <div class="log" id="frontendLog" style="max-height:180px;user-select:text;cursor:text">Waiting for output…</div>
     </div>
   </div>
 
   <!-- ── Documents ── -->
   <div class="card">
-    <div class="card-title">Local Bot Documents - rag-backend/docs</div>
+    <div class="document-head">
+      <div class="card-title" id="documentTitle">Local Bot Documents - rag-backend/docs</div>
+      <div class="target-toggle" aria-label="Document environment">
+        <button type="button" id="localTargetBtn" class="active" onclick="setDocumentTarget('local')">Local</button>
+        <button type="button" id="ec2TargetBtn" onclick="setDocumentTarget('ec2')">EC2</button>
+      </div>
+    </div>
+    <input
+      class="document-search"
+      id="documentSearch"
+      type="search"
+      placeholder="Search documents by filename"
+      aria-label="Search documents by filename"
+      oninput="renderDocs()"
+    />
 
     <div class="dropzone" id="dropzone"
       onclick="document.getElementById('fileInput').click()"
@@ -236,7 +266,7 @@
       ondrop="onDrop(event)">
       <div class="dropzone-icon">📂</div>
       <strong>Drop files here or click to browse</strong>
-      <p>Files are uploaded to the local backend and indexed incrementally</p>
+      <p id="documentTargetHelp">Files are uploaded to the local backend and indexed incrementally</p>
       <input type="file" id="fileInput" accept=".txt,.md,.html,.pdf" multiple onchange="uploadFiles(this.files)" />
     </div>
 
@@ -275,43 +305,11 @@
         <button class="btn-primary" id="savePromptBtn" onclick="savePrompt()">Save Prompt</button>
       </div>
     </div>
-    <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:0.78rem;color:var(--muted)">Remote prompt sync is locked until deployment testing is complete.</span>
-      <button class="btn-ghost" id="syncPromptBtn" onclick="showRemoteNotice()">Remote Sync Locked</button>
-    </div>
-  </div>
-
-  <!-- Remote controls -->
-  <div class="card">
-    <div class="card-title">Remote Server Controls</div>
-    <div>
-      <button class="btn-ghost" id="restartBtn" onclick="showRemoteNotice()">
-        Remote Restart Locked
-      </button>
-    </div>
-    <div class="log hidden" id="serverLog"></div>
   </div>
 
 </main>
 
 <div id="toast"></div>
-
-<div class="modal-backdrop" id="remoteModal" role="presentation" onclick="onRemoteBackdrop(event)">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="remoteModalTitle">
-    <div class="modal-head">
-      <h2 id="remoteModalTitle">Remote server actions are unavailable</h2>
-      <button class="modal-close" type="button" aria-label="Close dialog" onclick="hideRemoteNotice()">x</button>
-    </div>
-    <p>
-      Uploading files, syncing prompts, restarting services, and switching this dashboard to the remote server are locked.
-      The updated backend and indexing workflow still need deployment testing before the dashboard can safely change live data.
-      Local backend, frontend, document, and prompt workflows remain available.
-    </p>
-    <div class="modal-actions">
-      <button class="btn-primary" type="button" onclick="hideRemoteNotice()">Understood</button>
-    </div>
-  </div>
-</div>
 
 <script>
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -353,9 +351,26 @@ async function startService(service) {
     if (d.error) throw new Error(d.error);
     toast(d.started ? `${service} launch requested` : `${service} is already running`);
     startHealthPolling();
-    if (service === 'backend') startLogPolling();
+    startLogPolling();
   } catch (e) {
     toast(`Could not launch ${service}: ${e.message}`, 'err');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+async function stopService(service) {
+  const btn = document.getElementById(service === 'backend' ? 'stopBackendBtn' : 'stopFrontendBtn');
+  setLoading(btn, true, ' Stopping…');
+  try {
+    const r = await fetch(`/api/local/stop/${service}`, { method: 'POST' });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    toast(d.stopped ? `${service} stopped` : `${service} is already stopped`);
+    startHealthPolling();
+    loadLocalLogs();
+  } catch (e) {
+    toast(`Could not stop ${service}: ${e.message}`, 'err');
   } finally {
     setLoading(btn, false);
   }
@@ -365,7 +380,8 @@ function updateServiceStatus(service, state) {
   const dot = document.getElementById(`${service}Dot`);
   const label = document.getElementById(`${service}Label`);
   const link = document.getElementById(`${service}Link`);
-  const btn = document.getElementById(service === 'backend' ? 'startBackendBtn' : 'startFrontendBtn');
+  const startBtn = document.getElementById(service === 'backend' ? 'startBackendBtn' : 'startFrontendBtn');
+  const stopBtn = document.getElementById(service === 'backend' ? 'stopBackendBtn' : 'stopFrontendBtn');
 
   dot.className = `dot ${state.ready ? 'dot-live' : state.launched ? 'dot-local' : 'dot-unknown'}`;
   label.textContent = state.ready
@@ -374,58 +390,77 @@ function updateServiceStatus(service, state) {
       ? `${service[0].toUpperCase() + service.slice(1)} starting…`
       : `${service[0].toUpperCase() + service.slice(1)} stopped`;
   link.classList.toggle('disabled', !state.ready);
-  btn.disabled = state.ready || state.launched;
-  btn.textContent = state.ready ? 'Running' : state.launched ? 'Starting…' : `Launch ${service[0].toUpperCase() + service.slice(1)}`;
+  startBtn.disabled = state.ready || state.launched;
+  startBtn.textContent = state.ready ? 'Running' : state.launched ? 'Starting…' : `Launch ${service[0].toUpperCase() + service.slice(1)}`;
+  stopBtn.disabled = !state.launched;
+  stopBtn.textContent = 'Stop';
 }
 
-function showRemoteNotice() {
-  document.getElementById('remoteModal').classList.add('show');
-}
+let documentTarget = 'local';
+let loadedDocuments = [];
 
-function hideRemoteNotice() {
-  document.getElementById('remoteModal').classList.remove('show');
+function setDocumentTarget(target) {
+  documentTarget = target;
+  const isEc2 = target === 'ec2';
+  document.getElementById('localTargetBtn').classList.toggle('active', !isEc2);
+  document.getElementById('ec2TargetBtn').classList.toggle('active', isEc2);
+  document.getElementById('documentTitle').textContent =
+    `${isEc2 ? 'EC2' : 'Local'} Bot Documents - rag-backend/docs`;
+  document.getElementById('documentTargetHelp').textContent = isEc2
+    ? 'Files are transferred over SSH and the EC2 backend is restarted to reload the index'
+    : 'Files are uploaded to the local backend and indexed incrementally';
+  document.getElementById('documentSearch').value = '';
+  loadDocs();
 }
-
-function onRemoteBackdrop(event) {
-  if (event.target === event.currentTarget) hideRemoteNotice();
-}
-
-document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') hideRemoteNotice();
-});
 
 // ── Documents ────────────────────────────────────────────────────────────────
+function renderDocs() {
+  const list = document.getElementById('docList');
+  const query = document.getElementById('documentSearch').value.trim().toLowerCase();
+  const files = loadedDocuments.filter(file => file.name.toLowerCase().includes(query));
+  if (!files.length) {
+    const label = query
+      ? `No documents match "${esc(query)}"`
+      : `No ${documentTarget === 'ec2' ? 'EC2' : 'local'} documents`;
+    list.innerHTML = `<div class="doc-list-empty">${label}</div>`;
+    return;
+  }
+  list.innerHTML = files.map(f => `
+    <div class="doc-item" id="doc-${esc(encodeURIComponent(f.name))}">
+      <div class="doc-item-left">
+        <span>📄</span>
+        <span class="doc-name" title="${esc(f.name)}">${esc(f.name)}</span>
+        <span class="doc-size">${fmtSize(f.size)}</span>
+      </div>
+      <button class="btn-danger" style="padding:6px 12px;font-size:0.78rem"
+        onclick="deleteDoc(${JSON.stringify(f.name)})">Remove</button>
+    </div>
+  `).join('');
+}
+
 async function loadDocs() {
   const list = document.getElementById('docList');
   list.innerHTML = '<div class="doc-list-empty">Loading…</div>';
   try {
-    const r = await fetch('/api/docs');
+    const r = await fetch(`/api/docs?target=${documentTarget}`);
     const d = await r.json();
     if (d.error) throw new Error(d.error);
-    if (!d.files.length) {
-      list.innerHTML = '<div class="doc-list-empty">No local documents</div>';
-      return;
-    }
-    list.innerHTML = d.files.map(f => `
-      <div class="doc-item" id="doc-${esc(encodeURIComponent(f.name))}">
-        <div class="doc-item-left">
-          <span>📄</span>
-          <span class="doc-name" title="${esc(f.name)}">${esc(f.name)}</span>
-          <span class="doc-size">${fmtSize(f.size)}</span>
-        </div>
-        <button class="btn-danger" style="padding:6px 12px;font-size:0.78rem"
-          onclick="deleteDoc(${JSON.stringify(f.name)})">Remove</button>
-      </div>
-    `).join('');
+    loadedDocuments = d.files;
+    renderDocs();
   } catch (e) {
+    loadedDocuments = [];
     list.innerHTML = `<div class="doc-list-empty" style="color:var(--danger)">⚠ ${esc(e.message)}</div>`;
   }
 }
 
 async function deleteDoc(name) {
-  if (!confirm(`Remove "${name}" from local documents and the local index?`)) return;
+  const label = documentTarget === 'ec2' ? 'EC2' : 'local';
+  if (!confirm(`Remove "${name}" from ${label} documents and its index?`)) return;
   try {
-    const r = await fetch('/api/docs/' + encodeURIComponent(name), { method: 'DELETE' });
+    const r = await fetch(
+      '/api/docs/' + encodeURIComponent(name) + `?target=${documentTarget}`,
+      { method: 'DELETE' }
+    );
     const d = await r.json();
     if (d.error) throw new Error(d.error);
     toast(`Removed ${name}`);
@@ -464,7 +499,7 @@ async function uploadFiles(files) {
     const fd = new FormData();
     fd.append('file', file);
     try {
-      const r = await fetch('/api/docs/upload', { method: 'POST', body: fd });
+      const r = await fetch(`/api/docs/upload?target=${documentTarget}`, { method: 'POST', body: fd });
       const d = await r.json();
       if (d.error) throw new Error(d.error);
       success++;
@@ -479,27 +514,6 @@ async function uploadFiles(files) {
   setTimeout(() => wrap.classList.add('hidden'), 2500);
   document.getElementById('fileInput').value = '';
   loadDocs();
-}
-
-// ── Server Controls ──────────────────────────────────────────────────────────
-async function restartBackend() {
-  const btn = document.getElementById('restartBtn');
-  const log = document.getElementById('serverLog');
-  log.classList.remove('hidden');
-  log.textContent = 'Sending restart command to server…\n(pm2 restart rag-backend + /api/reload — takes ~5 sec)';
-  setLoading(btn, true, ' Restarting…');
-  try {
-    const r = await fetch('/api/server/restart', { method: 'POST' });
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    log.textContent = '✓ ' + d.message;
-    toast('Backend restarted & bot reloaded');
-  } catch (e) {
-    log.textContent = '✗ ' + e.message;
-    toast('Restart failed: ' + e.message, 'err');
-  } finally {
-    setLoading(btn, false);
-  }
 }
 
 // ── Git ──────────────────────────────────────────────────────────────────────
@@ -529,22 +543,25 @@ function stopHealthPolling() {
   healthPoller = null;
 }
 
-// ── Backend logs ─────────────────────────────────────────────────────────────
+// ── Local service logs ───────────────────────────────────────────────────────
 let logPoller = null;
 
-async function loadBackendLogs() {
+async function loadLocalLogs() {
   try {
     const r = await fetch('/api/local-logs');
     const d = await r.json();
-    const el = document.getElementById('backendLog');
-    el.textContent = d.logs.length ? d.logs.join('\n') : 'No output yet…';
-    el.scrollTop = el.scrollHeight;
+    for (const service of ['backend', 'frontend']) {
+      const el = document.getElementById(`${service}Log`);
+      const logs = d[`${service}Logs`] || [];
+      el.textContent = logs.length ? logs.join('\n') : 'No output yet…';
+      el.scrollTop = el.scrollHeight;
+    }
   } catch {}
 }
 
 function startLogPolling() {
-  loadBackendLogs();
-  logPoller = setInterval(loadBackendLogs, 2000);
+  loadLocalLogs();
+  logPoller = setInterval(loadLocalLogs, 2000);
 }
 
 function stopLogPolling() {
@@ -567,28 +584,6 @@ async function loadPrompt() {
   } catch (e) {
     status.textContent = '⚠ ' + e.message;
     status.style.color = 'var(--danger)';
-  }
-}
-
-async function syncPrompt() {
-  const btn    = document.getElementById('syncPromptBtn');
-  const status = document.getElementById('promptStatus');
-  setLoading(btn, true, ' Syncing…');
-  status.textContent = 'Pulling latest code on server, restarting backend…';
-  status.style.color = 'var(--muted)';
-  try {
-    const r = await fetch('/api/server/sync-prompt', { method: 'POST' });
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    status.textContent = '✓ ' + d.message;
-    status.style.color = 'var(--success)';
-    toast('Prompt live on server');
-  } catch (e) {
-    status.textContent = '⚠ ' + e.message;
-    status.style.color = 'var(--danger)';
-    toast('Sync failed: ' + e.message, 'err');
-  } finally {
-    setLoading(btn, false);
   }
 }
 

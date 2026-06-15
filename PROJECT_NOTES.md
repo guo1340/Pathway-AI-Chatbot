@@ -58,8 +58,12 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 - OCR settings are included in PDF index metadata, so existing PDFs are reprocessed once after this feature is deployed and again whenever OCR settings change.
 - `POST /api/upload` and `POST /api/reload` require a JWT containing both `JWT_REQUIRED_CAP` and `JWT_DASHBOARD_CAP`.
 - Dashboard local uploads are proxied to authenticated `POST /api/upload`, and local deletions call authenticated `POST /api/reload`.
+- Dashboard document controls can target Local or EC2 explicitly. EC2 listing/upload/deletion uses SSH/SFTP and restarts `rag-backend` through PM2 so the production index reloads.
+- Dashboard-launched backend and frontend processes have individual Stop controls and separate bounded output consoles. The dashboard stops only child processes it launched.
+- The document card filters the currently loaded Local or EC2 list by filename without making an additional backend or SSH request.
 - When the backend `.env` has no JWT secret, the dashboard creates an in-memory local secret and passes it only to the backend process it launches.
-- Coworker-specific SSH paths remain unchanged for future deployment work, but all remote routes are currently locked.
+- Coworker-specific SSH host, user, key, and project paths remain local in `dashboard/.env`.
+- The dashboard requires `dashboard/.env` to exist before EC2 mode is selected. On Windows, OpenSSH also requires the configured PEM file ACL to exclude broad user groups; the key should remain outside the tracked repository.
 
 ## Important Files
 
@@ -214,9 +218,9 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - `rag-backend/package.json` is empty even though `package-lock.json` and `node_modules` exist.
 - `rag-backend/README.md` is empty; top-level `README.md` has the useful setup docs.
 - `App.tsx` duplicates API helper logic instead of using `webapp/src/api.ts`.
-- Dashboard deployment details are local configuration, but the remote SSH routes and exact text toggle patterns remain disabled legacy code pending deployment approval.
+- Dashboard deployment details remain local configuration. EC2 document operations use the configured SSH connection; prompt synchronization, environment switching, and standalone restart controls remain unavailable in the UI.
 - Dashboard git commands may fail unless Git safe-directory ownership is configured for the current user.
-- Dashboard local deletion removes the local file and calls authenticated backend `/api/reload`; remote deletion remains locked.
+- Dashboard local deletion removes the local file and calls authenticated backend `/api/reload`; EC2 deletion uses SFTP and then restarts PM2 to rebuild the remote index.
 - If local deletion cannot reload the backend index, the dashboard restores the original source file.
 - Uploads accept `.txt`, `.md`, `.html`, and `.pdf`; unsupported types return HTTP 400.
 - Uploads use a temporary file and atomic replacement so oversized same-name uploads preserve the existing document.

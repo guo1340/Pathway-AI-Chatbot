@@ -136,6 +136,36 @@ async function sftpUpload(localPath, remoteName) {
   });
 }
 
+async function sftpListDocuments() {
+  const conn = await createSSHClient();
+  return new Promise((resolve, reject) => {
+    conn.sftp((err, sftp) => {
+      if (err) { conn.end(); return reject(err); }
+      sftp.readdir(REMOTE_DOCS, (readErr, entries) => {
+        conn.end();
+        if (readErr) return reject(readErr);
+        resolve(entries
+          .filter(entry => entry.attrs && entry.attrs.isFile())
+          .map(entry => ({ name: entry.filename, size: entry.attrs.size }))
+          .sort((a, b) => a.name.localeCompare(b.name)));
+      });
+    });
+  });
+}
+
+async function sftpDelete(remoteName) {
+  const conn = await createSSHClient();
+  return new Promise((resolve, reject) => {
+    conn.sftp((err, sftp) => {
+      if (err) { conn.end(); return reject(err); }
+      sftp.unlink(`${REMOTE_DOCS}/${remoteName}`, unlinkErr => {
+        conn.end();
+        unlinkErr ? reject(unlinkErr) : resolve();
+      });
+    });
+  });
+}
+
 async function sftpUploadTo(localPath, fullRemotePath) {
   const conn = await createSSHClient();
   return new Promise((resolve, reject) => {
@@ -169,14 +199,20 @@ console.log(`uv → ${UV_EXE}`);
 
 const localProcs = { backend: null, frontend: null };
 let backendLogs = [];
+let frontendLogs = [];
 
-function captureBackendOutput(data) {
-  const lines = data.toString().split('\n').map(l => l.trim()).filter(Boolean);
+function captureOutput(service, data) {
+  const lines = data.toString()
+    .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '')
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean);
+  const logs = service === 'backend' ? backendLogs : frontendLogs;
   lines.forEach(l => {
-    console.log('[backend]', l);
-    backendLogs.push(l);
+    console.log(`[${service}]`, l);
+    logs.push(l);
   });
-  if (backendLogs.length > 200) backendLogs = backendLogs.slice(-200);
+  if (logs.length > 200) logs.splice(0, logs.length - 200);
 }
 
 function startLocalBackend() {
@@ -193,8 +229,8 @@ function startLocalBackend() {
     },
   });
 
-  backend.stdout?.on('data', captureBackendOutput);
-  backend.stderr?.on('data', captureBackendOutput);
+  backend.stdout?.on('data', data => captureOutput('backend', data));
+  backend.stderr?.on('data', data => captureOutput('backend', data));
   backend.on('error', (err) => {
     backendLogs.push(`[error] ${err.message}`);
     console.error('[backend]', err.message);
@@ -209,17 +245,60 @@ function startLocalBackend() {
 
 function startLocalFrontend() {
   if (localProcs.frontend) return false;
+  frontendLogs = [];
   const frontend = spawn('cmd', ['/c', 'npm', 'run', 'dev'], {
     cwd: path.join(PROJECT_ROOT, 'webapp'),
     windowsHide: true,
   });
+  frontend.stdout?.on('data', data => captureOutput('frontend', data));
+  frontend.stderr?.on('data', data => captureOutput('frontend', data));
   frontend.on('error', (err) => {
-    backendLogs.push(`[frontend error] ${err.message}`);
+    frontendLogs.push(`[error] ${err.message}`);
     console.error('[frontend]', err.message);
   });
-  frontend.on('exit', () => { localProcs.frontend = null; });
+  frontend.on('exit', (code) => {
+    frontendLogs.push(`[exited with code ${code}]`);
+    localProcs.frontend = null;
+  });
   localProcs.frontend = frontend;
   return true;
+}
+
+function validLocalService(service) {
+  return service === 'backend' || service === 'frontend';
+}
+
+function stopLocalService(service) {
+  if (!validLocalService(service)) {
+    return Promise.reject(new Error('Invalid local service'));
+  }
+  const proc = localProcs[service];
+  if (!proc) return Promise.resolve(false);
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      localProcs[service] = null;
+      if (error) reject(error);
+      else resolve(true);
+    };
+    if (process.platform === 'win32') {
+      const killer = spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { windowsHide: true });
+      let errorText = '';
+      killer.stderr?.on('data', data => { errorText += data.toString(); });
+      killer.on('error', finish);
+      killer.on('exit', code => finish(code === 0 ? null : new Error(errorText.trim() || `taskkill exited with code ${code}`)));
+      return;
+    }
+    try {
+      proc.kill('SIGTERM');
+      finish();
+    } catch (error) {
+      finish(error);
+    }
+  });
 }
 
 function stopLocalServers() {
@@ -232,6 +311,7 @@ function stopLocalServers() {
   localProcs.backend = null;
   localProcs.frontend = null;
   backendLogs = [];
+  frontendLogs = [];
 }
 
 // Clean up if the dashboard itself is closed
@@ -291,6 +371,17 @@ function remoteLocked(req, res, next) {
   });
 }
 
+function documentTarget(req) {
+  const target = String(req.query.target || 'local').toLowerCase();
+  return target === 'local' || target === 'ec2' ? target : null;
+}
+
+function validDocumentName(filename) {
+  return filename === path.basename(filename)
+    && !filename.includes('\\')
+    && ['.md', '.txt', '.html', '.pdf'].includes(path.extname(filename).toLowerCase());
+}
+
 // ── Toggle helpers ────────────────────────────────────────────────────────────
 function readNorm(filePath) {
   return fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n');
@@ -329,7 +420,8 @@ const upload = multer({ dest: os.tmpdir() });
 // Backend startup logs (for debugging local mode)
 app.get('/api/local-logs', (req, res) => {
   res.json({
-    logs: backendLogs,
+    backendLogs,
+    frontendLogs,
     backendRunning: Boolean(localProcs.backend),
     frontendRunning: Boolean(localProcs.frontend),
   });
@@ -388,15 +480,30 @@ app.post('/api/toggle', remoteLocked, (req, res) => {
 // Upload through the authenticated local backend API.
 app.post('/api/docs/upload', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file provided' });
+  const target = documentTarget(req);
+  if (!target) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: 'Invalid document target' });
+  }
   const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+  if (!validDocumentName(originalName)) {
+    fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: 'Invalid or unsupported filename' });
+  }
   try {
-    const form = new FormData();
-    form.append('file', new Blob([fs.readFileSync(req.file.path)]), originalName);
-    const result = await callLocalBackend('/api/upload', {
-      method: 'POST',
-      body: form,
-    });
-    res.json({ success: true, ...result });
+    if (target === 'ec2') {
+      await sftpUpload(req.file.path, originalName);
+      await sshExec('pm2 restart rag-backend --update-env');
+      res.json({ success: true, target, filename: originalName });
+    } else {
+      const form = new FormData();
+      form.append('file', new Blob([fs.readFileSync(req.file.path)]), originalName);
+      const result = await callLocalBackend('/api/upload', {
+        method: 'POST',
+        body: form,
+      });
+      res.json({ success: true, target, ...result });
+    }
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   } finally {
@@ -404,9 +511,14 @@ app.post('/api/docs/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// List documents in the local backend docs folder.
-app.get('/api/docs', (req, res) => {
+// List documents from the selected local or EC2 backend docs folder.
+app.get('/api/docs', async (req, res) => {
+  const target = documentTarget(req);
+  if (!target) return res.status(400).json({ error: 'Invalid document target' });
   try {
+    if (target === 'ec2') {
+      return res.json({ files: await sftpListDocuments(), target });
+    }
     fs.mkdirSync(LOCAL_DOCS, { recursive: true });
     const files = fs.readdirSync(LOCAL_DOCS, { withFileTypes: true })
       .filter(entry => entry.isFile())
@@ -415,19 +527,38 @@ app.get('/api/docs', (req, res) => {
         return { name: entry.name, size: stat.size };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-    res.json({ files });
+    res.json({ files, target });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// Delete locally, then synchronize the backend index.
+app.post('/api/local/stop/:service', async (req, res) => {
+  if (!validLocalService(req.params.service)) {
+    return res.status(400).json({ error: 'Invalid local service' });
+  }
+  try {
+    const stopped = await stopLocalService(req.params.service);
+    res.json({ success: true, stopped });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Delete from the selected environment, then synchronize its backend index.
 app.delete('/api/docs/:filename', async (req, res) => {
+  const target = documentTarget(req);
+  if (!target) return res.status(400).json({ error: 'Invalid document target' });
   const filename = req.params.filename;
-  if (filename.includes('/') || filename.includes('..') || filename.includes('\\')) {
+  if (!validDocumentName(filename)) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
   try {
+    if (target === 'ec2') {
+      await sftpDelete(filename);
+      await sshExec('pm2 restart rag-backend --update-env');
+      return res.json({ success: true, target });
+    }
     const filePath = path.join(LOCAL_DOCS, filename);
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
     const original = fs.readFileSync(filePath);
@@ -438,7 +569,7 @@ app.delete('/api/docs/:filename', async (req, res) => {
       fs.writeFileSync(filePath, original);
       throw new Error(`Index reload failed; local file was restored. ${reloadError.message}`);
     }
-    res.json({ success: true });
+    res.json({ success: true, target });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

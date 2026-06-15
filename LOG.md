@@ -1607,3 +1607,100 @@ Follow-up:
 - The interactive attachment was canceled because no organization-approved Ubuntu Pro account is currently available.
 - No Ubuntu Pro service or ESM package was enabled, installed, or changed.
 - Maintenance is deferred until Pathway provides or approves the subscription.
+
+### 2026-06-15 17:16:36 +08:00 - Local And EC2 Dashboard Document Targets
+
+Restored the dashboard's SSH-backed EC2 document workflow without changing the production backend API.
+
+- Added an explicit Local/EC2 segmented control to the document card.
+- Kept local upload and deletion on the authenticated backend upload/reload APIs.
+- Added EC2 document listing, upload, and deletion through the existing SSH/SFTP configuration.
+- Restarted the EC2 `rag-backend` PM2 process after remote upload or deletion so the document index reloads.
+- Rejected unsupported targets, unsafe filenames, and unsupported file extensions before remote file operations.
+- Removed the disabled remote-feature card, modal, prompt-sync notice, and their unused browser handlers.
+- Left dashboard login, HTTPS migration, prompt synchronization, environment switching, and standalone PM2 controls for later tasks.
+
+Verification completed:
+
+1. Dashboard server, security test, and inline browser JavaScript syntax checks passed.
+2. `npm.cmd run test:security` passed all 8 configuration and validation checks.
+3. A temporary dashboard process returned HTTP 200 for the root and local document list.
+4. An invalid document target returned HTTP 400.
+5. EC2 mode without local SSH configuration returned a clear HTTP 500 configuration error instead of attempting an implicit fallback.
+
+### Steps And Instructions For Testing
+
+1. Create `dashboard/.env` from `dashboard/.env.example` and set the EC2 SSH host, user, PEM path, and remote project root.
+2. From `dashboard`, run `npm start`, then open `http://localhost:3131`.
+3. Keep the document target on Local, upload a disposable supported file, refresh the list, and delete it.
+4. Switch the document target to EC2. The heading and helper text should identify EC2, and the list should show `/home/ubuntu/Pathway-AI-Chatbot/rag-backend/docs`.
+5. Upload a uniquely named disposable file in EC2 mode.
+6. On EC2, confirm the file exists in `rag-backend/docs` and `pm2 status` shows `rag-backend` online after the automatic restart.
+7. Delete the disposable file from the EC2 list and confirm it disappears from both the dashboard and the server directory.
+8. Ask a question that would retrieve the disposable document before deletion and repeat after deletion to confirm the remote index follows the file changes.
+
+Optimal result:
+
+- Local and EC2 lists never mix.
+- Every request carries the currently selected target.
+- EC2 operations require the configured SSH key and never expose it to the browser.
+- Supported uploads appear after the PM2 restart, deleted files stop being retrieved, and `rag-backend` remains online.
+
+### 2026-06-15 18:36:17 +08:00 - Dashboard SSH Configuration Repair
+
+Resolved the local dashboard error `PATHWAY_SSH_HOST is not configured` and completed the EC2 read-only connection check.
+
+- Confirmed `dashboard/.env` was missing rather than the PEM file.
+- Created the ignored local environment file with the operator's SSH host, user, PEM path, and remote project root.
+- Confirmed the configured PEM file already existed outside the repository and did not need to be moved.
+- Restricted the Windows PEM ACL to the current user, Administrators, and SYSTEM after OpenSSH rejected broader group access.
+- Restarted the dashboard so the new environment values were loaded.
+- Verified the PEM with a direct SSH handshake.
+- Verified the restarted dashboard listed EC2 documents successfully through its own SSH/SFTP route.
+- Kept the actual EC2 address, private key, and local `.env` out of tracked files.
+
+Optimal result:
+
+- EC2 mode no longer reports a missing SSH host.
+- OpenSSH accepts the PEM without an unprotected-key warning.
+- The dashboard can list remote documents while Git continues to ignore `.env` and PEM files.
+
+### 2026-06-15 18:32:48 +08:00 - Dashboard Process Controls, Frontend Output, And Document Search
+
+Expanded the local dashboard controls while preserving the existing launch and document-management behavior.
+
+- Added individual Stop buttons for dashboard-launched backend and frontend process trees.
+- Added a validated `POST /api/local/stop/:service` route that refuses unknown service names.
+- Kept unmanaged processes safe: the dashboard enables Stop only for child processes it launched and currently tracks.
+- Captured bounded frontend stdout/stderr separately from backend output.
+- Removed terminal color escape sequences before showing CLI output in the browser.
+- Added separate backend and frontend output consoles with manual refresh and automatic polling.
+- Added a filename search field above the document controls.
+- Search filters the already loaded Local or EC2 document list in memory and does not trigger extra SSH requests.
+
+Verification completed:
+
+1. Dashboard server, security test, and inline browser JavaScript syntax passed.
+2. Dashboard security configuration suite passed all 9 checks.
+3. Invalid stop service names returned HTTP 400.
+4. An already-stopped tracked service returned success with `stopped: false`.
+5. The dashboard launched Vite, reported it ready, captured five frontend output lines, stopped its process tree, and reported it stopped.
+6. The dashboard launched Uvicorn, received HTTP 200 from `/api/health`, captured backend output, stopped its process tree, and reported it stopped.
+7. `git diff --check` passed.
+
+### Steps And Instructions For Testing
+
+1. Run `npm start` from `dashboard` and open `http://localhost:3131`.
+2. Click Launch Backend. Confirm its status reaches Ready, its output console shows Uvicorn startup lines, and Stop becomes enabled.
+3. Click Stop for Backend. Confirm port 8000 closes, the status returns to Stopped, and Launch Backend becomes available.
+4. Repeat the launch/stop workflow for Frontend. Confirm its output console shows the Vite URL and port 5173 closes after Stop.
+5. Switch the document target between Local and EC2 and confirm the search field clears when the target changes.
+6. Enter a partial filename with mixed letter casing. Confirm only matching documents remain visible.
+7. Enter a value with no matches. Confirm the list shows a no-match message without changing or deleting documents.
+8. Clear the search field and confirm the full previously loaded list returns without another visible loading state.
+
+Optimal result:
+
+- Only processes launched by the current dashboard instance can be stopped.
+- Backend and frontend output remain separate and readable.
+- Search is case-insensitive, affects only the selected environment, and performs no file mutation or additional SSH request.

@@ -1039,3 +1039,63 @@ Test correction:
 - Updated the test to wait for both final rendered elements. The final implementation then replaced the old typing animation with a direct pending-bubble-to-complete-answer swap, eliminating transient raw formatting markers.
 - Final diff review found pending-bubble cleanup attached to the clear-history failure path instead of the answer-request failure path.
 - Moved cleanup to the request catch block, asserted failed requests leave no response spinner, and reran the production build plus all 39 frontend checks successfully.
+
+## 2026-06-15 17:16:36 +08:00 - Dashboard Local And EC2 Document Target Verification
+
+Completed locally:
+
+- [x] Dashboard server and security-test JavaScript syntax passed.
+- [x] Dashboard inline browser JavaScript syntax passed.
+- [x] Dashboard security configuration suite passed all 8 checks.
+- [x] Dashboard root returned HTTP 200 from a temporary local process.
+- [x] Local document listing returned HTTP 200.
+- [x] An unsupported document target returned HTTP 400.
+- [x] EC2 selection without configured SSH settings returned a clear configuration error and did not fall back to local files.
+- [x] Disabled remote-feature UI text and controls are absent from the dashboard markup.
+
+New live workflow tests:
+
+- [ ] Click Local and EC2 and confirm the active control, document heading, helper text, and file list all switch together.
+- [ ] With valid `dashboard/.env` SSH settings, confirm EC2 mode lists the production `rag-backend/docs` directory.
+- [ ] Upload a uniquely named supported document in EC2 mode and confirm SFTP transfer succeeds, PM2 restarts, and `rag-backend` returns online.
+- [ ] Confirm the uploaded EC2 document can be retrieved by a document-backed chat query.
+- [ ] Delete the disposable EC2 document and confirm it is removed remotely, PM2 returns online, and the document is no longer retrieved.
+- [ ] Confirm unsafe filenames and unsupported extensions cannot be uploaded or deleted in either target.
+
+Optimal result: the selected target is explicit and isolated, local behavior remains unchanged, and configured EC2 document changes safely reload the production index through the existing SSH connection.
+
+## 2026-06-15 18:36:17 +08:00 - Dashboard SSH Configuration Verification
+
+- [x] Confirmed `dashboard/.env` exists locally and is ignored by Git.
+- [x] Confirmed the required SSH host, user, key path, and remote root values are configured without logging their sensitive values.
+- [x] Confirmed the configured PEM file exists outside the repository.
+- [x] Removed broad Windows group access that caused OpenSSH to reject the PEM as unprotected.
+- [x] Direct non-interactive SSH verification succeeded.
+- [x] Restarted the dashboard after creating `.env`.
+- [x] Dashboard EC2 document listing returned HTTP 200 and listed the remote files.
+
+Optimal result: local configuration and key permissions are accepted by SSH, secrets remain untracked, and dashboard EC2 mode connects successfully.
+
+## 2026-06-15 18:32:48 +08:00 - Dashboard Service Controls And Document Search Verification
+
+Completed:
+
+- [x] Dashboard server, security-test, and inline browser JavaScript syntax passed.
+- [x] Dashboard security configuration suite passed all 9 checks.
+- [x] Unknown local service names are rejected with HTTP 400.
+- [x] Stopping a service that is not tracked returns success with `stopped: false`.
+- [x] Dashboard-launched Vite reached Ready and produced frontend output.
+- [x] Frontend Stop terminated the Vite process tree and released port 5173.
+- [x] Dashboard-launched Uvicorn reached Ready and produced backend output.
+- [x] Backend Stop terminated the Uvicorn process tree and released port 8000.
+- [x] Dashboard markup includes separate Stop controls, frontend output, and document search.
+
+New browser interaction tests:
+
+- [ ] Confirm backend and frontend Stop buttons enable only after the dashboard launches their respective processes.
+- [ ] Confirm backend and frontend output remains visually separate and automatically scrolls to the newest line.
+- [ ] Confirm document search is case-insensitive and filters both Local and EC2 filename lists.
+- [ ] Confirm changing Local/EC2 target clears the previous search and loads the selected environment's complete list.
+- [ ] Confirm clearing the query restores the cached list without another document API or SSH request.
+
+Optimal result: dashboard-owned development processes can be ended cleanly, both CLI streams are visible, and document search is fast, isolated, and non-destructive.

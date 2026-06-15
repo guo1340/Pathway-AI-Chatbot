@@ -48,6 +48,8 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Complete the local operations dashboard for launching the backend and frontend, managing local bot documents, editing the local prompt, and monitoring local service status.
 - [x] Make local document upload and deletion compatible with the backend's authenticated incremental upload/reload APIs.
 - [x] Lock remote dashboard operations and explain the deployment-testing limitation in a dismissible dialog.
+- [x] Restore SSH-backed EC2 document listing, upload, and deletion behind an explicit Local/EC2 document-target toggle.
+- [x] Add dashboard-managed backend/frontend stop controls, separate service output consoles, and filename search for Local and EC2 documents.
 - [ ] Re-enable live environment controls after the updated backend and indexing workflow are approved for deployment.
 - [ ] Replace SSH-based document management, prompt synchronization, and backend restart operations with authenticated HTTPS backend APIs so dashboard access does not depend on the operator's IP address.
 - [ ] Add an option to restart pm2 on ec2 with a button.
@@ -171,6 +173,9 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-13 22:00:10 +08:00 - Recorded owner confirmation that live WordPress subscriber/token verification is complete and clarified the optional Git-history rewrite plus manual Ubuntu ESM maintenance boundary.
 - 2026-06-13 22:06:49 +08:00 - Reviewed the production Ubuntu transcript; identified five ESM Apps updates and confirmed installation is blocked until the server is attached to Ubuntu Pro.
 - 2026-06-13 - Confirmed the production server remains unattached to Ubuntu Pro and deferred ESM installation pending an organization-approved subscription.
+- 2026-06-15 17:16:36 +08:00 - Restored SSH-backed EC2 document management with a Local/EC2 dashboard toggle; live EC2 mutation tests remain pending configured SSH access.
+- 2026-06-15 18:32:48 +08:00 - Added local service stop controls, frontend CLI output, and Local/EC2 document filename search; process lifecycle tests passed.
+- 2026-06-15 18:36:17 +08:00 - Completed local dashboard SSH setup by creating the ignored environment file, restricting PEM permissions, and verifying EC2 document listing.
 
 ## Steps and Instructions for Testing
 
