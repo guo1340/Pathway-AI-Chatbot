@@ -13,6 +13,9 @@ dependencies = [
     "langchain-ollama>=0.1.1",
     "python-dotenv>=1.0.1",
     "pypdf>=4.2.0",
+    "pymupdf>=1.24.0",
+    "pytesseract>=0.3.13",
+    "rapidocr-onnxruntime>=1.4.4",
     "bs4>=0.0.2",
     "python-multipart>=0.0.20",
 ]
