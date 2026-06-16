@@ -198,6 +198,19 @@ const server = createServer((req, res) => {
         }));
         return;
       }
+      if (query === "outline formatting") {
+        res.writeHead(200);
+        res.end(JSON.stringify({
+          answer: "I. [1] **Introduction**\n   Define worship clearly. [1] - Reference John 4:23-24. [1] II. [1] **Historical Context** - Discuss early AG worship. [1] A. [1] **Old Testament Terms**\nExplain bārak and halāl. [1] - B. [1] **New Testament Terms**\nExplain proskyneō. [1]",
+          citations: [{
+            title: "Worship in the Bible",
+            url: `${APP_ORIGIN}/api/files/worship.pdf?file_token=test#page=1`,
+          }],
+          conversation_id: "test-conversation",
+          remaining_tokens: 5000,
+        }));
+        return;
+      }
 
       const remaining = query === "low balance"
         ? 1000
@@ -985,6 +998,30 @@ async function runUi(cdp) {
     /statement\.pdf\?file_token=test#page=1$/
   );
   record("balanced double-asterisk text renders bold alongside citation links");
+
+  await freshValidPage(cdp);
+  await setInputAndSend(cdp, "outline formatting");
+  await waitFor(
+    () => cdp.evaluate(
+      "document.querySelector('.rcb-msg.ai:last-child strong')?.textContent === 'Introduction'"
+    ),
+    "outline bold heading"
+  );
+  const outlineText = await cdp.evaluate(
+    "document.querySelector('.rcb-msg.ai:last-child .ai-text')?.textContent"
+  );
+  assert.equal(/\b(?:I|II)\.\s+\[1\]/.test(outlineText), false);
+  assert.equal(/\b[A-Z]\.\s+\[1\]/.test(outlineText), false);
+  assert.equal(/\[1\]\s+(?:Introduction|Historical Context|Old Testament Terms|New Testament Terms)/.test(outlineText), false);
+  assert.match(outlineText, /I\. Introduction\n/);
+  assert.match(outlineText, /\n\nII\. Historical Context/);
+  assert.match(outlineText, /\n• Reference John 4:23-24/);
+  assert.match(outlineText, /\nB\. New Testament Terms/);
+  assert.match(
+    await cdp.evaluate("document.querySelector('.rcb-msg.ai:last-child .inline-citation')?.href"),
+    /worship\.pdf\?file_token=test#page=1$/
+  );
+  record("outline formatting removes leading citation markers and restores line breaks");
 }
 
 async function run() {

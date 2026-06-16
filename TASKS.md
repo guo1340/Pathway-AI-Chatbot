@@ -25,7 +25,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Add process-local per-user daily token accounting and return `remaining_tokens` after each successful `/api/ask` response.
 - [x] Move per-user daily token accounting to durable SQLite storage so balances survive restarts and remain atomic across multiple workers on one server.
 - [x] Replace full JWT citation query parameters with short-lived filename-scoped file tickets while keeping source titles and filenames visible.
-- [ ] Decide whether to coordinate a Git history rewrite for the former EC2 IP/hostname. Making the repository private limits future access but does not erase existing clones, forks, or cached history. Because the address is public metadata rather than a credential and the current tracked tree is clean, rewriting history is optional unless an actual secret is found.
+- [x] Decide whether to coordinate a Git history rewrite for the former EC2 IP/hostname. Making the repository private limits future access but does not erase existing clones, forks, or cached history. Because the address is public metadata rather than a credential and the current tracked tree is clean, rewriting history is optional unless an actual secret is found.
 
 ## Priority 3: Frontend Security
 
@@ -80,7 +80,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## In Progress
 
-- Current task: WordPress Ask AI iframe height is now measured from the actual viewport instead of hard-coded admin-bar offsets; double-scroll follow-up is complete. Ubuntu ESM maintenance still requires production shell access; Git history rewriting is optional unless an actual secret is discovered.
+- Current task: Citation markers before headings/bold outline labels are normalized in frontend rendering, prompt guidance now discourages that format, and all related frontend tests passed. Ubuntu ESM maintenance still requires production shell access.
 
 ## Done
 
@@ -182,6 +182,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-16 16:41:39 +08:00 - Completed the new Priority 8 frontend and dashboard tasks: daily token balance in the info dialog, iframe-height-safe Ask AI layout, and EC2 active-branch prompt sync with optional commit/push.
 - 2026-06-16 17:12:41 +08:00 - Fixed the hosted Ask AI double-scroll regression, made loaded history land at the newest message, and kept the logo/info topbar pinned while the chat log scrolls.
 - 2026-06-16 17:36:18 +08:00 - Removed hard-coded WordPress admin-bar iframe offsets and switched Ask AI to measured available viewport height; focused and full frontend checks passed.
+- 2026-06-16 18:15:23 +08:00 - Fixed outline/citation formatting by normalizing misplaced citation markers before headings or bold labels, restoring inline outline breaks, and adding prompt guidance plus browser regression coverage.
 
 ## Steps and Instructions for Testing
 

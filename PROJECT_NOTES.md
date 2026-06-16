@@ -207,6 +207,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - Authentication checking remains a blocking full-screen state. Backend response waiting no longer covers the chat; the disabled Send button displays an accessible spinner while the existing conversation remains visible.
 - A pending AI message bubble appears immediately after send with its own spinner, is excluded from session persistence, and is replaced in place by the complete returned answer without replaying a typing animation.
 - Backend answer spans wrapped in balanced `**` markers render as escaped React `<strong>` content; citation markers continue to render as authenticated links.
+- Frontend answer rendering normalizes model output before tokenizing links/bold text: citation markers placed before Roman numeral, numbered, lettered, or bold outline labels are removed from the heading position; inline outline and bullet boundaries are restored as line breaks.
 - Request failures use a dismissible notification dialog; authorization failures explain the redirect and provide an immediate login action.
 - The authorization dialog's `Go to login` control is a top-level link to `https://pathway.training/wp-login.php`, so it works from the cross-origin chat iframe.
 - The nuke button calls authenticated backend compaction. Visible raw history is removed only after it is folded into the retained private summary; daily token usage is not reset.
@@ -217,6 +218,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The information dialog always includes a daily balance row. Before the backend returns a balance, it shows that the app is waiting for the next backend balance.
 - `page-ask-ai.php` measures the actual available viewport height from `.askai-wrap`'s top offset and stores it in `--askai-available-height`; this avoids hard-coded WordPress admin-bar offsets and prevents the hosted page from creating a second vertical scrollbar.
 - The chat app root is a fixed-height flex column: header stays pinned at the top, composer stays at the bottom, and only `.rcb-log` scrolls. Message updates use a deferred scroll-to-bottom so loaded history opens at the newest message.
+- `rag-backend/prompt.txt` also instructs the model to place citations at the end of supported sentences or paragraphs, never before headings, outline labels, or bolded heading text. This is a prompt guard only; frontend normalization remains the code-level fallback.
 
 ## Known Issues / Risks
 
