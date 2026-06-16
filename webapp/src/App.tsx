@@ -2,6 +2,7 @@ import React from 'react'
 import { IoClose, IoInformationCircleOutline, IoHelpCircleOutline } from "react-icons/io5";
 
 const WORDPRESS_LOGIN_URL = 'https://pathway.training/wp-login.php'
+const DAILY_BALANCE_STORAGE_KEY = 'rag_remaining_tokens'
 
 class RagApiError extends Error {
   status: number
@@ -108,6 +109,7 @@ type Notice = {
   message: string
   redirecting?: boolean
 }
+type TokenHelpTopic = 'input' | 'response'
 
 function estimateTokens(text: string) {
   if (!text) return 0
@@ -117,6 +119,20 @@ function estimateTokens(text: string) {
 function positiveNumber(value: unknown, fallback: number) {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function coerceRemainingTokens(value: unknown) {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : null
+}
+
+function readStoredRemainingTokens() {
+  try {
+    return coerceRemainingTokens(sessionStorage.getItem(DAILY_BALANCE_STORAGE_KEY))
+  } catch {
+    return null
+  }
 }
 
 function enabled(value: unknown) {
@@ -186,18 +202,31 @@ export default function App({
   const [q, setQ] = React.useState('')
   const [busy, setBusy] = React.useState(false)
   const [convId, setConvId] = React.useState<string | undefined>(undefined)
-  const [remainingTokens, setRemainingTokens] = React.useState<number | null>(null)
+  const [remainingTokens, setRemainingTokens] = React.useState<number | null>(() =>
+    readStoredRemainingTokens()
+  )
   const [quotaMessage, setQuotaMessage] = React.useState('')
   const [authChecking, setAuthChecking] = React.useState(true)
   const [notice, setNotice] = React.useState<Notice | null>(null)
   const [infoDialogOpen, setInfoDialogOpen] = React.useState(false)
-  const [tokenHelpOpen, setTokenHelpOpen] = React.useState(false)
+  const [tokenHelpOpen, setTokenHelpOpen] = React.useState<TokenHelpTopic | null>(null)
   const [clearDialogOpen, setClearDialogOpen] = React.useState(false)
   const [localAuth, setLocalAuth] = React.useState<{
     apiBase: string
     token: string
   } | null>(null)
   const logRef = React.useRef<HTMLDivElement | null>(null)
+
+  const rememberRemainingTokens = React.useCallback((value: unknown) => {
+    const next = coerceRemainingTokens(value)
+    if (next === null) return
+    setRemainingTokens(next)
+    try {
+      sessionStorage.setItem(DAILY_BALANCE_STORAGE_KEY, String(next))
+    } catch {
+      /* sessionStorage can be unavailable in restricted browser contexts */
+    }
+  }, [])
   const inputRef = React.useRef<HTMLTextAreaElement | null>(null)
   const redirectTimerRef = React.useRef<number | null>(null)
   const cfg = (window as any).RAG_CHATBOT_CONFIG || {}
@@ -351,7 +380,7 @@ export default function App({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       if (clearDialogOpen) setClearDialogOpen(false)
-      else if (tokenHelpOpen) setTokenHelpOpen(false)
+      else if (tokenHelpOpen) setTokenHelpOpen(null)
       else if (infoDialogOpen) setInfoDialogOpen(false)
       else if (!notice?.redirecting) setNotice(null)
     }
@@ -361,7 +390,7 @@ export default function App({
 
   // Reset the token-help popover whenever the info dialog is closed.
   React.useEffect(() => {
-    if (!infoDialogOpen) setTokenHelpOpen(false)
+    if (!infoDialogOpen) setTokenHelpOpen(null)
   }, [infoDialogOpen])
 
   // 🧠 Load conversation from sessionStorage on mount
@@ -399,10 +428,7 @@ export default function App({
             ? data.conversation_id
             : undefined
         )
-        const loadedRemaining = Number(data?.remaining_tokens)
-        if (Number.isFinite(loadedRemaining)) {
-          setRemainingTokens(Math.max(0, loadedRemaining))
-        }
+        rememberRemainingTokens(data?.remaining_tokens)
       })
       .catch(() => {
         /* keep sessionStorage as an offline fallback */
@@ -410,7 +436,7 @@ export default function App({
     return () => {
       active = false
     }
-  }, [authChecking, authReady, authToken, effectiveApiBase])
+  }, [authChecking, authReady, authToken, effectiveApiBase, rememberRemainingTokens])
 
   // ---- helpers ----
   function basenameFromUrl(u?: string) {
@@ -519,10 +545,7 @@ export default function App({
       })
 
       setConvId(data.conversation_id)
-      const nextRemainingTokens = Number(data.remaining_tokens)
-      if (Number.isFinite(nextRemainingTokens)) {
-        setRemainingTokens(Math.max(0, nextRemainingTokens))
-      }
+      rememberRemainingTokens(data.remaining_tokens)
       const answer = data.answer || ''
       const citations: Citation[] | undefined = data.citations
 
@@ -566,7 +589,7 @@ export default function App({
         return
       }
       if (e instanceof RagApiError && e.status === 429 && e.remainingTokens !== undefined) {
-        setRemainingTokens(Math.max(0, e.remainingTokens))
+        rememberRemainingTokens(e.remainingTokens)
         setQuotaMessage(
           e.remainingTokens === 0
             ? 'Your daily AI token balance is exhausted. Please try again after the daily reset.'
@@ -608,10 +631,7 @@ export default function App({
     setBusy(true)
     try {
       const data = await clearRagConversation(effectiveApiBase, authToken)
-      const nextRemainingTokens = Number(data?.remaining_tokens)
-      if (Number.isFinite(nextRemainingTokens)) {
-        setRemainingTokens(Math.max(0, nextRemainingTokens))
-      }
+      rememberRemainingTokens(data?.remaining_tokens)
       setMsgs([])
       setQ('')
       setConvId(
@@ -625,7 +645,7 @@ export default function App({
       sessionStorage.removeItem('chat_history')
     } catch (e: any) {
       if (e instanceof RagApiError && e.remainingTokens !== undefined) {
-        setRemainingTokens(Math.max(0, e.remainingTokens))
+        rememberRemainingTokens(e.remainingTokens)
       }
       setClearDialogOpen(false)
       setInfoDialogOpen(false)
@@ -762,38 +782,56 @@ export default function App({
               <p>This bot can make mistakes — please check the sources given at the end of each answer.</p>
             </section>
             <section className="info-dialog-section">
-              <div className="token-usage-heading">
-                <h3>Token usage</h3>
-                <div className="token-help">
-                  <button
-                    type="button"
-                    className="token-help-btn"
-                    aria-label="What do these mean?"
-                    aria-expanded={tokenHelpOpen}
-                    title="What do these mean?"
-                    onClick={() => setTokenHelpOpen((open) => !open)}
-                  >
-                    <IoHelpCircleOutline />
-                  </button>
-                  {tokenHelpOpen && (
-                    <div className="token-help-bubble" role="dialog" aria-label="Token usage explained">
-                      <p>
-                        <strong>Input tokens</strong> are the size of your message plus
-                        recent chat that gets sent to the AI. Think of a token as roughly
-                        a few letters of text. The number after the slash is the most one
-                        message may use.
-                      </p>
-                      <p>
-                        <strong>Max response</strong> is the longest answer the AI can write
-                        back to you, also measured in tokens.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <h3>Token usage</h3>
               <dl className="token-grid" data-over-limit={exceedsInputTokenLimit || exceedsRemainingBalance}>
-                <dt>Input tokens</dt>
-                <dt>Max response</dt>
+                <dt>
+                  <span>Input tokens</span>
+                  <div className="token-help">
+                    <button
+                      type="button"
+                      className="token-help-btn"
+                      aria-label="What are input tokens?"
+                      aria-expanded={tokenHelpOpen === 'input'}
+                      title="What are input tokens?"
+                      onClick={() =>
+                        setTokenHelpOpen((open) => (open === 'input' ? null : 'input'))
+                      }
+                    >
+                      <IoHelpCircleOutline />
+                    </button>
+                    {tokenHelpOpen === 'input' && (
+                      <div className="token-help-bubble" role="dialog" aria-label="Input tokens explained">
+                        <p>
+                          <strong>Input tokens</strong> are the size of your message plus recent chat that gets sent to the AI. Think of a token as roughly a few letters of text.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </dt>
+                <dt>
+                  <span>Max response</span>
+                  <div className="token-help">
+                    <button
+                      type="button"
+                      className="token-help-btn"
+                      aria-label="What is max response?"
+                      aria-expanded={tokenHelpOpen === 'response'}
+                      title="What is max response?"
+                      onClick={() =>
+                        setTokenHelpOpen((open) => (open === 'response' ? null : 'response'))
+                      }
+                    >
+                      <IoHelpCircleOutline />
+                    </button>
+                    {tokenHelpOpen === 'response' && (
+                      <div className="token-help-bubble" role="dialog" aria-label="Max response explained">
+                        <p>
+                          <strong>Max response</strong> is the longest answer the bot is allowed to generate for one reply.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </dt>
                 <dd>~{estimatedInputTokens.toLocaleString()} / {inputTokenLimit.toLocaleString()}</dd>
                 <dd>{maxOutputTokens.toLocaleString()}</dd>
               </dl>

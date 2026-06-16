@@ -83,7 +83,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## In Progress
 
-- Current task: Completed the three new Priority 8 frontend/backend items (larger info button, plain-language token help popover, and durable daily-balance display on load) plus a fix for the duplicated WordPress admin bar after re-authentication. Backend suite reruns clean locally; the new browser UI/security checks must be run on a host with Chrome. Ubuntu ESM maintenance still requires production shell access.
+- Current task: Corrected the three Priority 8 frontend/backend items: the info button remains a larger accessible target without the oversized filled badge styling, the question-mark help buttons now sit inside the token grid next to Input tokens and Max response, and the daily balance loads from backend history or the latest known session balance on refresh.
 
 ## Done
 
@@ -127,6 +127,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Re-audited the webapp after the earlier Vite advisory report; the current installed Vite 6.4.3 tree reports zero vulnerabilities, so the forced Vite 8 migration is no longer required.
 - [x] Enlarged the Ask AI info button, added a plain-language token-usage help popover, and made the daily token balance load from `/api/history` so it no longer shows "Waiting for the next backend balance" after a refresh.
 - [x] Fixed the duplicated WordPress admin bar that appeared after a timed-out session re-authenticated, by redirecting the top-level window instead of the embedded chat iframe.
+- [x] Corrected the token help placement so the circled question marks are in the token grid header cells beside Input tokens and Max response, cleaned up the enlarged info button styling, and added a session fallback for the daily balance while `/api/history` remains the backend authority.
 
 ## Notes for Codex
 
@@ -189,6 +190,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-16 17:36:18 +08:00 - Removed hard-coded WordPress admin-bar iframe offsets and switched Ask AI to measured available viewport height; focused and full frontend checks passed.
 - 2026-06-16 18:15:23 +08:00 - Fixed outline/citation formatting by normalizing misplaced citation markers before headings or bold labels, restoring inline outline breaks, and adding prompt guidance plus browser regression coverage.
 - 2026-06-16 19:56:52 +08:00 - Completed the three new Priority 8 items (larger info button, token-usage help popover, daily-balance-on-load) and fixed the duplicated WordPress admin bar after re-auth by redirecting the top window; added backend and browser tests.
+- 2026-06-16 22:03:50 +08:00 - Redid the three Priority 8 token UI/balance fixes: moved help controls into the token grid headers, refined the larger info button style, persisted the latest known daily balance, and reran focused frontend/backend verification.
 
 ## Steps and Instructions for Testing
 
