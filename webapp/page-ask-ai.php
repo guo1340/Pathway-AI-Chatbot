@@ -100,18 +100,8 @@ $iframe_url = add_query_arg([
 
         .askai-wrap {
             width: 100%;
-            height: 100dvh;
+            height: var(--askai-available-height, 100dvh);
             overflow: hidden;
-        }
-
-        body.admin-bar .askai-wrap {
-            height: calc(100dvh - 32px);
-        }
-
-        @media screen and (max-width: 782px) {
-            body.admin-bar .askai-wrap {
-                height: calc(100dvh - 46px);
-            }
         }
 
         .askai-iframe {
@@ -128,6 +118,27 @@ $iframe_url = add_query_arg([
         <iframe class="askai-iframe" src="<?php echo esc_url($iframe_url); ?>" allow="clipboard-write"
             referrerpolicy="strict-origin-when-cross-origin"></iframe>
     </div>
+
+    <script>
+        (function () {
+            var wrap = document.querySelector('.askai-wrap');
+            if (!wrap) return;
+
+            function setAskAiHeight() {
+                var viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+                var top = wrap.getBoundingClientRect().top;
+                var availableHeight = Math.max(0, viewportHeight - top);
+                document.documentElement.style.setProperty('--askai-available-height', availableHeight + 'px');
+            }
+
+            setAskAiHeight();
+            window.addEventListener('resize', setAskAiHeight);
+            window.addEventListener('orientationchange', setAskAiHeight);
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', setAskAiHeight);
+            }
+        }());
+    </script>
 
     <?php wp_footer(); ?>
 </body>

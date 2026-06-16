@@ -1242,6 +1242,10 @@ async function run() {
     ]) {
       assert.ok(template.includes(parameter), `Missing iframe parameter ${parameter}`);
     }
+    assert.ok(template.includes("--askai-available-height"));
+    assert.ok(template.includes("getBoundingClientRect().top"));
+    assert.equal(template.includes("32px"), false);
+    assert.equal(template.includes("46px"), false);
     record("WordPress template passes hosted auth parameters");
 
     vite = spawn(process.execPath, [

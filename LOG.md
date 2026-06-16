@@ -1818,3 +1818,31 @@ Optimal result:
 - The parent page does not scroll independently from the chat iframe.
 - The chat history opens at the bottom.
 - Long answers scroll inside the chat log while the topbar and composer remain available.
+
+### 2026-06-16 17:36:18 +08:00 - Ask AI Measured Height Follow-Up
+
+Removed the hard-coded WordPress admin-bar height subtraction from the Ask AI page template.
+
+- The template now measures the actual available height from `.askai-wrap`'s top position and the current viewport height.
+- The measured value is written to `--askai-available-height`, which the iframe wrapper uses with a `100dvh` fallback.
+- The frontend security suite now checks that the template uses measured height and does not include the old fixed admin-bar pixel values.
+
+Verification completed:
+
+1. `php -l webapp/page-ask-ai.php`
+2. `node --check scripts/test-frontend-security.mjs`
+3. `cd webapp && npm.cmd run build`
+4. `cd webapp && npm.cmd run test:ui` - 6 checks passed.
+5. `cd webapp && npm.cmd run test:frontend-security` - 21 checks passed.
+
+### Steps And Instructions For Testing
+
+1. Open the WordPress Ask AI page while logged in.
+2. Confirm the page does not show both a parent page scrollbar and a chat scrollbar on the right.
+3. Resize the browser window and confirm the chat iframe continues to fit the visible area.
+4. Scroll a long chat history and confirm only the chat history region scrolls.
+
+Optimal result:
+
+- The iframe height adapts to the actual WordPress layout without fixed admin-bar constants.
+- The outer WordPress page does not add an extra vertical scrollbar.
