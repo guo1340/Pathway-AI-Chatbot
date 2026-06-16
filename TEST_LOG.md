@@ -1212,3 +1212,35 @@ Test note:
 - The first Priority 8 run was started in parallel with the summary suite and failed with `EADDRINUSE` on the shared browser-test port. The sequential rerun passed without code changes.
 
 Optimal result: outline-style answers no longer show `[1]` before headings or bold labels, outline sections are readable, and supported factual sentences can still keep citation links.
+
+
+## 2026-06-16 19:56:52 +08:00 - Token Help, Daily Balance Load, And Double-Header Fix Verification
+
+Added the larger info button, the token-usage help popover, the daily-balance-on-load behavior, and the iframe top-redirect fix for the duplicated WordPress admin bar. All previously executed checks above remain checked.
+
+Executed in this environment:
+
+- [x] `python -m py_compile rag-backend/main.py` passed.
+- [x] `python -m unittest tests.test_backend_security` passed all 17 backend checks, including the new `test_history_reports_remaining_daily_tokens` (history returns `remaining_tokens`).
+- [x] `esbuild` bundled `webapp/src/main.tsx` with no TypeScript/JSX errors (the repo build uses esbuild for transforms).
+- [x] `node --check webapp/scripts/test-frontend-security.mjs` passed.
+- [x] `git diff` shows only the intended source/test/doc changes with no line-ending churn.
+
+### Pending Host Browser Verification (Chrome required)
+
+These browser checks were authored but could not run in the Linux build environment because Chrome is not installed here. Run them on a Windows/host machine with Chrome.
+
+- [ ] `cd webapp && npm run build` regenerates `dist` and refreshes `plugin/dist`.
+- [ ] `npm run test:ui` passes all 10 UI checks, including:
+  - [ ] The info button computes to at least 44x44 px with an icon of at least 24x24 px (Task 80).
+  - [ ] The token help button reveals a bubble explaining "Input tokens" and "Max response" in plain language and toggles closed again (Task 81).
+  - [ ] On a fresh load the info dialog shows the backend daily balance (e.g. "3,200 daily tokens remaining") with no message sent (Task 82).
+- [ ] `npm run test:frontend-security` passes all 22 checks, including "expired token inside an iframe redirects the top window, not the frame" (double-header bug fix).
+- [ ] `npm run test:frontend-priority8` still passes all 10 Priority 8 checks.
+- [ ] `npm run test:conversation-summary` still passes all 3 summary checks.
+
+### Manual Production Verification
+
+- [ ] Open Ask AI from WordPress, allow the JWT to expire, send a message, and confirm the browser redirects to the login page at the top level with only one WordPress admin bar (no stacked/duplicated header) and no nested iframe.
+
+Optimal result: the three new Priority 8 items behave as specified and a timed-out embedded session never produces a duplicated WordPress header.

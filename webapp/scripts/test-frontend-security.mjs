@@ -27,6 +27,7 @@ const uiOnly = process.argv.includes("--ui");
 let mockHistoryMessages = [];
 let clearConversationCalls = 0;
 let clearConversationShouldFail = false;
+let historyRemainingTokens = 5000;
 
 function record(name) {
   results.push(name);
@@ -77,11 +78,22 @@ const server = createServer((req, res) => {
     return;
   }
 
+  if (url.pathname === "/iframe-parent") {
+    const src = url.searchParams.get("src") || "";
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(
+      `<!doctype html><title>parent</title>` +
+      `<iframe id="frame" src="${src}" style="width:100%;height:100%;border:0"></iframe>`
+    );
+    return;
+  }
+
   if (url.pathname === "/api/history" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({
       messages: conversationSummaryOnly || uiOnly ? mockHistoryMessages : [],
       conversation_id: "thread-test-user",
+      remaining_tokens: historyRemainingTokens,
     }));
     return;
   }
@@ -936,9 +948,54 @@ async function runUi(cdp) {
   );
   assert.match(
     await cdp.evaluate("document.querySelector('.daily-token-status')?.textContent"),
-    /Daily balance\s*Waiting for the next backend balance/
+    /Daily balance\s*5,000 daily tokens remaining/
   );
   record("info dialog contains guidance, 2x2 token details, daily balance, and clear action");
+
+  // Task 80: the info button is enlarged and clearly visible.
+  const infoBtnSize = await cdp.evaluate(`(() => {
+    const btn = document.querySelector('.info-btn');
+    const icon = btn.querySelector('svg');
+    const b = getComputedStyle(btn);
+    const i = icon ? getComputedStyle(icon) : { width: '0px', height: '0px' };
+    return {
+      width: parseFloat(b.width),
+      height: parseFloat(b.height),
+      iconWidth: parseFloat(i.width),
+      iconHeight: parseFloat(i.height),
+    };
+  })()`);
+  assert.ok(infoBtnSize.width >= 44 && infoBtnSize.height >= 44);
+  assert.ok(infoBtnSize.iconWidth >= 24 && infoBtnSize.iconHeight >= 24);
+  record("info button is enlarged for clear visibility");
+
+  // Task 81: a help button reveals a plain-language token explanation bubble.
+  await openInfoDialog(cdp);
+  assert.equal(await cdp.evaluate("Boolean(document.querySelector('.token-help-bubble'))"), false);
+  await cdp.evaluate("document.querySelector('.token-help-btn').click()");
+  await waitForSelector(cdp, ".token-help-bubble");
+  const bubbleText = await cdp.evaluate("document.querySelector('.token-help-bubble').textContent");
+  assert.match(bubbleText, /Input tokens/);
+  assert.match(bubbleText, /Max response/);
+  await cdp.evaluate("document.querySelector('.token-help-btn').click()");
+  await waitFor(
+    () => cdp.evaluate("!document.querySelector('.token-help-bubble')"),
+    "token help bubble toggles closed"
+  );
+  record("token help button explains input tokens and max response in plain language");
+
+  // Task 82: the daily balance is populated from the history load, before any ask.
+  await cdp.evaluate("document.querySelector('.info-dialog .dialog-close').click()");
+  historyRemainingTokens = 3200;
+  await freshValidPage(cdp);
+  await openInfoDialog(cdp);
+  assert.match(
+    await cdp.evaluate("document.querySelector('.daily-token-status')?.textContent"),
+    /3,200 daily tokens remaining/
+  );
+  assert.equal(askBodies.length, 0);
+  historyRemainingTokens = 5000;
+  record("daily balance loads from history on refresh without sending a message");
 
   await clickText(cdp, ".info-dialog button", "Clear chat history");
   await waitForSelector(cdp, "#clear-dialog-title");
@@ -1097,6 +1154,22 @@ async function run() {
       `${APP_ORIGIN}/access`
     );
     record("expired JWT redirects");
+
+    const framedChild = pageUrl({
+      token: expiredToken,
+      requireAuth: "1",
+      requiredCap: "edit_posts",
+      accessUrl: `${APP_ORIGIN}/access`,
+    });
+    await navigate(
+      cdp,
+      `${APP_ORIGIN}/iframe-parent?src=${encodeURIComponent(framedChild)}`
+    );
+    await waitFor(
+      async () => (await cdp.evaluate("location.href")).startsWith(`${APP_ORIGIN}/access`),
+      "iframe redirects the top window"
+    );
+    record("expired token inside an iframe redirects the top window, not the frame");
 
     await expectRedirect(
       cdp,

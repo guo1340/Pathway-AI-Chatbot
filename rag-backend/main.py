@@ -159,6 +159,7 @@ class ChatOut(BaseModel):
 class HistoryOut(BaseModel):
     messages: List[Dict[str, Any]]
     conversation_id: str
+    remaining_tokens: int
 
 
 class ClearConversationOut(BaseModel):
@@ -682,6 +683,7 @@ def conversation_history(user=Depends(require_auth)):
     return HistoryOut(
         messages=messages,
         conversation_id=_conversation_id(user_key),
+        remaining_tokens=remaining_daily_tokens(user),
     )
 
 
