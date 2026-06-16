@@ -1244,3 +1244,29 @@ These browser checks were authored but could not run in the Linux build environm
 - [ ] Open Ask AI from WordPress, allow the JWT to expire, send a message, and confirm the browser redirects to the login page at the top level with only one WordPress admin bar (no stacked/duplicated header) and no nested iframe.
 
 Optimal result: the three new Priority 8 items behave as specified and a timed-out embedded session never produces a duplicated WordPress header.
+
+## 2026-06-16 22:03:50 +08:00 - Priority 8 Token UI Redo Verification
+
+Corrected and verified the three Priority 8 token UI/balance tasks after the previous implementation placed the help control beside the wrong heading.
+
+Completed:
+
+- [x] The top-right info button remains a larger 44x44 px target with a 24x24 px icon, but now uses a cleaner transparent/header-native style.
+- [x] The token help controls now sit inside `.token-grid dt` beside `Input tokens` and `Max response`.
+- [x] No token help button remains beside the `Token usage` section title.
+- [x] Each help button opens a specific plain-language bubble for its own token field.
+- [x] The latest valid daily balance is cached in session storage and used as a refresh fallback while `/api/history` remains authoritative when it returns `remaining_tokens`.
+- [x] `node --check webapp/scripts/test-frontend-security.mjs` passed.
+- [x] `cd webapp && npm.cmd run build` passed.
+- [x] `cd webapp && npm.cmd run test:ui` passed all 10 UI checks.
+- [x] `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 Priority 8 frontend checks.
+- [x] `cd webapp && npm.cmd run test:conversation-summary` passed all 3 conversation-summary frontend checks.
+- [x] `python -m py_compile rag-backend/main.py rag-backend/rag.py` passed.
+- [x] `cd rag-backend && ..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v` passed all 17 backend checks.
+
+Blocked/failed checks:
+
+- [ ] `cd webapp && npm.cmd run test:frontend-security` timed out three times on the first hosted-domain `Page.navigate` call before any app assertion ran. The focused UI and Priority 8 suites that cover the new changes passed in this environment.
+- [ ] `cd webapp && npm.cmd audit --audit-level=high` reports the existing Vite/esbuild advisory chain and recommends a breaking Vite 8 upgrade; no dependency change was made during this UI redo.
+
+Optimal result: the token table contains the question-mark help controls in the correct cells, the info button is visible without looking oversized, and the daily balance does not normally show the waiting fallback after refresh.
