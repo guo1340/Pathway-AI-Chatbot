@@ -1169,3 +1169,21 @@ Test note:
 - The first `test:frontend-priority8` attempt was run in parallel with `test:conversation-summary` and failed with `EADDRINUSE` on the shared test port. The sequential rerun passed without code changes.
 
 Optimal result: the WordPress page has only one visible right-side scrollbar, the chat opens at the latest message, and the Pathway logo/info controls remain visible while reviewing long answers.
+
+## 2026-06-16 17:36:18 +08:00 - Ask AI Measured Height Follow-Up
+
+Replaced the previous fixed WordPress admin-bar height subtraction with measured viewport sizing.
+
+Completed:
+
+- [x] `page-ask-ai.php` now computes available height from `.askai-wrap.getBoundingClientRect().top` and `visualViewport.height`/`innerHeight`.
+- [x] The iframe wrapper consumes `--askai-available-height` with a `100dvh` CSS fallback.
+- [x] Hard-coded `32px` and `46px` admin-bar offsets were removed.
+- [x] Frontend security tests now assert the WordPress template uses measured height and does not include those fixed admin-bar values.
+- [x] `php -l webapp/page-ask-ai.php` passed.
+- [x] `node --check scripts/test-frontend-security.mjs` passed.
+- [x] `cd webapp && npm.cmd run build` passed and refreshed `plugin/dist`.
+- [x] `cd webapp && npm.cmd run test:ui` passed all 6 UI checks.
+- [x] `cd webapp && npm.cmd run test:frontend-security` passed all 21 frontend security checks.
+
+Optimal result: the Ask AI iframe height adapts to the actual WordPress/admin-bar layout without hard-coded pixel offsets, leaving only the intended chat-log scrollbar visible.

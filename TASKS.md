@@ -80,7 +80,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## In Progress
 
-- Current task: WordPress Ask AI iframe double-scroll, initial scroll position, and moving header regression are fixed. Ubuntu ESM maintenance still requires production shell access; Git history rewriting is optional unless an actual secret is discovered.
+- Current task: WordPress Ask AI iframe height is now measured from the actual viewport instead of hard-coded admin-bar offsets; double-scroll follow-up is complete. Ubuntu ESM maintenance still requires production shell access; Git history rewriting is optional unless an actual secret is discovered.
 
 ## Done
 
@@ -181,6 +181,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-15 18:36:17 +08:00 - Completed local dashboard SSH setup by creating the ignored environment file, restricting PEM permissions, and verifying EC2 document listing.
 - 2026-06-16 16:41:39 +08:00 - Completed the new Priority 8 frontend and dashboard tasks: daily token balance in the info dialog, iframe-height-safe Ask AI layout, and EC2 active-branch prompt sync with optional commit/push.
 - 2026-06-16 17:12:41 +08:00 - Fixed the hosted Ask AI double-scroll regression, made loaded history land at the newest message, and kept the logo/info topbar pinned while the chat log scrolls.
+- 2026-06-16 17:36:18 +08:00 - Removed hard-coded WordPress admin-bar iframe offsets and switched Ask AI to measured available viewport height; focused and full frontend checks passed.
 
 ## Steps and Instructions for Testing
 
