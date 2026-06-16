@@ -1913,3 +1913,41 @@ Verification performed:
 Optimal result:
 
 - The info button is large and obvious, users can learn what the token figures mean, the daily balance is correct immediately after a refresh, and an expired embedded session never produces a duplicated WordPress header.
+
+### 2026-06-16 22:03:50 +08:00 - Priority 8 Token UI Redo
+
+Redid the three Priority 8 token UI/balance tasks after the previous pass placed the help control in the wrong spot and made the info button too visually heavy.
+
+Changes:
+
+- Frontend (`webapp/src/App.tsx`, `webapp/src/styles.css`): moved the circled question-mark help controls into the token grid header cells beside `Input tokens` and `Max response`; each opens its own plain-language bubble.
+- Frontend (`webapp/src/styles.css`): kept the top-right info button as a larger 44px accessible target, but changed it back to a cleaner transparent/header-native style with a 24px icon.
+- Frontend (`webapp/src/App.tsx`): stores the latest valid `remaining_tokens` in `sessionStorage` and initializes the dialog from that value while `/api/history` remains the authoritative backend balance when it returns a number.
+- Tests (`webapp/scripts/test-frontend-security.mjs`): added assertions that exactly two help buttons live in `.token-grid dt`, none live beside the `Token usage` title, and the daily balance can fall back to the latest known session value without sending a message.
+
+Verification completed:
+
+1. `node --check webapp/scripts/test-frontend-security.mjs` passed.
+2. `cd webapp && npm.cmd run build` passed.
+3. `cd webapp && npm.cmd run test:ui` passed all 10 UI checks.
+4. `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 Priority 8 checks.
+5. `cd webapp && npm.cmd run test:conversation-summary` passed all 3 summary checks.
+6. `python -m py_compile rag-backend/main.py rag-backend/rag.py` passed.
+7. `cd rag-backend && ..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v` passed all 17 backend checks.
+
+Test notes:
+
+- `cd webapp && npm.cmd run test:frontend-security` was attempted three times and timed out on the first hosted-domain `Page.navigate` call before any app assertion ran. The focused UI and Priority 8 suites, including the new tests for this fix, passed in the same environment.
+- `npm.cmd audit --audit-level=high` reports the existing Vite/esbuild advisory chain and suggests a breaking Vite 8 upgrade; no dependency upgrade was made for this minimal UI correction.
+
+### Steps And Instructions For Testing
+
+1. Open the Ask AI info dialog.
+2. Confirm the top-right info button is easy to hit and read, but does not look like a large filled badge.
+3. In the Token usage grid, confirm a circled `?` appears beside `Input tokens` and another beside `Max response`.
+4. Click each `?` and confirm the bubble explains only that specific term in plain language.
+5. Refresh after a known balance is available and open the info dialog before sending a new message.
+
+Optimal result:
+
+- The help controls are in the token table headers, the info button fits the existing Pathway header style, and the Daily balance row shows the latest known/backend balance instead of "Waiting for the next backend balance" on normal refreshes.

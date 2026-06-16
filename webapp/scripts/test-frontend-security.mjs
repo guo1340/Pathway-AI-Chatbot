@@ -969,20 +969,33 @@ async function runUi(cdp) {
   assert.ok(infoBtnSize.iconWidth >= 24 && infoBtnSize.iconHeight >= 24);
   record("info button is enlarged for clear visibility");
 
-  // Task 81: a help button reveals a plain-language token explanation bubble.
+  // Task 81: help buttons sit beside the two token-grid headers and reveal plain-language bubbles.
   await openInfoDialog(cdp);
   assert.equal(await cdp.evaluate("Boolean(document.querySelector('.token-help-bubble'))"), false);
-  await cdp.evaluate("document.querySelector('.token-help-btn').click()");
+  assert.equal(
+    await cdp.evaluate("document.querySelectorAll('.token-grid dt .token-help-btn').length"),
+    2
+  );
+  assert.equal(
+    await cdp.evaluate("document.querySelectorAll('.token-usage-heading .token-help-btn').length"),
+    0
+  );
+  await cdp.evaluate("document.querySelectorAll('.token-grid dt .token-help-btn')[0].click()");
   await waitForSelector(cdp, ".token-help-bubble");
   const bubbleText = await cdp.evaluate("document.querySelector('.token-help-bubble').textContent");
   assert.match(bubbleText, /Input tokens/);
-  assert.match(bubbleText, /Max response/);
-  await cdp.evaluate("document.querySelector('.token-help-btn').click()");
+  assert.doesNotMatch(bubbleText, /Max response/);
+  await cdp.evaluate("document.querySelectorAll('.token-grid dt .token-help-btn')[1].click()");
+  await waitFor(
+    () => cdp.evaluate("document.querySelector('.token-help-bubble')?.textContent.includes('Max response')"),
+    "max-response help bubble"
+  );
+  await cdp.evaluate("document.querySelectorAll('.token-grid dt .token-help-btn')[1].click()");
   await waitFor(
     () => cdp.evaluate("!document.querySelector('.token-help-bubble')"),
     "token help bubble toggles closed"
   );
-  record("token help button explains input tokens and max response in plain language");
+  record("token-grid help buttons explain input tokens and max response in plain language");
 
   // Task 82: the daily balance is populated from the history load, before any ask.
   await cdp.evaluate("document.querySelector('.info-dialog .dialog-close').click()");
@@ -994,9 +1007,19 @@ async function runUi(cdp) {
     /3,200 daily tokens remaining/
   );
   assert.equal(askBodies.length, 0);
+  historyRemainingTokens = null;
+  await cdp.evaluate("sessionStorage.setItem('rag_remaining_tokens', '2700')");
+  await freshValidPage(cdp);
+  await openInfoDialog(cdp);
+  assert.match(
+    await cdp.evaluate("document.querySelector('.daily-token-status')?.textContent"),
+    /2,700 daily tokens remaining/
+  );
+  await cdp.evaluate("document.querySelector('.info-dialog .dialog-close').click()");
   historyRemainingTokens = 5000;
-  record("daily balance loads from history on refresh without sending a message");
+  record("daily balance loads from history or the latest known session balance without sending a message");
 
+  await openInfoDialog(cdp);
   await clickText(cdp, ".info-dialog button", "Clear chat history");
   await waitForSelector(cdp, "#clear-dialog-title");
   const dialogLayers = await cdp.evaluate(`(() => {
