@@ -65,6 +65,14 @@ async function loadRagHistory(apiBase: string, token: string): Promise<any> {
   return await res.json()
 }
 
+async function loadDailyBalance(apiBase: string, token: string): Promise<any> {
+  const res = await fetch(`${apiBase.replace(/\/$/, '')}/api/balance`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(`Balance request failed: ${res.status}`)
+  return await res.json()
+}
+
 async function clearRagConversation(apiBase: string, token: string): Promise<any> {
   const res = await fetch(
     `${apiBase.replace(/\/$/, '')}/api/conversation/clear`,
@@ -219,13 +227,14 @@ export default function App({
 
   const rememberRemainingTokens = React.useCallback((value: unknown) => {
     const next = coerceRemainingTokens(value)
-    if (next === null) return
+    if (next === null) return false
     setRemainingTokens(next)
     try {
       sessionStorage.setItem(DAILY_BALANCE_STORAGE_KEY, String(next))
     } catch {
       /* sessionStorage can be unavailable in restricted browser contexts */
     }
+    return true
   }, [])
   const inputRef = React.useRef<HTMLTextAreaElement | null>(null)
   const redirectTimerRef = React.useRef<number | null>(null)
@@ -428,10 +437,24 @@ export default function App({
             ? data.conversation_id
             : undefined
         )
-        rememberRemainingTokens(data?.remaining_tokens)
+        if (!rememberRemainingTokens(data?.remaining_tokens)) {
+          loadDailyBalance(effectiveApiBase, authToken)
+            .then((balance) => {
+              if (active) rememberRemainingTokens(balance?.remaining_tokens)
+            })
+            .catch(() => {
+              /* keep sessionStorage as an offline fallback */
+            })
+        }
       })
       .catch(() => {
-        /* keep sessionStorage as an offline fallback */
+        loadDailyBalance(effectiveApiBase, authToken)
+          .then((balance) => {
+            if (active) rememberRemainingTokens(balance?.remaining_tokens)
+          })
+          .catch(() => {
+            /* keep sessionStorage as an offline fallback */
+          })
       })
     return () => {
       active = false
@@ -786,7 +809,7 @@ export default function App({
               <dl className="token-grid" data-over-limit={exceedsInputTokenLimit || exceedsRemainingBalance}>
                 <dt>
                   <span>Input tokens</span>
-                  <div className="token-help">
+                  <div className="token-help token-help-left">
                     <button
                       type="button"
                       className="token-help-btn"
@@ -810,7 +833,7 @@ export default function App({
                 </dt>
                 <dt>
                   <span>Max response</span>
-                  <div className="token-help">
+                  <div className="token-help token-help-right">
                     <button
                       type="button"
                       className="token-help-btn"

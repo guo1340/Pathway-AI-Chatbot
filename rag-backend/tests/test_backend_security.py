@@ -334,12 +334,22 @@ class BackendSecurityTests(unittest.TestCase):
         self.assertIn("remaining_tokens", history.json())
         self.assertEqual(history.json()["remaining_tokens"], expected_remaining)
 
+        balance = self.client.get("/api/balance", headers=auth(self.normal_token))
+        self.assertEqual(balance.status_code, 200)
+        self.assertEqual(balance.json()["remaining_tokens"], expected_remaining)
+
         fresh_user = make_token(["edit_posts"], claims={"user_id": 4242})
         fresh_history = self.client.get("/api/history", headers=auth(fresh_user))
         self.assertEqual(fresh_history.status_code, 200)
         self.assertEqual(fresh_history.json()["messages"], [])
         self.assertEqual(
             fresh_history.json()["remaining_tokens"],
+            main.CHAT_DAILY_TOKEN_LIMIT,
+        )
+        self.assertEqual(
+            self.client.get("/api/balance", headers=auth(fresh_user)).json()[
+                "remaining_tokens"
+            ],
             main.CHAT_DAILY_TOKEN_LIMIT,
         )
 

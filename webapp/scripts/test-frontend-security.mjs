@@ -28,6 +28,7 @@ let mockHistoryMessages = [];
 let clearConversationCalls = 0;
 let clearConversationShouldFail = false;
 let historyRemainingTokens = 5000;
+let balanceRemainingTokens = 5000;
 
 function record(name) {
   results.push(name);
@@ -89,12 +90,21 @@ const server = createServer((req, res) => {
   }
 
   if (url.pathname === "/api/history" && req.method === "GET") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({
+    const payload = {
       messages: conversationSummaryOnly || uiOnly ? mockHistoryMessages : [],
       conversation_id: "thread-test-user",
-      remaining_tokens: historyRemainingTokens,
-    }));
+    };
+    if (historyRemainingTokens !== undefined) {
+      payload.remaining_tokens = historyRemainingTokens;
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(payload));
+    return;
+  }
+
+  if (url.pathname === "/api/balance" && req.method === "GET") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ remaining_tokens: balanceRemainingTokens }));
     return;
   }
 
@@ -985,6 +995,16 @@ async function runUi(cdp) {
   const bubbleText = await cdp.evaluate("document.querySelector('.token-help-bubble').textContent");
   assert.match(bubbleText, /Input tokens/);
   assert.doesNotMatch(bubbleText, /Max response/);
+  const inputBubbleBounds = await cdp.evaluate(`(() => {
+      const bubble = document.querySelector('.token-help-bubble').getBoundingClientRect();
+      const dialog = document.querySelector('.info-dialog').getBoundingClientRect();
+      return {
+        ok: bubble.left >= dialog.left && bubble.right <= dialog.right && bubble.bottom <= dialog.bottom,
+        bubble: { left: bubble.left, right: bubble.right, bottom: bubble.bottom },
+        dialog: { left: dialog.left, right: dialog.right, bottom: dialog.bottom },
+      };
+    })()`);
+  assert.equal(inputBubbleBounds.ok, true, JSON.stringify(inputBubbleBounds));
   await cdp.evaluate("document.querySelectorAll('.token-grid dt .token-help-btn')[1].click()");
   await waitFor(
     () => cdp.evaluate("document.querySelector('.token-help-bubble')?.textContent.includes('Max response')"),
@@ -1007,17 +1027,28 @@ async function runUi(cdp) {
     /3,200 daily tokens remaining/
   );
   assert.equal(askBodies.length, 0);
+  historyRemainingTokens = undefined;
+  balanceRemainingTokens = 4100;
+  await cdp.evaluate("sessionStorage.removeItem('rag_remaining_tokens')");
+  await freshValidPage(cdp);
+  await openInfoDialog(cdp);
+  assert.match(
+    await cdp.evaluate("document.querySelector('.daily-token-status')?.textContent"),
+    /4,100 daily tokens remaining/
+  );
+  await cdp.evaluate("document.querySelector('.info-dialog .dialog-close').click()");
   historyRemainingTokens = null;
   await cdp.evaluate("sessionStorage.setItem('rag_remaining_tokens', '2700')");
   await freshValidPage(cdp);
   await openInfoDialog(cdp);
   assert.match(
     await cdp.evaluate("document.querySelector('.daily-token-status')?.textContent"),
-    /2,700 daily tokens remaining/
+    /4,100 daily tokens remaining/
   );
   await cdp.evaluate("document.querySelector('.info-dialog .dialog-close').click()");
   historyRemainingTokens = 5000;
-  record("daily balance loads from history or the latest known session balance without sending a message");
+  balanceRemainingTokens = 5000;
+  record("daily balance loads from history, the balance endpoint, or the latest known session balance without sending a message");
 
   await openInfoDialog(cdp);
   await clickText(cdp, ".info-dialog button", "Clear chat history");
