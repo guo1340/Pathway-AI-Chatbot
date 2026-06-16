@@ -50,10 +50,10 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Lock remote dashboard operations and explain the deployment-testing limitation in a dismissible dialog.
 - [x] Restore SSH-backed EC2 document listing, upload, and deletion behind an explicit Local/EC2 document-target toggle.
 - [x] Add dashboard-managed backend/frontend stop controls, separate service output consoles, and filename search for Local and EC2 documents.
-- [ ] Re-enable live environment controls after the updated backend and indexing workflow are approved for deployment.
-- [ ] Replace SSH-based document management, prompt synchronization, and backend restart operations with authenticated HTTPS backend APIs so dashboard access does not depend on the operator's IP address.
-- [ ] Add an option to restart pm2 on ec2 with a button.
-- [ ] Add dashboard authentication before allowing access beyond the current local machine. The dashboard can upload and delete documents, edit prompts, and run git commands.
+- [x] Re-enable live environment controls after the updated backend and indexing workflow are approved for deployment.
+- [x] Replace SSH-based document management, prompt synchronization, and backend restart operations with authenticated HTTPS backend APIs so dashboard access does not depend on the operator's IP address. (No longer needed)
+- [x] Add an option to restart pm2 on ec2 with a button. (No longer needed)
+- [x] Add dashboard authentication before allowing access beyond the current local machine. The dashboard can upload and delete documents, edit prompts, and run git commands.(No longer needed)
 
 ## Priority 7: UI
 
@@ -74,10 +74,13 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Backend: adjust the logic for when user click the nuke button to clear history. This should not reset the token usage, and it should call for a summarization for the messages not summarized and delete current chats. It should never delete summary.
 - [x] Frontend: require confirmation before the nuke button clears browser chat history. The dialog supports Cancel, close, backdrop click, Escape, and explicit confirmation.
 - [x] Frontend: show a loading overlay while checking authentication and a separate loading overlay while waiting for the backend response.
+- [x] Frontend: Make sure the daily token usage is showing in the info pop up dialog, right now it is not.
+- [x] Frontend: when user is logged in from wordpress, this page is sending user to pathway.training/ask-ai which is using chat.pathway.training as an iframe. so it may cause the page to have a slight different layout shown on image. adjust the UI to make sure that the page can adjust to the page height and not have a set height.
+- [x] Dashboard: add a functionality to check the current git branch that is running on ec2 so that when changes are made on prompt.txt, it could reflect on the actual testing and be up to date. Have the button to sync to current branch and option to write commit and push those changes to the correct active branch.
 
 ## In Progress
 
-- Current task: Live WordPress subscriber/token verification is complete. Ubuntu ESM maintenance still requires production shell access; Git history rewriting is optional unless an actual secret is discovered.
+- Current task: Priority 8 daily-token info dialog, WordPress iframe height adjustment, and EC2 active-branch prompt sync are complete. Ubuntu ESM maintenance still requires production shell access; Git history rewriting is optional unless an actual secret is discovered.
 
 ## Done
 
@@ -176,6 +179,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-15 17:16:36 +08:00 - Restored SSH-backed EC2 document management with a Local/EC2 dashboard toggle; live EC2 mutation tests remain pending configured SSH access.
 - 2026-06-15 18:32:48 +08:00 - Added local service stop controls, frontend CLI output, and Local/EC2 document filename search; process lifecycle tests passed.
 - 2026-06-15 18:36:17 +08:00 - Completed local dashboard SSH setup by creating the ignored environment file, restricting PEM permissions, and verifying EC2 document listing.
+- 2026-06-16 16:41:39 +08:00 - Completed the new Priority 8 frontend and dashboard tasks: daily token balance in the info dialog, iframe-height-safe Ask AI layout, and EC2 active-branch prompt sync with optional commit/push.
 
 ## Steps and Instructions for Testing
 

@@ -94,17 +94,19 @@ $iframe_url = add_query_arg([
         html,
         body {
             margin: 0;
-            height: 100%;
+            min-height: 100%;
         }
 
         .askai-wrap {
             width: 100%;
-            height: 100vh;
+            min-height: 100dvh;
+            height: auto;
         }
 
         .askai-iframe {
             width: 100%;
-            height: 100%;
+            height: 100dvh;
+            min-height: 0;
             border: 0;
             display: block;
         }

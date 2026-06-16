@@ -122,6 +122,38 @@ async function sshExec(command) {
   });
 }
 
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+function remoteGitBaseCommand() {
+  return `git -C ${shellQuote(REMOTE_ROOT)}`;
+}
+
+function validCommitMessage(message) {
+  return (
+    typeof message === 'string' &&
+    message.trim().length > 0 &&
+    message.length <= 160 &&
+    !/[\r\n]/.test(message)
+  );
+}
+
+async function remoteGitStatus() {
+  const git = remoteGitBaseCommand();
+  const output = await sshExec([
+    `${git} branch --show-current`,
+    `${git} rev-parse --short HEAD`,
+    `${git} status --short -- rag-backend/prompt.txt`,
+  ].join(' && '));
+  const [branch = '', head = '', ...statusLines] = output.trimEnd().split(/\r?\n/);
+  return {
+    branch: branch.trim(),
+    head: head.trim(),
+    promptStatus: statusLines.join('\n').trim(),
+  };
+}
+
 async function sftpUpload(localPath, remoteName) {
   const conn = await createSSHClient();
   return new Promise((resolve, reject) => {
@@ -595,16 +627,61 @@ app.post('/api/server/restart', remoteLocked, async (req, res) => {
   }
 });
 
-// Sync prompt to server: SFTP prompt.txt → restart only (no re-index needed,
-// prompt.txt is read fresh on every query)
-app.post('/api/server/sync-prompt', remoteLocked, async (req, res) => {
+app.get('/api/server/git-status', async (req, res) => {
   try {
+    res.json(await remoteGitStatus());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Sync prompt to the EC2 checkout that is already active on the server.
+// The browser never supplies a branch name; optional push uses the active branch.
+app.post('/api/server/sync-prompt', async (req, res) => {
+  try {
+    const commitMessage = String(req.body?.commitMessage || '').trim();
+    const shouldPush = req.body?.push === true;
+    if ((commitMessage || shouldPush) && !validCommitMessage(commitMessage)) {
+      return res.status(400).json({ error: 'A one-line commit message is required before pushing prompt changes.' });
+    }
+
     await sftpUploadTo(
       PROMPT_FILE,
       `${REMOTE_ROOT}/rag-backend/prompt.txt`
     );
+    let commitOutput = '';
+    let pushOutput = '';
+    let status = await remoteGitStatus();
+
+    if (commitMessage) {
+      const git = remoteGitBaseCommand();
+      commitOutput = await sshExec([
+        `${git} add rag-backend/prompt.txt`,
+        `if ${git} diff --cached --quiet -- rag-backend/prompt.txt; then echo "No prompt changes to commit"; else ${git} commit -m ${shellQuote(commitMessage)}; fi`,
+      ].join(' && '));
+      status = await remoteGitStatus();
+    }
+
+    if (shouldPush) {
+      if (!status.branch) {
+        return res.status(409).json({ error: 'EC2 is not on a named Git branch, so the prompt cannot be pushed.' });
+      }
+      pushOutput = await sshExec(`${remoteGitBaseCommand()} push origin ${shellQuote(status.branch)}`);
+      status = await remoteGitStatus();
+    }
+
     await sshExec('pm2 restart rag-backend --update-env');
-    res.json({ success: true, message: 'Prompt synced — bot will use it on the next query.' });
+    return res.json({
+      success: true,
+      ...status,
+      committed: Boolean(commitMessage),
+      pushed: shouldPush,
+      commitOutput,
+      pushOutput,
+      message: shouldPush
+        ? `Prompt synced, committed, and pushed to ${status.branch}.`
+        : 'Prompt synced to the active EC2 branch and backend restarted.',
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

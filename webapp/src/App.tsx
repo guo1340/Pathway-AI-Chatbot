@@ -721,11 +721,14 @@ export default function App({
                 <dd>~{estimatedInputTokens.toLocaleString()} / {inputTokenLimit.toLocaleString()}</dd>
                 <dd>{maxOutputTokens.toLocaleString()}</dd>
               </dl>
-              {remainingTokens !== null && (
-                <p className="remaining-token-note">
-                  {remainingTokens.toLocaleString()} daily tokens remaining
-                </p>
-              )}
+              <div className="daily-token-status" aria-live="polite">
+                <span>Daily balance</span>
+                <strong>
+                  {remainingTokens !== null
+                    ? `${remainingTokens.toLocaleString()} daily tokens remaining`
+                    : 'Waiting for the next backend balance'}
+                </strong>
+              </div>
             </section>
             <section className="info-dialog-section info-dialog-danger">
               <button

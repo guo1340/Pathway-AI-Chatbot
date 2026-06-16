@@ -9,7 +9,7 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 - `webapp/`: Vite + React chat UI used standalone, embedded in WordPress, and hosted as the full-screen Ask AI iframe app.
 - `rag-backend/`: FastAPI RAG API using LangChain, Chroma, and either OpenAI or Ollama.
 - `plugin/`: WordPress plugin that injects the chat widget site-wide or via `[rag_chatbot]`.
-- `dashboard/`: Local Express dashboard for launching the backend/frontend, local document management, local prompt editing, service monitoring, and git actions. Remote operations remain present but are locked until deployment testing is complete.
+- `dashboard/`: Local Express dashboard for launching the backend/frontend, local document management, local prompt editing, service monitoring, and limited EC2 maintenance actions. Remote deployment toggles remain locked until deployment testing is complete.
 
 ## Current Git/Workspace Notes
 
@@ -59,6 +59,7 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 - `POST /api/upload` and `POST /api/reload` require a JWT containing both `JWT_REQUIRED_CAP` and `JWT_DASHBOARD_CAP`.
 - Dashboard local uploads are proxied to authenticated `POST /api/upload`, and local deletions call authenticated `POST /api/reload`.
 - Dashboard document controls can target Local or EC2 explicitly. EC2 listing/upload/deletion uses SSH/SFTP and restarts `rag-backend` through PM2 so the production index reloads.
+- Dashboard prompt controls can check the active Git branch on EC2, sync local `rag-backend/prompt.txt` to that active checkout, and optionally commit plus push the prompt change to the same active branch. The browser does not provide a branch name.
 - Dashboard-launched backend and frontend processes have individual Stop controls and separate bounded output consoles. The dashboard stops only child processes it launched.
 - The document card filters the currently loaded Local or EC2 list by filename without making an additional backend or SSH request.
 - When the backend `.env` has no JWT secret, the dashboard creates an in-memory local secret and passes it only to the backend process it launches.
@@ -144,7 +145,9 @@ Dashboard:
 - `GET /api/local-health`, `GET /api/local-logs`: local backend/frontend status and backend logs.
 - `GET /api/docs`, `POST /api/docs/upload`, `DELETE /api/docs/:filename`: local document operations using backend authentication for indexing.
 - `GET /api/prompt`, `POST /api/prompt`: local prompt editing.
-- `POST /api/toggle`, `POST /api/server/sync-prompt`, `POST /api/server/restart`: return HTTP 423 while remote deployment is locked.
+- `GET /api/server/git-status`: reads the active EC2 branch, short commit, and `rag-backend/prompt.txt` Git status through SSH.
+- `POST /api/server/sync-prompt`: uploads local `rag-backend/prompt.txt` to EC2, restarts PM2, and can optionally commit/push only to the EC2 checkout's active branch.
+- `POST /api/toggle`, `POST /api/server/restart`: return HTTP 423 while remote deployment is locked.
 
 ## Live vs Local Mode
 
@@ -211,6 +214,8 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The clear confirmation intentionally layers above the information dialog. Canceling clear returns to information; successful clear closes both dialogs.
 - The composer no longer uses a fixed 900-pixel minimum width or `100vw` root sizing, preventing page-level horizontal overflow at intermediate viewport sizes.
 - When the frontend knows the remaining daily balance and the estimated input-plus-output reservation exceeds it, Send opens a warning dialog without making the API request.
+- The information dialog always includes a daily balance row. Before the backend returns a balance, it shows that the app is waiting for the next backend balance.
+- `page-ask-ai.php` and the chat root use dynamic viewport/min-height sizing so the hosted iframe can fit the WordPress Ask AI page without relying on a rigid inherited `100%` height.
 
 ## Known Issues / Risks
 
@@ -218,7 +223,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - `rag-backend/package.json` is empty even though `package-lock.json` and `node_modules` exist.
 - `rag-backend/README.md` is empty; top-level `README.md` has the useful setup docs.
 - `App.tsx` duplicates API helper logic instead of using `webapp/src/api.ts`.
-- Dashboard deployment details remain local configuration. EC2 document operations use the configured SSH connection; prompt synchronization, environment switching, and standalone restart controls remain unavailable in the UI.
+- Dashboard deployment details remain local configuration. EC2 document operations and prompt synchronization use the configured SSH connection; environment switching and standalone restart controls remain unavailable in the UI.
 - Dashboard git commands may fail unless Git safe-directory ownership is configured for the current user.
 - Dashboard local deletion removes the local file and calls authenticated backend `/api/reload`; EC2 deletion uses SFTP and then restarts PM2 to rebuild the remote index.
 - If local deletion cannot reload the backend index, the dashboard restores the original source file.

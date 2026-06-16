@@ -134,6 +134,25 @@
       background: var(--bg); color: var(--text); font: inherit;
     }
     .document-search:focus { border-color: var(--accent); outline: none; }
+    .prompt-sync {
+      display: grid; gap: 10px; margin-top: 14px; padding: 14px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
+    }
+    .prompt-sync-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      flex-wrap: wrap;
+    }
+    .prompt-sync-status { font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
+    .prompt-sync-option {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.82rem; color: var(--muted);
+    }
+    .prompt-sync-input {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--surface); color: var(--text); font: inherit;
+    }
+    .prompt-sync-input:disabled { opacity: 0.5; }
+    .prompt-sync-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
     /* ── Log output ── */
     .log {
@@ -303,6 +322,27 @@
       <div style="display:flex;gap:10px">
         <button class="btn-ghost" onclick="loadPrompt()">↺ Reset</button>
         <button class="btn-primary" id="savePromptBtn" onclick="savePrompt()">Save Prompt</button>
+      </div>
+    </div>
+    <div class="prompt-sync">
+      <div class="prompt-sync-row">
+        <div class="prompt-sync-status" id="remoteBranchStatus">EC2 branch not checked.</div>
+        <button class="btn-ghost" id="checkBranchBtn" onclick="checkRemoteBranch()">Check EC2 Branch</button>
+      </div>
+      <label class="prompt-sync-option">
+        <input type="checkbox" id="commitPromptChanges" onchange="togglePromptCommit()" />
+        Commit and push prompt.txt to the active EC2 branch
+      </label>
+      <input
+        class="prompt-sync-input"
+        id="promptCommitMessage"
+        type="text"
+        maxlength="160"
+        placeholder="Commit message for prompt.txt"
+        disabled
+      />
+      <div class="prompt-sync-actions">
+        <button class="btn-success" id="syncPromptBtn" onclick="syncPromptToEc2()">Sync Prompt to EC2</button>
       </div>
     </div>
   </div>
@@ -614,6 +654,79 @@ async function savePrompt() {
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
+function renderRemoteBranchStatus(data) {
+  const status = document.getElementById('remoteBranchStatus');
+  if (!data || data.error) {
+    status.textContent = data?.error ? 'EC2 branch check failed: ' + data.error : 'EC2 branch not checked.';
+    status.style.color = data?.error ? 'var(--danger)' : 'var(--muted)';
+    return;
+  }
+  const branch = data.branch || 'detached HEAD';
+  const promptState = data.promptStatus ? 'prompt.txt has uncommitted changes' : 'prompt.txt clean';
+  status.textContent = `EC2 active branch: ${branch}${data.head ? ` @ ${data.head}` : ''} (${promptState})`;
+  status.style.color = data.promptStatus ? 'var(--warning)' : 'var(--success)';
+}
+
+async function checkRemoteBranch() {
+  const btn = document.getElementById('checkBranchBtn');
+  setLoading(btn, true, ' Checking...');
+  try {
+    const r = await fetch('/api/server/git-status');
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    renderRemoteBranchStatus(d);
+    toast('EC2 branch checked');
+  } catch (e) {
+    renderRemoteBranchStatus({ error: e.message });
+    toast('Branch check failed: ' + e.message, 'err');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
+function togglePromptCommit() {
+  const checked = document.getElementById('commitPromptChanges').checked;
+  const input = document.getElementById('promptCommitMessage');
+  input.disabled = !checked;
+  if (!checked) input.value = '';
+}
+
+async function syncPromptToEc2() {
+  const btn = document.getElementById('syncPromptBtn');
+  const status = document.getElementById('promptStatus');
+  const commitAndPush = document.getElementById('commitPromptChanges').checked;
+  const commitMessage = document.getElementById('promptCommitMessage').value.trim();
+  if (commitAndPush && !commitMessage) {
+    toast('Commit message required before pushing', 'err');
+    return;
+  }
+
+  setLoading(btn, true, ' Syncing...');
+  status.textContent = '';
+  try {
+    const r = await fetch('/api/server/sync-prompt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        commitMessage: commitAndPush ? commitMessage : '',
+        push: commitAndPush,
+      }),
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    status.textContent = d.message || 'Prompt synced to EC2';
+    status.style.color = 'var(--success)';
+    renderRemoteBranchStatus(d);
+    toast(commitAndPush ? 'Prompt synced and pushed' : 'Prompt synced to EC2');
+  } catch (e) {
+    status.textContent = 'Sync failed: ' + e.message;
+    status.style.color = 'var(--danger)';
+    toast('Sync failed: ' + e.message, 'err');
+  } finally {
+    setLoading(btn, false);
+  }
+}
+
 checkHealth();
 startHealthPolling();
 startLogPolling();

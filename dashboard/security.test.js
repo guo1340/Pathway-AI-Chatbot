@@ -7,6 +7,7 @@ const { createRequire } = require('module');
 
 const serverPath = path.join(__dirname, 'server.js');
 const source = fs.readFileSync(serverPath, 'utf8');
+const dashboardHtml = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
 const localRequire = createRequire(serverPath);
 
 function loadServer(envFile, environment = {}) {
@@ -15,7 +16,7 @@ function loadServer(envFile, environment = {}) {
 
   const instrumented = source.replace(
     /app\.listen\(PORT,[\s\S]*$/,
-    'module.exports = { SSH_HOST, SSH_USER, REMOTE_ROOT, localBackendToken, createSSHClient, remoteLocked, documentTarget, validDocumentName, validLocalService };'
+    'module.exports = { SSH_HOST, SSH_USER, REMOTE_ROOT, localBackendToken, createSSHClient, remoteLocked, documentTarget, validDocumentName, validLocalService, shellQuote, remoteGitBaseCommand, validCommitMessage };'
   );
   const sandboxProcess = Object.create(process);
   sandboxProcess.env = { ...environment };
@@ -106,7 +107,20 @@ async function run() {
   assert.strictEqual(locked.validLocalService('frontend'), true);
   assert.strictEqual(locked.validLocalService('database'), false);
 
-  console.log('Dashboard security configuration: 9 checks passed');
+  assert.strictEqual(locked.shellQuote("/home/ubuntu/Pathway-AI-Chatbot"), "'/home/ubuntu/Pathway-AI-Chatbot'");
+  assert.strictEqual(locked.shellQuote("Pathway's prompt"), "'Pathway'\\''s prompt'");
+  assert.strictEqual(locked.remoteGitBaseCommand(), `git -C ${locked.shellQuote(locked.REMOTE_ROOT)}`);
+  assert.strictEqual(locked.validCommitMessage('docs: update prompt'), true);
+  assert.strictEqual(locked.validCommitMessage(''), false);
+  assert.strictEqual(locked.validCommitMessage('bad\nmessage'), false);
+  assert.strictEqual(locked.validCommitMessage('x'.repeat(161)), false);
+  assert.match(source, /\/api\/server\/git-status/);
+  assert.match(source, /push origin/);
+  assert.match(dashboardHtml, /checkRemoteBranch/);
+  assert.match(dashboardHtml, /syncPromptToEc2/);
+  assert.match(dashboardHtml, /Commit and push prompt\.txt to the active EC2 branch/);
+
+  console.log('Dashboard security configuration: 13 checks passed');
 }
 
 run().catch((error) => {

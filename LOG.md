@@ -1704,3 +1704,79 @@ Optimal result:
 - Only processes launched by the current dashboard instance can be stopped.
 - Backend and frontend output remain separate and readable.
 - Search is case-insensitive, affects only the selected environment, and performs no file mutation or additional SSH request.
+
+### 2026-06-16 15:48:06 +08:00 - Pending Dashboard Browser Test Run
+
+Ran the locally reproducible unchecked dashboard tests before starting new implementation work.
+
+Completed:
+
+- `npm.cmd run test:security` passed all 9 dashboard security checks.
+- `npm.cmd run test:ui` passed all 5 frontend UI checks.
+- A temporary dashboard server was started at `http://127.0.0.1:3131/`.
+- Headless Chrome verified Local is the initial document target, EC2 switching updates the active button, title, helper text, and file list, and the configured SSH route loads 55 EC2 documents.
+- Headless Chrome verified Stop buttons follow launched, ready, and stopped UI states.
+- Headless Chrome verified backend and frontend output consoles stay separate and scroll to the newest line.
+- Headless Chrome verified document search is case-insensitive, no-match copy appears, clearing the query restores the cached list, and switching targets clears search.
+
+Not executed:
+
+- EC2 document upload, retrieval, and deletion were not run because they mutate production files.
+- Local `TASKS.md` did not contain any unchecked Priority 8 items at the time of this run. A `git fetch origin --prune` attempt failed with a GitHub connection reset, so implementation is waiting on the missing task text or a successful fetch.
+
+### Steps And Instructions For Testing
+
+1. From `dashboard`, run `npm.cmd run test:security`.
+2. From `webapp`, run `npm.cmd run test:ui`.
+3. Start the dashboard with `node server.js`.
+4. Open `http://127.0.0.1:3131/` in a browser.
+5. Confirm Local is active by default and the Stop buttons are disabled before launching services.
+6. Switch to EC2 and confirm the heading, helper text, active control, and document list change together.
+7. Search for part of a known filename using different casing and confirm only matching filenames remain.
+8. Clear the search field and confirm the full cached list returns.
+9. Switch back to Local and confirm the search field is cleared.
+
+Optimal result:
+
+- Local dashboard tests pass without mutating production documents.
+- EC2 read-only listing works through the configured SSH route.
+- Production document upload/delete tests remain explicit, approved live operations.
+
+### 2026-06-16 16:41:39 +08:00 - Priority 8 Token, Iframe, And Dashboard Branch Sync
+
+Completed the new unchecked Priority 8 tasks.
+
+- Added an always-visible daily balance row to the frontend information dialog.
+- Adjusted the WordPress Ask AI iframe template and chat root sizing so the hosted chat can fit the page height without relying on a fixed inherited height.
+- Added dashboard controls to check the active EC2 Git branch, sync local `rag-backend/prompt.txt` to that active checkout, and optionally commit/push prompt changes to the same active branch.
+- Kept branch selection server-side: the browser never sends a branch name.
+
+Verification completed:
+
+1. `node --check dashboard/server.js`
+2. `node --check dashboard/security.test.js`
+3. `node --check scripts/test-frontend-security.mjs`
+4. `php -l webapp/page-ask-ai.php`
+5. `cd dashboard && npm.cmd run test:security` - 13 checks passed.
+6. `cd webapp && npm.cmd run build`
+7. `cd webapp && npm.cmd run test:ui` - 5 checks passed.
+8. `cd webapp && npm.cmd run test:frontend-priority8` - 10 checks passed.
+9. `cd webapp && npm.cmd run test:conversation-summary` - 3 checks passed.
+10. `cd webapp && npm.cmd run test:frontend-security` - 21 checks passed.
+
+### Steps And Instructions For Testing
+
+1. Open the chat app and click the information button.
+2. Confirm the token section shows `Daily balance` even before sending a message.
+3. Send a successful message and reopen the information dialog.
+4. Confirm the daily balance updates to the backend-provided remaining token value.
+5. Load the WordPress Ask AI page and confirm the iframe fills the page height without an extra page-level scrollbar.
+6. Open the local dashboard, click `Check EC2 Branch`, and confirm it shows the active branch and short commit.
+7. Save a prompt locally, then click `Sync Prompt to EC2` only when an intentional live prompt update is desired.
+8. To commit and push a prompt update, check the commit/push option, enter a one-line commit message, then sync.
+
+Optimal result:
+
+- The info dialog always communicates daily token balance state.
+- The WordPress-hosted iframe fits the visible page cleanly.
+- Prompt sync targets the EC2 checkout's active branch, and optional commit/push cannot run without a commit message.

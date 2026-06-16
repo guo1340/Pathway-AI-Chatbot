@@ -1055,8 +1055,8 @@ Completed locally:
 
 New live workflow tests:
 
-- [ ] Click Local and EC2 and confirm the active control, document heading, helper text, and file list all switch together.
-- [ ] With valid `dashboard/.env` SSH settings, confirm EC2 mode lists the production `rag-backend/docs` directory.
+- [x] Click Local and EC2 and confirm the active control, document heading, helper text, and file list all switch together.
+- [x] With valid `dashboard/.env` SSH settings, confirm EC2 mode lists the production `rag-backend/docs` directory.
 - [ ] Upload a uniquely named supported document in EC2 mode and confirm SFTP transfer succeeds, PM2 restarts, and `rag-backend` returns online.
 - [ ] Confirm the uploaded EC2 document can be retrieved by a document-backed chat query.
 - [ ] Delete the disposable EC2 document and confirm it is removed remotely, PM2 returns online, and the document is no longer retrieved.
@@ -1092,10 +1092,55 @@ Completed:
 
 New browser interaction tests:
 
-- [ ] Confirm backend and frontend Stop buttons enable only after the dashboard launches their respective processes.
-- [ ] Confirm backend and frontend output remains visually separate and automatically scrolls to the newest line.
-- [ ] Confirm document search is case-insensitive and filters both Local and EC2 filename lists.
-- [ ] Confirm changing Local/EC2 target clears the previous search and loads the selected environment's complete list.
-- [ ] Confirm clearing the query restores the cached list without another document API or SSH request.
+- [x] Confirm backend and frontend Stop buttons enable only after the dashboard launches their respective processes.
+- [x] Confirm backend and frontend output remains visually separate and automatically scrolls to the newest line.
+- [x] Confirm document search is case-insensitive and filters both Local and EC2 filename lists.
+- [x] Confirm changing Local/EC2 target clears the previous search and loads the selected environment's complete list.
+- [x] Confirm clearing the query restores the cached list without another document API or SSH request.
 
 Optimal result: dashboard-owned development processes can be ended cleanly, both CLI streams are visible, and document search is fast, isolated, and non-destructive.
+
+## 2026-06-16 15:48:06 +08:00 - Dashboard Pending Local Browser Verification
+
+- [x] `npm.cmd run test:security` passed all 9 dashboard security configuration checks.
+- [x] `npm.cmd run test:ui` passed all 5 frontend UI checks.
+- [x] Headless Chrome confirmed Local is the initial active document target and Stop buttons are disabled before dashboard-managed services are launched.
+- [x] Headless Chrome confirmed backend/frontend Stop buttons follow launched, ready, and stopped UI states.
+- [x] Headless Chrome confirmed EC2 target selection updates the active control, title, helper text, and loads 55 remote documents through the configured SSH route.
+- [x] Headless Chrome confirmed document search is case-insensitive, no-match text is clear, clearing the query restores the cached list, and switching target clears the search.
+- [x] Headless Chrome confirmed backend and frontend output consoles remain separate and automatically scroll to the newest line.
+
+Not run:
+
+- [ ] EC2 upload, retrieval, and deletion workflow tests were not run because they mutate production documents and require explicit approval for a disposable production file.
+- [ ] Production WordPress token, public rate-limit/query-limit, Ubuntu Pro, EBS expansion, and Git-history rewrite checks remain external or blocked.
+
+Optimal result: all locally reproducible unchecked dashboard UI checks are now covered without changing production documents.
+
+## 2026-06-16 16:41:39 +08:00 - Priority 8 Token, Iframe, And Dashboard Branch Sync Verification
+
+Implemented and tested the new unchecked Priority 8 items from `TASKS.md`.
+
+Completed:
+
+- [x] Frontend info dialog now always shows a daily balance row, including a waiting state before the backend returns `remaining_tokens`.
+- [x] The WordPress Ask AI template and hosted chat root use dynamic viewport/min-height sizing instead of depending on a rigid inherited `100%` height.
+- [x] Dashboard can check the active EC2 Git branch and short commit through SSH.
+- [x] Dashboard can sync local `rag-backend/prompt.txt` to the active EC2 checkout and optionally commit/push to that same active branch after a one-line commit message is provided.
+- [x] `node --check dashboard/server.js` passed.
+- [x] `node --check dashboard/security.test.js` passed.
+- [x] `node --check scripts/test-frontend-security.mjs` passed.
+- [x] `php -l webapp/page-ask-ai.php` passed.
+- [x] `cd dashboard && npm.cmd run test:security` passed all 13 dashboard checks.
+- [x] `cd webapp && npm.cmd run build` passed and refreshed `plugin/dist`.
+- [x] `cd webapp && npm.cmd run test:ui` passed all 5 UI checks, including the daily balance row.
+- [x] `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 Priority 8 checks.
+- [x] `cd webapp && npm.cmd run test:conversation-summary` passed all 3 summary checks.
+- [x] `cd webapp && npm.cmd run test:frontend-security` passed all 21 frontend security checks.
+
+Not executed:
+
+- [ ] The dashboard `Sync Prompt to EC2` button was not clicked against production because it uploads and restarts the live EC2 backend. Use it only when an intentional prompt deployment is desired.
+- [ ] The optional dashboard prompt commit/push path was source- and helper-tested locally but not executed against EC2 to avoid creating a production commit without approval.
+
+Optimal result: users can see token balance state from the info dialog, the hosted iframe fits the WordPress Ask AI viewport, and prompt changes can be deployed to the same branch EC2 is actually running without the browser choosing an arbitrary branch.

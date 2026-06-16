@@ -866,7 +866,11 @@ async function runUi(cdp) {
     await cdp.evaluate("document.querySelector('.info-dialog').textContent"),
     /This bot can make mistakes/
   );
-  record("info dialog contains guidance, 2x2 token details, and clear action");
+  assert.match(
+    await cdp.evaluate("document.querySelector('.daily-token-status')?.textContent"),
+    /Daily balance\s*Waiting for the next backend balance/
+  );
+  record("info dialog contains guidance, 2x2 token details, daily balance, and clear action");
 
   await clickText(cdp, ".info-dialog button", "Clear chat history");
   await waitForSelector(cdp, "#clear-dialog-title");
@@ -888,6 +892,12 @@ async function runUi(cdp) {
     ),
     "low balance response"
   );
+  await openInfoDialog(cdp);
+  assert.match(
+    await cdp.evaluate("document.querySelector('.daily-token-status')?.textContent"),
+    /1,000 daily tokens remaining/
+  );
+  await cdp.evaluate("document.querySelector('.info-dialog .dialog-close').click()");
   const asksBeforeQuota = askBodies.length;
   await setInputAndSend(cdp, "request over remaining daily balance");
   await waitFor(

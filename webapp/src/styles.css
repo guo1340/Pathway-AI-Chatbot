@@ -12,12 +12,13 @@ body,
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
   margin: 0;
 }
 
 #rag-chatbot-root {
-  height: 100vh;
+  min-height: 100dvh;
+  height: 100%;
   width: 100%;
   overflow: hidden;
   font-family: ui-sans-serif, system-ui, -apple-system;
@@ -28,6 +29,7 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
+  min-height: 0;
   min-width: 0;
   max-width: none;
   /* override old max-width: 720px */
@@ -48,7 +50,7 @@ body {
 }
 
 .status-overlay {
-  min-height: 100vh;
+  min-height: 100dvh;
   flex-direction: column;
   padding: 1.5rem;
   box-sizing: border-box;
@@ -223,10 +225,26 @@ body {
   color: #a12622;
 }
 
-.remaining-token-note {
+.daily-token-status {
+  display: grid;
+  gap: .2rem;
   margin-top: .55rem !important;
+  padding: .6rem .7rem;
+  border: 1px solid #d5dfde;
+  border-radius: 6px;
+  background: #f7faf9;
+}
+
+.daily-token-status span {
   color: #526462;
-  font-size: .8rem;
+  font-size: .76rem;
+  font-weight: 600;
+}
+
+.daily-token-status strong {
+  color: #1f2f2e;
+  font-size: .88rem;
+  overflow-wrap: anywhere;
 }
 
 .info-dialog-danger {
