@@ -1187,3 +1187,28 @@ Completed:
 - [x] `cd webapp && npm.cmd run test:frontend-security` passed all 21 frontend security checks.
 
 Optimal result: the Ask AI iframe height adapts to the actual WordPress/admin-bar layout without hard-coded pixel offsets, leaving only the intended chat-log scrollbar visible.
+
+## 2026-06-16 18:15:23 +08:00 - Citation And Outline Formatting Verification
+
+Fixed the response formatting issue where model output placed `[1]` before bold outline headings and collapsed outline bullets into one paragraph.
+
+Completed:
+
+- [x] Frontend answer rendering now normalizes citation markers away from Roman numeral, numbered, lettered, and bold heading positions before rendering.
+- [x] Frontend answer rendering restores line breaks before inline outline sections and bullet-style `-` points.
+- [x] Citation links still render when markers remain in sentence/body positions.
+- [x] `rag-backend/prompt.txt` now tells the model to place citations at the end of supported sentences or paragraphs and never before headings, outline labels, or bolded headings.
+- [x] `node --check scripts/test-frontend-security.mjs` passed.
+- [x] `git diff --check` passed before documentation updates.
+- [x] `cd webapp && npm.cmd run build` passed and refreshed `plugin/dist`.
+- [x] `cd webapp && npm.cmd run test:ui` passed all 7 UI checks, including the new outline/citation regression.
+- [x] `cd webapp && npm.cmd run test:frontend-security` passed all 21 frontend security checks.
+- [x] `python -m py_compile rag-backend/main.py rag-backend/rag.py` passed.
+- [x] `cd webapp && npm.cmd run test:conversation-summary` passed all 3 summary checks.
+- [x] `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 Priority 8 checks after rerunning sequentially.
+
+Test note:
+
+- The first Priority 8 run was started in parallel with the summary suite and failed with `EADDRINUSE` on the shared browser-test port. The sequential rerun passed without code changes.
+
+Optimal result: outline-style answers no longer show `[1]` before headings or bold labels, outline sections are readable, and supported factual sentences can still keep citation links.

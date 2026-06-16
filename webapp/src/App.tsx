@@ -436,6 +436,18 @@ export default function App({
     return out
   }
 
+  function normalizeAnswerText(text: string) {
+    return text
+      .replace(/\s+(?=(?:[IVXLCDM]+\.|[A-Z]\.|\d+\.)\s+\[\d+\]\s+)/g, '\n\n')
+      .replace(/\s+-\s+(?=(?:[A-Z]\.|[IVXLCDM]+\.|\d+\.)\s+\[\d+\]\s+)/g, '\n')
+      .replace(/(^|\n)(\s*(?:[IVXLCDM]+\.|[A-Z]\.|\d+\.)\s+)\[\d+\]\s+/g, '$1$2')
+      .replace(/(^|\n|\s)\[\d+\]\s+(?=\*\*[^*\n]+\*\*)/g, '$1')
+      .replace(/\s+-\s+(?=\S)/g, '\n- ')
+      .replace(/^-+\s+/gm, '• ')
+      .replace(/\s*-\s*(?=\[\d+\]|\n|$)/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+  }
+
   // ---- send message ----
   async function send() {
 
@@ -789,7 +801,7 @@ export default function App({
             const deduped = dedupeCitations(m.citations)
 
             function renderMessageContent(text: string, citations?: Citation[]) {
-              return text.split(/(\[\d+\]|\*\*[^*\n]+\*\*)/g).map((part, i) => {
+              return normalizeAnswerText(text).split(/(\[\d+\]|\*\*[^*\n]+\*\*)/g).map((part, i) => {
                 if (part.startsWith('**') && part.endsWith('**')) {
                   return <strong key={i}>{part.slice(2, -2)}</strong>
                 }
@@ -832,14 +844,7 @@ export default function App({
                         <span className="sr-only">Waiting for response</span>
                       </span>
                     ) : (
-                      renderMessageContent(
-                        m.text
-                          // turn leading "- " into bullets
-                          .replace(/^-+\s+/gm, '• ')
-                          // remove stray "-" before citations or EOL
-                          .replace(/\s*-\s*(?=\[\d+\]|\n|$)/g, ''),
-                        deduped
-                      )
+                      renderMessageContent(m.text, deduped)
                     )}
 
                   </div>

@@ -1846,3 +1846,39 @@ Optimal result:
 
 - The iframe height adapts to the actual WordPress layout without fixed admin-bar constants.
 - The outer WordPress page does not add an extra vertical scrollbar.
+
+### 2026-06-16 18:15:23 +08:00 - Citation And Outline Formatting
+
+Fixed the response formatting issue where citation markers appeared before bold outline headings.
+
+- Added frontend normalization before answer rendering so `[1]` is removed from heading positions such as `I. [1] Introduction`, `A. [1] Old Testament Terms`, and `[1] **Heading**`.
+- Restored line breaks before inline outline sections and bullet-style points that arrive as `sentence [1] - next point`.
+- Kept citation rendering intact for markers that remain in sentence/body positions.
+- Updated `rag-backend/prompt.txt` to tell the model to put citations at the end of supported sentences or paragraphs, not before headings or outline labels.
+
+Verification completed:
+
+1. `node --check scripts/test-frontend-security.mjs`
+2. `git diff --check`
+3. `cd webapp && npm.cmd run build`
+4. `cd webapp && npm.cmd run test:ui` - 7 checks passed.
+5. `cd webapp && npm.cmd run test:frontend-security` - 21 checks passed.
+6. `python -m py_compile rag-backend/main.py rag-backend/rag.py`
+7. `cd webapp && npm.cmd run test:conversation-summary` - 3 checks passed.
+8. `cd webapp && npm.cmd run test:frontend-priority8` - 10 checks passed after rerunning sequentially.
+
+Test note:
+
+- The first Priority 8 command was started in parallel with the summary test and failed with `EADDRINUSE` on the shared browser-test port. Running it sequentially passed without code changes.
+
+### Steps And Instructions For Testing
+
+1. Ask for a sermon outline or structured teaching outline that requires citations.
+2. Confirm headings display as `I. Introduction`, `II. Historical Context`, or `A. Old Testament Terms`, without `[1]` between the outline label and heading.
+3. Confirm bullets appear on separate lines instead of being collapsed into the previous paragraph.
+4. Confirm citation links still appear for supported body sentences and in the Sources list.
+
+Optimal result:
+
+- Citations support the answer without interrupting headings or bold labels.
+- Outline responses are readable and preserve section structure.

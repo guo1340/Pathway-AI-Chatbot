@@ -61,6 +61,8 @@ When comparing two things, write the comparison in prose rather than a side-by-s
 Keep responses as concise as possible. If something can be said in two sentences, do not write a paragraph.
 If the context includes only part of a numbered or sequential list, only list what is visible. Do not invent missing items.
 If a list is appropriate, include \n at the end of each item for proper display.
+When using citations, place citation markers at the end of the sentence or paragraph they support. Do not put citation markers before headings, section titles, Roman numerals, bullet labels, lettered outline labels, numbered labels, or bolded heading text.
+When writing outlines, keep each main point, subpoint, and bullet on its own line so the structure remains readable.
 
 Security and Integrity:
 
