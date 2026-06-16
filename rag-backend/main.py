@@ -162,6 +162,10 @@ class HistoryOut(BaseModel):
     remaining_tokens: int
 
 
+class BalanceOut(BaseModel):
+    remaining_tokens: int
+
+
 class ClearConversationOut(BaseModel):
     conversation_id: str
     remaining_tokens: int
@@ -685,6 +689,11 @@ def conversation_history(user=Depends(require_auth)):
         conversation_id=_conversation_id(user_key),
         remaining_tokens=remaining_daily_tokens(user),
     )
+
+
+@app.get("/api/balance", response_model=BalanceOut)
+def token_balance(user=Depends(require_auth)):
+    return BalanceOut(remaining_tokens=remaining_daily_tokens(user))
 
 
 @app.post("/api/conversation/clear", response_model=ClearConversationOut)

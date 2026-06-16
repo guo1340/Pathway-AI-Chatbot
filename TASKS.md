@@ -83,7 +83,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 
 ## In Progress
 
-- Current task: Corrected the three Priority 8 frontend/backend items: the info button remains a larger accessible target without the oversized filled badge styling, the question-mark help buttons now sit inside the token grid next to Input tokens and Max response, and the daily balance loads from backend history or the latest known session balance on refresh.
+- Current task: Fixed the Priority 8 follow-up issues: token help bubbles now render above the token grid without clipping, and the daily balance loads from `/api/history`, then authenticated `/api/balance`, then the latest session fallback.
 
 ## Done
 
@@ -128,6 +128,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Enlarged the Ask AI info button, added a plain-language token-usage help popover, and made the daily token balance load from `/api/history` so it no longer shows "Waiting for the next backend balance" after a refresh.
 - [x] Fixed the duplicated WordPress admin bar that appeared after a timed-out session re-authenticated, by redirecting the top-level window instead of the embedded chat iframe.
 - [x] Corrected the token help placement so the circled question marks are in the token grid header cells beside Input tokens and Max response, cleaned up the enlarged info button styling, and added a session fallback for the daily balance while `/api/history` remains the backend authority.
+- [x] Fixed token help bubble clipping by allowing the token grid to overflow visibly and anchoring each bubble inside the dialog; added authenticated `/api/balance` as a direct fallback when history does not include `remaining_tokens`.
 
 ## Notes for Codex
 
@@ -191,6 +192,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-16 18:15:23 +08:00 - Fixed outline/citation formatting by normalizing misplaced citation markers before headings or bold labels, restoring inline outline breaks, and adding prompt guidance plus browser regression coverage.
 - 2026-06-16 19:56:52 +08:00 - Completed the three new Priority 8 items (larger info button, token-usage help popover, daily-balance-on-load) and fixed the duplicated WordPress admin bar after re-auth by redirecting the top window; added backend and browser tests.
 - 2026-06-16 22:03:50 +08:00 - Redid the three Priority 8 token UI/balance fixes: moved help controls into the token grid headers, refined the larger info button style, persisted the latest known daily balance, and reran focused frontend/backend verification.
+- 2026-06-16 23:26:50 +08:00 - Fixed the token help bubble z-index/clipping issue and added authenticated `/api/balance` so the frontend can still display daily balance when `/api/history` does not provide it.
 
 ## Steps and Instructions for Testing
 

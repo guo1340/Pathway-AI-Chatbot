@@ -133,6 +133,7 @@ Backend:
 - `GET /api/health`: health check.
 - `POST /api/ask`: authenticated chat endpoint with history support.
 - `GET /api/history`: returns only the authenticated user's newest visible raw exchanges plus the current `remaining_tokens` daily balance; it never returns the private summary.
+- `GET /api/balance`: returns only the authenticated user's current `remaining_tokens` daily balance and is used as a frontend fallback if history loading succeeds without a usable balance.
 - `POST /api/conversation/clear`: summarizes all visible raw exchanges, preserves the cumulative summary, removes the raw rows, and returns the updated token balance.
 - `GET /api/files/{name}`: authenticated file access using a bearer header or a short-lived filename-scoped `file_token` citation ticket.
 - `POST /api/upload`: dashboard-authorized upload and re-index.
@@ -215,7 +216,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The clear confirmation intentionally layers above the information dialog. Canceling clear returns to information; successful clear closes both dialogs.
 - The composer no longer uses a fixed 900-pixel minimum width or `100vw` root sizing, preventing page-level horizontal overflow at intermediate viewport sizes.
 - When the frontend knows the remaining daily balance and the estimated input-plus-output reservation exceeds it, Send opens a warning dialog without making the API request.
-- The information dialog always includes a daily balance row. It initializes from the latest known session balance and replaces that with `/api/history`'s backend `remaining_tokens` when available; only when neither exists should it show that the app is waiting for the next backend balance.
+- The information dialog always includes a daily balance row. It prefers `/api/history`'s backend `remaining_tokens`, falls back to authenticated `/api/balance` if history lacks a usable value, and only then uses the latest known session balance. It should show the waiting text only when none of those sources has returned a valid balance.
 - `page-ask-ai.php` measures the actual available viewport height from `.askai-wrap`'s top offset and stores it in `--askai-available-height`; this avoids hard-coded WordPress admin-bar offsets and prevents the hosted page from creating a second vertical scrollbar.
 - The chat app root is a fixed-height flex column: header stays pinned at the top, composer stays at the bottom, and only `.rcb-log` scrolls. Message updates use a deferred scroll-to-bottom so loaded history opens at the newest message.
 - `rag-backend/prompt.txt` also instructs the model to place citations at the end of supported sentences or paragraphs, never before headings, outline labels, or bolded heading text. This is a prompt guard only; frontend normalization remains the code-level fallback.
