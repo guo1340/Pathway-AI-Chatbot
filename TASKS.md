@@ -77,10 +77,13 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Frontend: Make sure the daily token usage is showing in the info pop up dialog, right now it is not.
 - [x] Frontend: when user is logged in from wordpress, this page is sending user to pathway.training/ask-ai which is using chat.pathway.training as an iframe. so it may cause the page to have a slight different layout shown on image. adjust the UI to make sure that the page can adjust to the page height and not have a set height.
 - [x] Dashboard: add a functionality to check the current git branch that is running on ec2 so that when changes are made on prompt.txt, it could reflect on the actual testing and be up to date. Have the button to sync to current branch and option to write commit and push those changes to the correct active branch.
+- [x] Frontend: Make the info button on the top right corner of the page much bigger, right now it is not visible enough.
+- [x] Frontend: add a circled question mark button after the input tokens and max response header that opens a chat bubble like display that explains in common language what they each are, users may not know what they are.
+- [x] Backend and Frontend: right now the daily balance has "waiting for the next backend balance" when page is refreshed, find a way to track the remaining daily balance when loading the messages, either keep track of it with the user id or with the latest message. Choose the cleanest and easiest way to do it so that it will always display the correct daily balance limit.
 
 ## In Progress
 
-- Current task: Citation markers before headings/bold outline labels are normalized in frontend rendering, prompt guidance now discourages that format, and all related frontend tests passed. Ubuntu ESM maintenance still requires production shell access.
+- Current task: Completed the three new Priority 8 frontend/backend items (larger info button, plain-language token help popover, and durable daily-balance display on load) plus a fix for the duplicated WordPress admin bar after re-authentication. Backend suite reruns clean locally; the new browser UI/security checks must be run on a host with Chrome. Ubuntu ESM maintenance still requires production shell access.
 
 ## Done
 
@@ -122,6 +125,8 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Recovered EC2 root capacity to approximately 1.3 GB free, restored the backend after reboot, and enabled the saved PM2 process through `pm2-ubuntu` systemd startup.
 - [x] Preserved citations when model answers omit inline markers and added a linked frontend Sources list as a reliable fallback.
 - [x] Re-audited the webapp after the earlier Vite advisory report; the current installed Vite 6.4.3 tree reports zero vulnerabilities, so the forced Vite 8 migration is no longer required.
+- [x] Enlarged the Ask AI info button, added a plain-language token-usage help popover, and made the daily token balance load from `/api/history` so it no longer shows "Waiting for the next backend balance" after a refresh.
+- [x] Fixed the duplicated WordPress admin bar that appeared after a timed-out session re-authenticated, by redirecting the top-level window instead of the embedded chat iframe.
 
 ## Notes for Codex
 
@@ -183,6 +188,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-16 17:12:41 +08:00 - Fixed the hosted Ask AI double-scroll regression, made loaded history land at the newest message, and kept the logo/info topbar pinned while the chat log scrolls.
 - 2026-06-16 17:36:18 +08:00 - Removed hard-coded WordPress admin-bar iframe offsets and switched Ask AI to measured available viewport height; focused and full frontend checks passed.
 - 2026-06-16 18:15:23 +08:00 - Fixed outline/citation formatting by normalizing misplaced citation markers before headings or bold labels, restoring inline outline breaks, and adding prompt guidance plus browser regression coverage.
+- 2026-06-16 19:56:52 +08:00 - Completed the three new Priority 8 items (larger info button, token-usage help popover, daily-balance-on-load) and fixed the duplicated WordPress admin bar after re-auth by redirecting the top window; added backend and browser tests.
 
 ## Steps and Instructions for Testing
 

@@ -1,5 +1,5 @@
 import React from 'react'
-import { IoClose, IoInformationCircleOutline } from "react-icons/io5";
+import { IoClose, IoInformationCircleOutline, IoHelpCircleOutline } from "react-icons/io5";
 
 const WORDPRESS_LOGIN_URL = 'https://pathway.training/wp-login.php'
 
@@ -154,6 +154,24 @@ function trustedAccessUrl(value: unknown) {
   }
 }
 
+// Redirect away from the chat to the access/login page.
+// When the chat runs inside an iframe (the WordPress "Ask AI" page embeds
+// chat.pathway.training), redirecting must target the TOP-LEVEL window. Replacing
+// the iframe's own location would load the WordPress page inside the frame, which
+// renders a second admin bar and a nested iframe -- the stacked "double header" bug.
+function redirectToAccess(url: string) {
+  try {
+    const top = window.top
+    if (top && top !== window.self) {
+      top.location.href = url
+      return
+    }
+  } catch {
+    /* cross-origin reads can throw; fall back to replacing this window */
+  }
+  window.location.replace(url)
+}
+
 // --- Main Component ---
 export default function App({
   apiBase,
@@ -173,6 +191,7 @@ export default function App({
   const [authChecking, setAuthChecking] = React.useState(true)
   const [notice, setNotice] = React.useState<Notice | null>(null)
   const [infoDialogOpen, setInfoDialogOpen] = React.useState(false)
+  const [tokenHelpOpen, setTokenHelpOpen] = React.useState(false)
   const [clearDialogOpen, setClearDialogOpen] = React.useState(false)
   const [localAuth, setLocalAuth] = React.useState<{
     apiBase: string
@@ -306,7 +325,7 @@ export default function App({
       redirecting: true,
     })
     redirectTimerRef.current = window.setTimeout(
-      () => window.location.replace(accessUrl),
+      () => redirectToAccess(accessUrl),
       1600
     )
 
@@ -328,16 +347,22 @@ export default function App({
   ])
 
   React.useEffect(() => {
-    if (!clearDialogOpen && !infoDialogOpen && !notice) return
+    if (!clearDialogOpen && !infoDialogOpen && !notice && !tokenHelpOpen) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       if (clearDialogOpen) setClearDialogOpen(false)
+      else if (tokenHelpOpen) setTokenHelpOpen(false)
       else if (infoDialogOpen) setInfoDialogOpen(false)
       else if (!notice?.redirecting) setNotice(null)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [clearDialogOpen, infoDialogOpen, notice])
+  }, [clearDialogOpen, infoDialogOpen, notice, tokenHelpOpen])
+
+  // Reset the token-help popover whenever the info dialog is closed.
+  React.useEffect(() => {
+    if (!infoDialogOpen) setTokenHelpOpen(false)
+  }, [infoDialogOpen])
 
   // 🧠 Load conversation from sessionStorage on mount
   React.useEffect(() => {
@@ -374,6 +399,10 @@ export default function App({
             ? data.conversation_id
             : undefined
         )
+        const loadedRemaining = Number(data?.remaining_tokens)
+        if (Number.isFinite(loadedRemaining)) {
+          setRemainingTokens(Math.max(0, loadedRemaining))
+        }
       })
       .catch(() => {
         /* keep sessionStorage as an offline fallback */
@@ -531,7 +560,7 @@ export default function App({
           redirecting: true,
         })
         redirectTimerRef.current = window.setTimeout(
-          () => window.location.replace(accessUrl),
+          () => redirectToAccess(accessUrl),
           1600
         )
         return
@@ -733,7 +762,35 @@ export default function App({
               <p>This bot can make mistakes — please check the sources given at the end of each answer.</p>
             </section>
             <section className="info-dialog-section">
-              <h3>Token usage</h3>
+              <div className="token-usage-heading">
+                <h3>Token usage</h3>
+                <div className="token-help">
+                  <button
+                    type="button"
+                    className="token-help-btn"
+                    aria-label="What do these mean?"
+                    aria-expanded={tokenHelpOpen}
+                    title="What do these mean?"
+                    onClick={() => setTokenHelpOpen((open) => !open)}
+                  >
+                    <IoHelpCircleOutline />
+                  </button>
+                  {tokenHelpOpen && (
+                    <div className="token-help-bubble" role="dialog" aria-label="Token usage explained">
+                      <p>
+                        <strong>Input tokens</strong> are the size of your message plus
+                        recent chat that gets sent to the AI. Think of a token as roughly
+                        a few letters of text. The number after the slash is the most one
+                        message may use.
+                      </p>
+                      <p>
+                        <strong>Max response</strong> is the longest answer the AI can write
+                        back to you, also measured in tokens.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
               <dl className="token-grid" data-over-limit={exceedsInputTokenLimit || exceedsRemainingBalance}>
                 <dt>Input tokens</dt>
                 <dt>Max response</dt>

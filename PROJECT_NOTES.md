@@ -132,7 +132,7 @@ Backend:
 
 - `GET /api/health`: health check.
 - `POST /api/ask`: authenticated chat endpoint with history support.
-- `GET /api/history`: returns only the authenticated user's newest visible raw exchanges; it never returns the private summary.
+- `GET /api/history`: returns only the authenticated user's newest visible raw exchanges plus the current `remaining_tokens` daily balance; it never returns the private summary.
 - `POST /api/conversation/clear`: summarizes all visible raw exchanges, preserves the cumulative summary, removes the raw rows, and returns the updated token balance.
 - `GET /api/files/{name}`: authenticated file access using a bearer header or a short-lived filename-scoped `file_token` citation ticket.
 - `POST /api/upload`: dashboard-authorized upload and re-index.

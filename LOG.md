@@ -1882,3 +1882,34 @@ Optimal result:
 
 - Citations support the answer without interrupting headings or bold labels.
 - Outline responses are readable and preserve section structure.
+### 2026-06-16 19:56:52 +08:00 - Token UI Help, Daily Balance On Load, And Double-Header Fix
+
+Completed three new Priority 8 items and fixed a re-authentication display bug.
+
+Changes:
+
+- Frontend (`webapp/src/styles.css`): enlarged `.rcb-head .info-btn` to a 3rem circle with a visible background, border, focus ring, and a 2rem icon so the information control is clearly visible.
+- Frontend (`webapp/src/App.tsx`, `webapp/src/styles.css`): added a circular help button after the Token usage heading that toggles a speech-bubble popover explaining "Input tokens" and "Max response" in plain language; the popover closes on toggle, Escape, or when the info dialog closes.
+- Backend (`rag-backend/main.py`): `GET /api/history` now returns `remaining_tokens` (via the existing `remaining_daily_tokens`) and `HistoryOut` gained the field.
+- Frontend (`webapp/src/App.tsx`): the history load now seeds the daily balance from `remaining_tokens`, so the info dialog shows the real balance after a refresh instead of "Waiting for the next backend balance".
+- Bug fix (`webapp/src/App.tsx`): authentication-failure/expiry redirects now target the top-level window through a new `redirectToAccess` helper. Previously the embedded chat iframe replaced its own location with the WordPress Ask AI page, which rendered a second WordPress admin bar and a nested iframe (the stacked "double header"). The WordPress template (`page-ask-ai.php`) was not the cause and was left unchanged.
+
+Verification performed:
+
+- `python -m py_compile rag-backend/main.py` passed.
+- `python -m unittest tests.test_backend_security` passed all 17 backend checks, including the new `test_history_reports_remaining_daily_tokens`.
+- `esbuild` bundled `webapp/src/main.tsx` with no errors (the repo build uses esbuild for TS/JSX).
+- `node --check webapp/scripts/test-frontend-security.mjs` passed.
+- The new browser UI and security checks (info-button size, token help popover, balance-on-load, and the iframe top-redirect regression) are written but must be executed on a host with Chrome installed; they could not run in the Linux build environment used for this change.
+
+### Steps And Instructions For Testing
+
+1. On a machine with Chrome, run `cd webapp && npm run build`.
+2. Run `npm run test:ui` and confirm all 10 UI checks pass, including the enlarged info button, the token help popover, and the daily-balance-on-load check.
+3. Run `npm run test:frontend-security` and confirm all 22 checks pass, including "expired token inside an iframe redirects the top window, not the frame".
+4. Run `cd rag-backend && python -m unittest tests.test_backend_security` and confirm 17 checks pass.
+5. Manually: open Ask AI through WordPress, let the session expire, send a message, and confirm the page redirects to login at the top level with only one admin bar (no stacked headers).
+
+Optimal result:
+
+- The info button is large and obvious, users can learn what the token figures mean, the daily balance is correct immediately after a refresh, and an expired embedded session never produces a duplicated WordPress header.

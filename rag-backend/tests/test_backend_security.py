@@ -316,6 +316,33 @@ class BackendSecurityTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(len(main.PIPE.answer_calls), before)
 
+    def test_history_reports_remaining_daily_tokens(self):
+        main.CHAT_DAILY_TOKEN_LIMIT = 20
+        main.LLM_MAX_OUTPUT_TOKENS = 5
+
+        ask = self.client.post(
+            "/api/ask",
+            headers=auth(self.normal_token),
+            json={"query": "hello"},
+        )
+        self.assertEqual(ask.status_code, 200)
+        expected_remaining = ask.json()["remaining_tokens"]
+        self.assertEqual(expected_remaining, 15)
+
+        history = self.client.get("/api/history", headers=auth(self.normal_token))
+        self.assertEqual(history.status_code, 200)
+        self.assertIn("remaining_tokens", history.json())
+        self.assertEqual(history.json()["remaining_tokens"], expected_remaining)
+
+        fresh_user = make_token(["edit_posts"], claims={"user_id": 4242})
+        fresh_history = self.client.get("/api/history", headers=auth(fresh_user))
+        self.assertEqual(fresh_history.status_code, 200)
+        self.assertEqual(fresh_history.json()["messages"], [])
+        self.assertEqual(
+            fresh_history.json()["remaining_tokens"],
+            main.CHAT_DAILY_TOKEN_LIMIT,
+        )
+
     def test_daily_token_reservation_rejection_release_and_reset(self):
         main.CHAT_DAILY_TOKEN_LIMIT = 4
         main.LLM_MAX_OUTPUT_TOKENS = 3
