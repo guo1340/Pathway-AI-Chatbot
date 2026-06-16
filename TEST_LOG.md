@@ -1144,3 +1144,28 @@ Not executed:
 - [ ] The optional dashboard prompt commit/push path was source- and helper-tested locally but not executed against EC2 to avoid creating a production commit without approval.
 
 Optimal result: users can see token balance state from the info dialog, the hosted iframe fits the WordPress Ask AI viewport, and prompt changes can be deployed to the same branch EC2 is actually running without the browser choosing an arbitrary branch.
+
+## 2026-06-16 17:12:41 +08:00 - Hosted Ask AI Scroll Regression Fix
+
+Fixed the frontend layout issue shown in the WordPress-hosted Ask AI screenshot.
+
+Completed:
+
+- [x] WordPress Ask AI template now hides parent page overflow and sizes the iframe to the viewport minus the WordPress admin bar when present.
+- [x] Chat root/card now use fixed viewport flex sizing, so the document body does not become the chat scroller.
+- [x] The chat logo/info topbar stays pinned while the message log scrolls.
+- [x] Loaded chat history scrolls to the bottom after React renders the messages.
+- [x] Removed the older fixed `380px` chat-log height override by replacing it with a flexing internal scroll region.
+- [x] `node --check scripts/test-frontend-security.mjs` passed.
+- [x] `php -l webapp/page-ask-ai.php` passed.
+- [x] `cd webapp && npm.cmd run build` passed and refreshed `plugin/dist`.
+- [x] `cd webapp && npm.cmd run test:ui` passed all 6 UI checks, including one internal scrollbar, bottom-loaded history, and pinned topbar.
+- [x] `cd webapp && npm.cmd run test:conversation-summary` passed all 3 summary checks.
+- [x] `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 Priority 8 checks after rerunning sequentially.
+- [x] `cd webapp && npm.cmd run test:frontend-security` passed all 21 frontend security checks.
+
+Test note:
+
+- The first `test:frontend-priority8` attempt was run in parallel with `test:conversation-summary` and failed with `EADDRINUSE` on the shared test port. The sequential rerun passed without code changes.
+
+Optimal result: the WordPress page has only one visible right-side scrollbar, the chat opens at the latest message, and the Pathway logo/info controls remain visible while reviewing long answers.

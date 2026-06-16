@@ -551,7 +551,14 @@ export default function App({
   // auto-scroll to bottom on new messages
   React.useEffect(() => {
     const el = logRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (!el) return
+    const scrollToBottom = () => {
+      el.scrollTop = el.scrollHeight
+    }
+    scrollToBottom()
+    requestAnimationFrame(scrollToBottom)
+    const timer = window.setTimeout(scrollToBottom, 0)
+    return () => window.clearTimeout(timer)
   }, [msgs])
 
   // 🧠 Optional clear chat button

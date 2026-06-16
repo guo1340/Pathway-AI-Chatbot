@@ -1780,3 +1780,41 @@ Optimal result:
 - The info dialog always communicates daily token balance state.
 - The WordPress-hosted iframe fits the visible page cleanly.
 - Prompt sync targets the EC2 checkout's active branch, and optional commit/push cannot run without a commit message.
+
+### 2026-06-16 17:12:41 +08:00 - Hosted Ask AI Scroll Regression Fix
+
+Fixed the WordPress-hosted chat layout regression shown in the screenshot.
+
+- The WordPress Ask AI template now hides parent page overflow and sizes the iframe to account for the WordPress admin bar.
+- The chat card is a fixed-height flex column; the header and composer stay in place while only the message log scrolls.
+- Loaded history now performs a deferred scroll-to-bottom after render so users land at the newest message.
+- The older fixed `380px` message-log height override was replaced with a flexing internal scroll region.
+
+Verification completed:
+
+1. `node --check scripts/test-frontend-security.mjs`
+2. `php -l webapp/page-ask-ai.php`
+3. `cd webapp && npm.cmd run build`
+4. `cd webapp && npm.cmd run test:ui` - 6 checks passed.
+5. `cd webapp && npm.cmd run test:conversation-summary` - 3 checks passed.
+6. `cd webapp && npm.cmd run test:frontend-priority8` - 10 checks passed after rerunning sequentially.
+7. `cd webapp && npm.cmd run test:frontend-security` - 21 checks passed.
+
+Test note:
+
+- The first Priority 8 command was started in parallel with the summary test and failed with `EADDRINUSE` on the shared browser-test port. Running the suite sequentially passed without code changes.
+
+### Steps And Instructions For Testing
+
+1. Open the WordPress Ask AI page while logged in.
+2. Confirm the right side of the browser shows only the page/browser scrollbar, not a second iframe/chat scrollbar beside it.
+3. Load a conversation with enough messages to overflow the chat area.
+4. Confirm the newest messages and composer are visible after load.
+5. Scroll the chat history upward.
+6. Confirm the Pathway logo and information button remain visible at the top of the chat area.
+
+Optimal result:
+
+- The parent page does not scroll independently from the chat iframe.
+- The chat history opens at the bottom.
+- Long answers scroll inside the chat log while the topbar and composer remain available.

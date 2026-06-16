@@ -215,7 +215,8 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The composer no longer uses a fixed 900-pixel minimum width or `100vw` root sizing, preventing page-level horizontal overflow at intermediate viewport sizes.
 - When the frontend knows the remaining daily balance and the estimated input-plus-output reservation exceeds it, Send opens a warning dialog without making the API request.
 - The information dialog always includes a daily balance row. Before the backend returns a balance, it shows that the app is waiting for the next backend balance.
-- `page-ask-ai.php` and the chat root use dynamic viewport/min-height sizing so the hosted iframe can fit the WordPress Ask AI page without relying on a rigid inherited `100%` height.
+- `page-ask-ai.php` subtracts the WordPress admin bar from the iframe viewport and hides page overflow, so the hosted page does not create a second vertical scrollbar.
+- The chat app root is a fixed-height flex column: header stays pinned at the top, composer stays at the bottom, and only `.rcb-log` scrolls. Message updates use a deferred scroll-to-bottom so loaded history opens at the newest message.
 
 ## Known Issues / Risks
 

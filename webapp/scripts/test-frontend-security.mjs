@@ -80,7 +80,7 @@ const server = createServer((req, res) => {
   if (url.pathname === "/api/history" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({
-      messages: conversationSummaryOnly ? mockHistoryMessages : [],
+      messages: conversationSummaryOnly || uiOnly ? mockHistoryMessages : [],
       conversation_id: "thread-test-user",
     }));
     return;
@@ -847,6 +847,61 @@ async function runUi(cdp) {
     assert.ok(layout.rowLeft >= 0 && layout.rowRight <= layout.innerWidth);
   }
   record("composer has no horizontal page overflow at desktop threshold or mobile widths");
+
+  mockHistoryMessages = Array.from({ length: 18 }, (_, index) => [
+    {
+      who: "you",
+      text: `layout question ${index + 1}`,
+      citations: [],
+      time: "10:00",
+    },
+    {
+      who: "ai",
+      text: `layout answer ${index + 1}\n\n${"Long answer line. ".repeat(18)}`,
+      citations: [],
+      time: "10:00",
+    },
+  ]).flat();
+  await freshValidPage(cdp);
+  await waitFor(
+    () => cdp.evaluate("document.querySelectorAll('.rcb-msg.ai').length >= 18"),
+    "loaded long history"
+  );
+  const scrollLayout = await cdp.evaluate(`(() => {
+    const header = document.querySelector('.rcb-head');
+    const log = document.querySelector('.rcb-log');
+    const before = header.getBoundingClientRect();
+    const initiallyAtBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 2;
+    log.scrollTop = 0;
+    const after = header.getBoundingClientRect();
+    return {
+      innerHeight,
+      documentHeight: document.documentElement.scrollHeight,
+      bodyHeight: document.body.scrollHeight,
+      logClientHeight: log.clientHeight,
+      logScrollHeight: log.scrollHeight,
+      logScrollTop: log.scrollTop,
+      initiallyAtBottom,
+      headerTopBefore: before.top,
+      headerTopAfter: after.top,
+    };
+  })()`);
+  assert.ok(scrollLayout.documentHeight <= scrollLayout.innerHeight + 1);
+  assert.ok(scrollLayout.bodyHeight <= scrollLayout.innerHeight + 1);
+  assert.ok(scrollLayout.logScrollHeight > scrollLayout.logClientHeight);
+  assert.equal(scrollLayout.initiallyAtBottom, true);
+  assert.ok(scrollLayout.headerTopBefore >= 0 && scrollLayout.headerTopBefore <= 1);
+  assert.equal(scrollLayout.headerTopAfter, scrollLayout.headerTopBefore);
+  await cdp.evaluate("document.querySelector('.rcb-log').scrollTop = document.querySelector('.rcb-log').scrollHeight");
+  await waitFor(
+    () => cdp.evaluate(`(() => {
+      const log = document.querySelector('.rcb-log');
+      return log.scrollTop + log.clientHeight >= log.scrollHeight - 2;
+    })()`),
+    "chat log bottom"
+  );
+  mockHistoryMessages = [];
+  record("chat history uses one internal scrollbar and keeps the topbar fixed");
 
   await freshValidPage(cdp);
   assert.equal(
