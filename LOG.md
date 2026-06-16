@@ -1951,3 +1951,40 @@ Test notes:
 Optimal result:
 
 - The help controls are in the token table headers, the info button fits the existing Pathway header style, and the Daily balance row shows the latest known/backend balance instead of "Waiting for the next backend balance" on normal refreshes.
+
+### 2026-06-16 23:26:50 +08:00 - Token Help Bubble And Balance Fallback Follow-Up
+
+Fixed two live UI issues from the token UI redo.
+
+Changes:
+
+- Frontend (`webapp/src/styles.css`): changed the token grid so the help bubble can overflow visibly instead of being clipped by the grid's previous `overflow: hidden`.
+- Frontend (`webapp/src/styles.css`, `webapp/src/App.tsx`): anchored the left and right token-help bubbles differently so both stay inside the information dialog.
+- Backend (`rag-backend/main.py`): added authenticated `GET /api/balance`, returning the current `remaining_tokens` without also loading conversation history.
+- Frontend (`webapp/src/App.tsx`): if `/api/history` loads but has no usable `remaining_tokens`, the frontend now calls `/api/balance` before falling back to the last stored session balance.
+- Tests (`webapp/scripts/test-frontend-security.mjs`, `rag-backend/tests/test_backend_security.py`): covered the bubble bounds and the history-missing-balance fallback path.
+
+Clarification:
+
+- The previous fix was: read `remaining_tokens` from `/api/history` and cache it in `sessionStorage`. The screenshot still showed "Waiting..." because that browser had no cached balance and the history response did not provide a usable `remaining_tokens`. The new fix adds `/api/balance` as a direct backend fallback for that case.
+
+Verification completed:
+
+1. `node --check webapp/scripts/test-frontend-security.mjs` passed.
+2. `python -m py_compile rag-backend/main.py rag-backend/rag.py` passed.
+3. `cd webapp && npm.cmd run build` passed.
+4. `cd rag-backend && ..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v` passed all 17 backend checks.
+5. `cd webapp && npm.cmd run test:ui` passed all 10 UI checks.
+6. `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 Priority 8 frontend checks.
+
+### Steps And Instructions For Testing
+
+1. Open the Chat information dialog.
+2. Click the `?` beside `Input tokens` and confirm the bubble appears above the grid content, is not clipped, and stays inside the white dialog panel.
+3. Click the `?` beside `Max response` and confirm the same behavior.
+4. Refresh the page with a valid token and open Chat information before sending a message.
+5. Confirm Daily balance shows a numeric remaining-token value instead of "Waiting for the next backend balance".
+
+Optimal result:
+
+- Help bubbles float cleanly above the token grid, and the daily balance is populated from history or the balance endpoint without requiring a new chat send.

@@ -228,9 +228,8 @@ body {
 .token-help-bubble {
   position: absolute;
   top: calc(100% + 7px);
-  right: 0;
   z-index: 20;
-  width: min(15rem, 72vw);
+  width: min(11rem, 70vw);
   padding: .7rem .8rem;
   border: 1px solid #cfe0de;
   border-radius: 10px;
@@ -246,7 +245,6 @@ body {
   content: "";
   position: absolute;
   top: -7px;
-  right: 4px;
   width: 12px;
   height: 12px;
   background: #ffffff;
@@ -263,13 +261,29 @@ body {
   margin-top: .5rem;
 }
 
+.token-help-left .token-help-bubble {
+  left: 0;
+}
+
+.token-help-left .token-help-bubble::before {
+  left: 4px;
+}
+
+.token-help-right .token-help-bubble {
+  right: 0;
+}
+
+.token-help-right .token-help-bubble::before {
+  right: 4px;
+}
+
 .token-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 0;
   border: 1px solid #d5dfde;
   border-radius: 6px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .token-grid dt,
@@ -281,6 +295,8 @@ body {
 }
 
 .token-grid dt {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -292,6 +308,8 @@ body {
 }
 
 .token-grid dd {
+  position: relative;
+  z-index: 1;
   border-top: 1px solid #d5dfde;
   font-size: .95rem;
   font-weight: 600;

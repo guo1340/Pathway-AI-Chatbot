@@ -1270,3 +1270,24 @@ Blocked/failed checks:
 - [ ] `cd webapp && npm.cmd audit --audit-level=high` reports the existing Vite/esbuild advisory chain and recommends a breaking Vite 8 upgrade; no dependency change was made during this UI redo.
 
 Optimal result: the token table contains the question-mark help controls in the correct cells, the info button is visible without looking oversized, and the daily balance does not normally show the waiting fallback after refresh.
+
+## 2026-06-16 23:26:50 +08:00 - Token Help Bubble And Balance Fallback Follow-Up
+
+Fixed and verified the follow-up issues shown in the screenshots.
+
+Completed:
+
+- [x] Token-help bubbles are no longer clipped by the token grid.
+- [x] The input-token and max-response bubbles are side-aware and stay inside the information dialog.
+- [x] Added authenticated `GET /api/balance` for direct daily-balance lookup.
+- [x] Frontend now falls back from `/api/history` to `/api/balance` when history does not include a usable `remaining_tokens`.
+- [x] Frontend tests cover the missing-history-balance case and assert the help bubble remains within the dialog bounds.
+- [x] Backend tests cover `/api/balance` for both used and fresh daily-token buckets.
+- [x] `node --check webapp/scripts/test-frontend-security.mjs` passed.
+- [x] `python -m py_compile rag-backend/main.py rag-backend/rag.py` passed.
+- [x] `cd webapp && npm.cmd run build` passed.
+- [x] `cd rag-backend && ..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v` passed all 17 backend checks.
+- [x] `cd webapp && npm.cmd run test:ui` passed all 10 UI checks.
+- [x] `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 Priority 8 frontend checks.
+
+Optimal result: the `?` popovers render above the token grid instead of under or behind it, and Daily balance shows a numeric value after refresh without requiring the user to send a message.
