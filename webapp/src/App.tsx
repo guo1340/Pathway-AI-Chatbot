@@ -363,7 +363,7 @@ export default function App({
     if (authToken && !tokenPayloadValid) {
       message = 'Your sign-in link is invalid. Please log in again.'
     } else if (authToken && tokenExpiry <= Math.floor(Date.now() / 1000)) {
-      message = 'Your session has expired. Please log in again.'
+      message = 'Your session has expired. Retrying log in.'
     } else if (!hasRequiredCap) {
       message = 'Your account is not authorized to use Ask AI. Please log in with an authorized account.'
     }
