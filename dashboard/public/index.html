@@ -667,13 +667,26 @@ function renderRemoteBranchStatus(data) {
   status.style.color = data.promptStatus ? 'var(--warning)' : 'var(--success)';
 }
 
+async function readDashboardJsonResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.toLowerCase().includes('application/json')) {
+    const body = await response.text();
+    const snippet = body.replace(/\s+/g, ' ').trim().slice(0, 160);
+    throw new Error(`HTTP ${response.status} returned non-JSON response${snippet ? `: ${snippet}` : ''}`);
+  }
+  const data = await response.json();
+  if (!response.ok || data.error) {
+    throw new Error(data.error || `HTTP ${response.status}`);
+  }
+  return data;
+}
+
 async function checkRemoteBranch() {
   const btn = document.getElementById('checkBranchBtn');
   setLoading(btn, true, ' Checking...');
   try {
     const r = await fetch('/api/server/git-status');
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
+    const d = await readDashboardJsonResponse(r);
     renderRemoteBranchStatus(d);
     toast('EC2 branch checked');
   } catch (e) {
@@ -712,8 +725,7 @@ async function syncPromptToEc2() {
         push: commitAndPush,
       }),
     });
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
+    const d = await readDashboardJsonResponse(r);
     status.textContent = d.message || 'Prompt synced to EC2';
     status.style.color = 'var(--success)';
     renderRemoteBranchStatus(d);

@@ -111,6 +111,8 @@ type Msg = {
   citations?: Citation[]
   time?: string
   pending?: boolean
+  revealText?: string
+  revealing?: boolean
 }
 type Notice = {
   title: string
@@ -118,6 +120,9 @@ type Notice = {
   redirecting?: boolean
 }
 type TokenHelpTopic = 'input' | 'response'
+const VISIBLE_EXCHANGES = 4
+const VISIBLE_MESSAGES = VISIBLE_EXCHANGES * 2
+const RESPONSE_REVEAL_CHARS = 4
 
 function estimateTokens(text: string) {
   if (!text) return 0
@@ -127,6 +132,10 @@ function estimateTokens(text: string) {
 function positiveNumber(value: unknown, fallback: number) {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function historyTextForMessage(message: Msg) {
+  return message.revealText ?? message.text
 }
 
 function coerceRemainingTokens(value: unknown) {
@@ -219,6 +228,8 @@ export default function App({
   const [infoDialogOpen, setInfoDialogOpen] = React.useState(false)
   const [tokenHelpOpen, setTokenHelpOpen] = React.useState<TokenHelpTopic | null>(null)
   const [clearDialogOpen, setClearDialogOpen] = React.useState(false)
+  const [overBudgetQuery, setOverBudgetQuery] = React.useState('')
+  const [clearingForResend, setClearingForResend] = React.useState(false)
   const [localAuth, setLocalAuth] = React.useState<{
     apiBase: string
     token: string
@@ -287,7 +298,7 @@ export default function App({
   const authReady = !authInvalid
   const inputTokenLimit = positiveNumber(
     cfg.inputTokenLimit || import.meta.env.VITE_CHAT_INPUT_TOKEN_LIMIT,
-    2000
+    3000
   )
   const queryMaxLength = positiveNumber(
     cfg.queryMaxLength || import.meta.env.VITE_CHAT_QUERY_MAX_LENGTH,
@@ -297,9 +308,9 @@ export default function App({
     cfg.maxOutputTokens || import.meta.env.VITE_LLM_MAX_OUTPUT_TOKENS,
     1200
   )
-  const recentHistory = msgs.slice(-6)
+  const recentHistory = msgs.filter((message) => !message.pending).slice(-VISIBLE_MESSAGES)
   const historyText = recentHistory
-    .map((m) => `${m.who === 'you' ? 'User' : 'Assistant'}: ${m.text}`)
+    .map((m) => `${m.who === 'you' ? 'User' : 'Assistant'}: ${historyTextForMessage(m)}`)
     .join('\n')
   const requestText = historyText.trim()
     ? `${historyText}\n\nUser: ${q.trim()}`
@@ -417,7 +428,7 @@ export default function App({
 
   // 🧠 Save messages to sessionStorage on every update
   React.useEffect(() => {
-    const persistentMsgs = msgs.filter((message) => !message.pending)
+    const persistentMsgs = msgs.filter((message) => !message.pending && !message.revealing)
     if (persistentMsgs.length) {
       sessionStorage.setItem('chat_history', JSON.stringify(persistentMsgs))
     } else {
@@ -501,17 +512,21 @@ export default function App({
   }
 
 
-  function dedupeCitations(citations?: Citation[]) {
+  function usedCitationRefs(text: string, citations?: Citation[]) {
     if (!citations?.length) return []
+    const refs: Array<{ marker: number; citation: Citation }> = []
     const seen = new Set<string>()
-    const out: Citation[] = []
-    for (const c of citations) {
-      const key = (basenameFromUrl(c.url) || c.title || '').trim().toLowerCase()
-      if (!key || seen.has(key)) continue
+    for (const match of normalizeAnswerText(text).matchAll(/\[(\d+)\]/g)) {
+      const marker = Number(match[1])
+      if (!Number.isInteger(marker) || marker < 1) continue
+      const citation = citations[marker - 1]
+      if (!citation) continue
+      const key = `${marker}:${(citation.url || citation.title || '').toLowerCase()}`
+      if (seen.has(key)) continue
       seen.add(key)
-      out.push(c)
+      refs.push({ marker, citation })
     }
-    return out
+    return refs
   }
 
   function normalizeAnswerText(text: string) {
@@ -526,22 +541,7 @@ export default function App({
       .replace(/\n{3,}/g, '\n\n')
   }
 
-  // ---- send message ----
-  async function send() {
-
-    if (!authReady || !authToken) return
-
-    const query = q.trim()
-    if (!query || busy || exceedsInputTokenLimit) return
-    if (exceedsRemainingBalance) {
-      const message = `This request may use approximately ${estimatedReservation.toLocaleString()} tokens, but your remaining daily balance is ${remainingTokens?.toLocaleString() || 0}. Shorten the message or try again after the daily reset.`
-      setQuotaMessage(message)
-      setNotice({
-        title: 'Daily token limit',
-        message,
-      })
-      return
-    }
+  async function submitQuery(query: string, historyForRequest: Msg[]) {
     setQ('')
     setQuotaMessage('')
     if (inputRef.current) inputRef.current.style.height = 'auto'
@@ -557,14 +557,14 @@ export default function App({
       pending: true,
     }
 
-    setMsgs((m) => [...m.slice(-22), newUserMsg, pendingAiMsg])
+    setMsgs((m) => [...m.slice(-(VISIBLE_MESSAGES - 2)), newUserMsg, pendingAiMsg])
     setBusy(true)
     try {
-      const data = await askRag(effectiveApiBase, authToken, {
+      const data = await askRag(effectiveApiBase, authToken!, {
         query,
         source,
         conversation_id: convId,
-        history: msgs, // send full conversation memory
+        history: historyForRequest,
       })
 
       setConvId(data.conversation_id)
@@ -583,13 +583,16 @@ export default function App({
         }
         const answerMessage: Msg = {
           who: 'ai',
-          text: answer,
+          text: '',
+          revealText: answer,
+          revealing: Boolean(answer),
           citations,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         }
+        if (!answer) answerMessage.revealing = false
         if (pendingIndex >= 0) next[pendingIndex] = answerMessage
         else next.push(answerMessage)
-        return next.slice(-24)
+        return next.slice(-VISIBLE_MESSAGES)
       })
     } catch (e: any) {
       setMsgs((messages) => messages.filter((message) => !message.pending))
@@ -631,8 +634,45 @@ export default function App({
               ? 'Too many requests were sent. Please wait briefly and try again.'
               : 'The chatbot could not complete this response. Please try again.',
       })
+    } finally {
+      setBusy(false)
     }
-    setBusy(false)
+  }
+
+  // ---- send message ----
+  async function send() {
+
+    if (!authReady || !authToken) return
+
+    const query = q.trim()
+    if (!query || busy) return
+    if (exceedsInputTokenLimit) {
+      if (estimateTokens(query) > inputTokenLimit) {
+        setNotice({
+          title: 'Message is too long',
+          message: `This message is over the ${inputTokenLimit.toLocaleString()} input-token limit by itself. Shorten it and try again.`,
+        })
+        return
+      }
+      setOverBudgetQuery(query)
+      return
+    }
+    if (exceedsRemainingBalance) {
+      const message = `This request may use approximately ${estimatedReservation.toLocaleString()} tokens, but your remaining daily balance is ${remainingTokens?.toLocaleString() || 0}. Shorten the message or try again after the daily reset.`
+      setQuotaMessage(message)
+      setNotice({
+        title: 'Daily token limit',
+        message,
+      })
+      return
+    }
+    await submitQuery(
+      query,
+      msgs
+        .filter((message) => !message.pending)
+        .slice(-VISIBLE_MESSAGES)
+        .map((message) => ({ ...message, text: historyTextForMessage(message), revealing: false, revealText: undefined }))
+    )
   }
 
   // auto-scroll to bottom on new messages
@@ -645,6 +685,26 @@ export default function App({
     scrollToBottom()
     requestAnimationFrame(scrollToBottom)
     const timer = window.setTimeout(scrollToBottom, 0)
+    return () => window.clearTimeout(timer)
+  }, [msgs])
+
+  React.useEffect(() => {
+    if (!msgs.some((message) => message.revealing && message.revealText !== undefined)) return
+    const timer = window.setTimeout(() => {
+      setMsgs((current) => current.map((message) => {
+        if (!message.revealing || message.revealText === undefined) return message
+        const nextLength = Math.min(
+          message.revealText.length,
+          message.text.length + RESPONSE_REVEAL_CHARS
+        )
+        const nextText = message.revealText.slice(0, nextLength)
+        if (nextLength >= message.revealText.length) {
+          const { revealText, revealing, ...done } = message
+          return { ...done, text: nextText }
+        }
+        return { ...message, text: nextText }
+      }))
+    }, 16)
     return () => window.clearTimeout(timer)
   }, [msgs])
 
@@ -681,6 +741,43 @@ export default function App({
       })
     }
     setBusy(false)
+  }
+
+  async function clearHistoryAndResend() {
+    const query = overBudgetQuery.trim()
+    if (!query || !authToken || busy || clearingForResend) return
+    setClearingForResend(true)
+    setBusy(true)
+    try {
+      const data = await clearRagConversation(effectiveApiBase, authToken)
+      rememberRemainingTokens(data?.remaining_tokens)
+      setMsgs([])
+      setQ('')
+      setConvId(
+        typeof data?.conversation_id === 'string'
+          ? data.conversation_id
+          : undefined
+      )
+      setQuotaMessage('')
+      setOverBudgetQuery('')
+      sessionStorage.removeItem('chat_history')
+      setBusy(false)
+      await submitQuery(query, [])
+    } catch (e: any) {
+      if (e instanceof RagApiError && e.remainingTokens !== undefined) {
+        rememberRemainingTokens(e.remainingTokens)
+      }
+      setNotice({
+        title: 'Chat could not be cleared',
+        message:
+          e instanceof RagApiError && e.status === 429
+            ? 'There are not enough daily tokens to summarize this chat. Your visible history was kept.'
+            : 'The chat could not be summarized safely, so your visible history was kept. Please try again.',
+      })
+      setBusy(false)
+    } finally {
+      setClearingForResend(false)
+    }
   }
 
   function handleRipple(e: React.MouseEvent<HTMLButtonElement>) {
@@ -747,6 +844,53 @@ export default function App({
                 Understood
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {overBudgetQuery && (
+        <div
+          className="dialog-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !clearingForResend) {
+              setOverBudgetQuery('')
+            }
+          }}
+        >
+          <div className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="over-budget-title">
+            <button
+              type="button"
+              className="dialog-close"
+              onClick={() => setOverBudgetQuery('')}
+              aria-label="Close token limit recovery"
+              title="Close"
+              disabled={clearingForResend}
+            >
+              <IoClose />
+            </button>
+            <h2 id="over-budget-title">This message is too large</h2>
+            <p>
+              The current chat history makes this request exceed the {inputTokenLimit.toLocaleString()} input-token limit.
+              Clear and summarize the visible history, then send this message again.
+            </p>
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="dialog-secondary"
+                onClick={() => setOverBudgetQuery('')}
+                disabled={clearingForResend}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="dialog-danger"
+                onClick={clearHistoryAndResend}
+                disabled={clearingForResend}
+              >
+                {clearingForResend ? 'Clearing...' : 'Clear history and continue'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -916,7 +1060,7 @@ export default function App({
           </>
         ) : (
           msgs.map((m, i) => {
-            const deduped = dedupeCitations(m.citations)
+            const citationRefs = usedCitationRefs(m.text, m.citations)
 
             function renderMessageContent(text: string, citations?: Citation[]) {
               return normalizeAnswerText(text).split(/(\[\d+\]|\*\*[^*\n]+\*\*)/g).map((part, i) => {
@@ -962,20 +1106,20 @@ export default function App({
                         <span className="sr-only">Waiting for response</span>
                       </span>
                     ) : (
-                      renderMessageContent(m.text, deduped)
+                      renderMessageContent(m.text, m.citations)
                     )}
 
                   </div>
-                  {m.who === 'ai' && deduped.length > 0 && (
+                  {m.who === 'ai' && !m.revealing && citationRefs.length > 0 && (
                     <div className="rcb-cite" aria-label="Sources">
                       <div className="rcb-cite-label">Sources:</div>
                       <ol className="rcb-cite-list">
-                        {deduped.map((citation, citationIndex) => {
+                        {citationRefs.map(({ marker, citation }, citationIndex) => {
                           const href = toHttpUrl(citation, effectiveApiBase)
                           const title =
                             citation.title ||
                             basenameFromUrl(citation.url) ||
-                            `Source ${citationIndex + 1}`
+                            `Source ${marker}`
                           return (
                             <li className="rcb-cite-item" key={`${title}-${citationIndex}`}>
                               {href ? (
@@ -984,10 +1128,10 @@ export default function App({
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >
-                                  [{citationIndex + 1}] {title}
+                                  [{marker}] {title}
                                 </a>
                               ) : (
-                                <span>[{citationIndex + 1}] {title}</span>
+                                <span>[{marker}] {title}</span>
                               )}
                             </li>
                           )
@@ -1041,8 +1185,7 @@ export default function App({
               onClick={send}
               disabled={
                 busy ||
-                !authToken ||
-                exceedsInputTokenLimit
+                !authToken
               }
               aria-label={busy ? 'Waiting for response' : 'Send message'}
             >
