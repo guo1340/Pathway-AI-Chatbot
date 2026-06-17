@@ -2081,3 +2081,71 @@ Verification completed:
 Optimal result:
 
 - WordPress users whose roles include `contributor` pass the page check even when they do not have `edit_posts`. The WordPress token issuer mints `cap: ["contributor"]`, the frontend accepts it, and the backend accepts `/api/ask` with `JWT_REQUIRED_CAP=contributor`.
+
+### 2026-06-17 13:04:08 +08:00 - Priority 9 Response UX, Token Budgeting, And Citation Integrity
+
+Implemented the unchecked Priority 9 frontend/live-testing tasks without touching the separate dashboard branch-check item.
+
+Changes:
+
+- Frontend (`webapp/src/App.tsx`): new assistant answers now reveal progressively from the existing loading bubble, while restored history still appears instantly.
+- Frontend (`webapp/src/App.tsx`): Sources now render only after a new answer finishes revealing, and citation metadata is suppressed when the answer text did not use matching `[n]` markers.
+- Frontend (`webapp/src/App.tsx`): the input-token fallback is now 3,000, recent visible history is limited to 4 exchanges, and over-budget requests open a `Clear history and continue` dialog that calls the existing backend clear endpoint before resending.
+- Backend (`rag-backend/main.py`): default input limit is now 3,000, visible exchanges default to 4, server history defaults to 8 messages, and hidden history/summary context strips stale `[n]` markers and `Sources:` sections before prompt construction.
+- Config examples (`rag-backend/.env.example`, `webapp/.env.example`): updated defaults to match the new token/history settings.
+- Tests: added a focused `npm run test:frontend-priority9` browser suite and a backend citation-marker leak regression.
+
+Verification completed:
+
+1. `node --check webapp/scripts/test-frontend-security.mjs` passed.
+2. `python -m py_compile rag-backend/main.py rag-backend/tests/test_backend_security.py` passed.
+3. `cd webapp && npm.cmd run build` passed.
+
+New tests queued for next step:
+
+1. Run `cd webapp && npm.cmd run test:frontend-priority9`.
+2. Run `cd rag-backend && ..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v`.
+3. In live Ask AI, send a sourced answer and confirm the answer reveals progressively, then Sources appears after completion.
+4. In live Ask AI, send a plain greeting and confirm no unrelated inline citation or Sources block appears.
+5. In live Ask AI, continue a long chat until the estimate exceeds 3,000 input tokens, choose `Clear history and continue`, and confirm the original question is resent after backend clear/summarization succeeds.
+
+Optimal result:
+
+- New responses feel live without blocking reading, token budgeting stays aligned between frontend and backend, and old history citation markers no longer create misleading source links.
+
+### 2026-06-17 17:25:24 +08:00 - Priority 9 Test Run And Dashboard JSON Error Handling
+
+Ran the queued Priority 9 tests, fixed the issues they exposed, and completed the remaining dashboard branch/prompt sync task.
+
+Changes:
+
+- Frontend test harness (`webapp/scripts/test-frontend-security.mjs`): Priority 9 history seeding now reaches `/api/history`, the reveal assertion matches the mock response, and the over-budget recovery check waits for the actual resend API call.
+- Backend test (`rag-backend/tests/test_backend_security.py`): the citation-marker leak regression now uses short queries that fit the test limit and writes summary state through the existing `conversation_state` table.
+- Dashboard backend (`dashboard/server.js`): added JSON responses for unknown `/api/*` routes and API error middleware so Express does not return an HTML error page to dashboard API callers.
+- Dashboard frontend (`dashboard/public/index.html`): added `readDashboardJsonResponse()` and used it for `Check EC2 Branch` plus `Sync Prompt to EC2`, including readable HTTP/non-JSON snippets when the response is not JSON.
+- Dashboard test (`dashboard/security.test.js`): extended checks for the new JSON-safe frontend/backend guards.
+
+Verification completed:
+
+1. `cd webapp && npm.cmd run test:frontend-priority9` passed all 3 focused Priority 9 browser checks.
+2. `cd rag-backend && ..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v` passed all 18 backend checks.
+3. `node --check webapp/scripts/test-frontend-security.mjs` passed.
+4. `python -m py_compile rag-backend/main.py rag-backend/tests/test_backend_security.py` passed.
+5. `cd dashboard && node --check server.js` passed.
+6. `cd dashboard && node security.test.js` passed 18 checks.
+7. `cd dashboard && npm.cmd run test:security` passed 18 checks.
+8. `cd webapp && npm.cmd run build` passed.
+9. `php -l webapp/page-ask-ai.php` passed.
+
+### Steps And Instructions For Testing
+
+1. Start the dashboard locally with `cd dashboard && npm start`.
+2. Click `Check EC2 Branch`.
+3. With valid SSH configuration, confirm the inline status shows the active EC2 branch and short commit.
+4. With invalid SSH configuration, wrong origin, or a missing route, confirm the toast/inline status shows a readable HTTP or JSON error and never shows `Unexpected token '<'`.
+5. Use `Sync Prompt to EC2` without commit/push and confirm success reports the active branch status after restart.
+6. Use `Sync Prompt to EC2` with commit/push and a one-line commit message and confirm success reports the branch, commit status, and push result.
+
+Optimal result:
+
+- Dashboard branch and prompt-sync operations either succeed normally or fail with clear JSON-based messages. The operator should not see a raw HTML parse error.

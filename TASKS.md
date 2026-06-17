@@ -80,12 +80,43 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Frontend: Make the info button on the top right corner of the page much bigger, right now it is not visible enough.
 - [x] Frontend: add a circled question mark button after the input tokens and max response header that opens a chat bubble like display that explains in common language what they each are, users may not know what they are.
 - [x] Backend and Frontend: right now the daily balance has "waiting for the next backend balance" when page is refreshed, find a way to track the remaining daily balance when loading the messages, either keep track of it with the user id or with the latest message. Choose the cleanest and easiest way to do it so that it will always display the correct daily balance limit.
-- [ ] needs to allow more than 2000 token per question since history may be too long, also add recomendations
 - [x] WordPress/Auth: explicitly allow users with WordPress role slug `contributor` to access Ask AI without requiring the `edit_posts` capability.
 
+## Priority 9: Response UX, Token Budgeting, and Citation Integrity
+
+These tasks come from live Ask AI usage. Context and acceptance criteria are included so each can be implemented directly. Key files: frontend `webapp/src/App.tsx` and `webapp/src/styles.css`; backend `rag-backend/main.py`; config in `rag-backend/.env` / `rag-backend/.env.example` and `webapp/.env.example`.
+
+### Response typing animation
+
+- [x] Add a typing/reveal animation to assistant answers. Today the answer from `/api/ask` is inserted into the chat all at once (see `send()` replacing the pending bubble in `App.tsx`). Reveal the answer text progressively (word or small character chunks) at a configurable speed, starting from the existing loading bubble. Requirements: keep `**bold**` and `[n]` citation rendering working in `renderMessageContent`; keep the chat auto-scrolled to the newest text while typing; do not block the input or a second send; only animate brand-new answers, not messages loaded from `/api/history` (those should appear instantly).
+- [x] Show the Sources section only after the answer finishes typing. Today the `.rcb-cite` Sources list and inline citation links render as soon as a message has citations, so they appear before the text is fully shown. Defer rendering the Sources block for a message until its reveal animation completes. Messages restored from history still show Sources immediately.
+
+### Token budget tuning (raise per-question limit, summarize sooner)
+
+- [x] Raise the single-question input-token ceiling from 2000 to 3000, consistently on both sides. Update the backend default `CHAT_INPUT_TOKEN_LIMIT` (in `rag-backend/main.py` and `rag-backend/.env` / `.env.example`, used by the 422 check in `/api/ask`) and the frontend `VITE_CHAT_INPUT_TOKEN_LIMIT` (default for `inputTokenLimit` in `App.tsx` and `webapp/.env.example`, used by `exceedsInputTokenLimit`). The two limits must stay equal.
+- [x] Reduce the visible raw-history window so summarization triggers sooner. Today `CHAT_VISIBLE_EXCHANGES = 12` (and `CHAT_SERVER_HISTORY_MESSAGES = 24`); after ~4-5 turns the history plus a new question exceeds the input limit. Lower the visible exchanges to about 4 (keep it env-configurable) so older turns are folded into the private summary before the prompt grows too large. Keep frontend and backend consistent: backend `CHAT_VISIBLE_EXCHANGES` / summary trigger and the 24-message slices in `/api/history`; frontend history sent in `send()` and `recentHistory`. Tune this together with the 3000-token change and verify a normal multi-turn chat stays within budget.
+
+### Over-budget recovery (extends the two tasks above)
+
+- [x] When a request would exceed the per-question input-token limit, offer "Clear history and continue" instead of leaving the user stuck. Today an over-limit request only disables Send (`exceedsInputTokenLimit`) with no way forward. Show a dialog that explains the message is too large because of accumulated history and offers a one-click action that summarizes + clears the conversation (existing `POST /api/conversation/clear`) and then automatically resends the original question. Cancel sends nothing and preserves history.
+
+### Citation integrity (history interference)
+
+Observed in production: a summary-style answer cited only the newest retrieval (e.g. `301-400`) and dropped earlier sources it summarized (`1-100`, `101-200`); a plain `hello` reply showed a Source link on "Hello!". Root cause appears to be history text carrying old `[n]` markers into the new prompt.
+
+- [x] Stop history/summary context from injecting stale citation markers into the prompt. `_build_query_with_context` in `main.py` includes prior assistant answers verbatim, including their `[n]` markers, so the model echoes markers (e.g. "Hello! [1]") that then get linked to the current retrieval. Strip or neutralize `[n]` markers (and any "Sources:" text) from history and summary text before adding it to the prompt.
+- [x] Render inline citation links and Sources only for markers actually grounded in the current answer's retrieved documents. In `App.tsx`, `[n]` is linked to `citations[n-1]` whenever that citation exists, so a spurious marker mislinks to an unrelated current source. Add a guard so a message only links/lists citations the answer genuinely used, and suppress the Sources block when the answer used no retrieved documents (e.g. greetings).
+- [x] Fix source accuracy for summary-style answers. When an answer summarizes earlier turns, decide and implement the intended behavior: either carry forward the citations of the summarized turns the answer references, or scope the Sources strictly to the current answer so omitted earlier sources are not misleading. The result must not drop clearly-referenced prior sources nor attach unrelated ones. Review how citations are stored per turn (`_store_server_turn`, `_add_file_tickets`) and renumbered (`_normalize_citations_with_map`, `_renumber_answer_markers`).
+- [x] Add tests for citation integrity: a greeting returns no markers/Sources; history markers do not leak into a new answer; a summary answer's Sources are accurate; marker renumbering stays correct. Cover the backend (`rag-backend/tests/test_backend_security.py`) and the frontend browser suite (`webapp/scripts/test-frontend-security.mjs`).
+
+### Dashboard EC2 branch check / prompt sync
+
+Observed in the dashboard: clicking "Check EC2 Branch" shows `Branch check failed: Unexpected token '<', "<!DOCTYPE "... is not valid JSON`. The `GET /api/server/git-status` response is an HTML page, but `checkRemoteBranch()` in `dashboard/public/index.html` calls `await r.json()` directly (no `r.ok` / content-type check), so `JSON.parse` throws on the `<!DOCTYPE ...>` body.
+
+- [x] Make the dashboard branch check and prompt sync fail gracefully and fix the underlying non-JSON response. Frontend (`dashboard/public/index.html`, `checkRemoteBranch()` and the `Sync Prompt to EC2` handler that calls `POST /api/server/sync-prompt`): check `r.ok` and the `content-type` before parsing; if the body is not JSON, read it as text and surface a clear message (HTTP status plus a short snippet) instead of the raw `Unexpected token '<'` error. Backend (`dashboard/server.js`, `GET /api/server/git-status` and `POST /api/server/sync-prompt`): always respond with JSON (including a JSON `{ error }` body and a proper status code) on every path, including SSH/exec failures and missing-config cases, so the default Express HTML error page is never returned. Investigate and fix why HTML is being returned (e.g. unhandled exception falling through to Express's HTML error handler, a missing/renamed route, the dashboard server not restarted after changes, or the request hitting the wrong origin). Acceptance: a healthy EC2 reports the active branch/commit; every failure shows a readable JSON-based message in the toast and the inline status, with no `Unexpected token '<'` errors.
 ## In Progress
 
-- Current task: Corrected Ask AI access to use the WordPress role slug `contributor` as the shared page/frontend/backend auth signal. The live Contributor role has `edit_posts: no`, so `edit_posts` is no longer used for normal chat access.
+- Current task: Priority 9 response UX, token budgeting, citation integrity, and dashboard JSON-safe branch/prompt sync handling are complete. All focused local tests have passed.
 
 ## Done
 
@@ -132,6 +163,8 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Corrected the token help placement so the circled question marks are in the token grid header cells beside Input tokens and Max response, cleaned up the enlarged info button styling, and added a session fallback for the daily balance while `/api/history` remains the backend authority.
 - [x] Fixed token help bubble clipping by allowing the token grid to overflow visibly and anchoring each bubble inside the dialog; added authenticated `/api/balance` as a direct fallback when history does not include `remaining_tokens`.
 - [x] Replaced the Ask AI `edit_posts` requirement with the exact WordPress role slug `contributor` across the page, frontend required capability, backend default capability, and tests.
+- [x] Completed Priority 9 response reveal, token-budget recovery, shorter visible history, and citation-integrity hardening; generated focused pending checks for the next test run.
+- [x] Hardened dashboard EC2 branch check and prompt sync so API failures and non-JSON responses produce readable JSON-based errors instead of `Unexpected token '<'`.
 
 ## Notes for Codex
 
@@ -144,6 +177,8 @@ Improve the chatbot's backend architecture and security before expanding fronten
 ## Work Log
 
 - Full timestamped history: [`LOG.md`](LOG.md#work-log)
+- 2026-06-17 17:25:24 +08:00 - Ran the Priority 9 frontend/backend tests, fixed their regressions, hardened dashboard branch/prompt JSON error handling, and passed the dashboard security checks.
+- 2026-06-17 13:04:08 +08:00 - Implemented Priority 9 response reveal, over-budget recovery, 3,000-token input defaults, 4-exchange visible history, and citation-marker hardening; generated focused pending tests.
 - 2026-06-05 17:27:47 +08:00 - Completed content-aware document chunking.
 - 2026-06-05 17:27:47 +08:00 - Completed incremental document indexing.
 - 2026-06-05 20:20:53 +08:00 - Completed scanned PDF OCR indexing support.
@@ -193,24 +228,5 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-16 17:12:41 +08:00 - Fixed the hosted Ask AI double-scroll regression, made loaded history land at the newest message, and kept the logo/info topbar pinned while the chat log scrolls.
 - 2026-06-16 17:36:18 +08:00 - Removed hard-coded WordPress admin-bar iframe offsets and switched Ask AI to measured available viewport height; focused and full frontend checks passed.
 - 2026-06-16 18:15:23 +08:00 - Fixed outline/citation formatting by normalizing misplaced citation markers before headings or bold labels, restoring inline outline breaks, and adding prompt guidance plus browser regression coverage.
-- 2026-06-16 19:56:52 +08:00 - Completed the three new Priority 8 items (larger info button, token-usage help popover, daily-balance-on-load) and fixed the duplicated WordPress admin bar after re-auth by redirecting the top window; added backend and browser tests.
-- 2026-06-16 22:03:50 +08:00 - Redid the three Priority 8 token UI/balance fixes: moved help controls into the token grid headers, refined the larger info button style, persisted the latest known daily balance, and reran focused frontend/backend verification.
-- 2026-06-16 23:26:50 +08:00 - Fixed the token help bubble z-index/clipping issue and added authenticated `/api/balance` so the frontend can still display daily balance when `/api/history` does not provide it.
-- 2026-06-17 10:04:03 +08:00 - Clarified and guarded contributor-and-above Ask AI access with the shared `edit_posts` capability, plus instructions for future `read`/all-logged-in access.
-- 2026-06-17 10:26:29 +08:00 - Simplified the Ask AI access fix by removing the extra capability variable and checking the WordPress `contributor` role directly, with `edit_posts` retained for higher roles and backend JWT validation.
-- 2026-06-17 10:51:36 +08:00 - Corrected Ask AI auth after live debugging showed Contributor has `edit_posts: no`; normal chat access now uses role/cap string `contributor` instead of `edit_posts`.
-
-## Steps and Instructions for Testing
-
-- Detailed test procedures and expected results: [`LOG.md`](LOG.md#steps-and-instructions-for-testing)
-- Executed test results: [`TEST_LOG.md`](TEST_LOG.md)
-- Priority 2 security results and the pending production ESM maintenance checklist: [`TEST_LOG.md`](TEST_LOG.md#priority-2-backend-security-verification)
-- Pending Priority 3 and 5 frontend behavior tests: [`TEST_LOG.md`](TEST_LOG.md#pending-priority-3-and-5-frontend-verification)
-- Pending Priority 8 frontend interaction tests: [`TEST_LOG.md`](TEST_LOG.md#pending-priority-8-frontend-interaction-verification)
-- Priority 1 backend structure tests are documented under:
-  - Content-aware document chunking
-  - Incremental document indexing
-  - Scanned PDF OCR indexing
-  - Local dashboard service controls
-  - Local dashboard document management
-  - Remote dashboard operation lock
+- 2026-06-16 19:56:52 +08:00 - Completed the three new Priority 8 items (larger info button, token-usage help popover, daily-balance-on-load) and fixed the
+                                                                                                             

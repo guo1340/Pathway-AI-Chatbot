@@ -31,7 +31,7 @@ JWT_SECRET = os.getenv("PATHWAY_RAG_JWT_SECRET", "")
 JWT_REQUIRED_CAP = os.getenv("JWT_REQUIRED_CAP", "contributor")
 JWT_DASHBOARD_CAP = os.getenv("JWT_DASHBOARD_CAP", "manage_rag")
 CHAT_QUERY_MAX_LENGTH = int(os.getenv("CHAT_QUERY_MAX_LENGTH", "4000"))
-CHAT_INPUT_TOKEN_LIMIT = int(os.getenv("CHAT_INPUT_TOKEN_LIMIT", "2000"))
+CHAT_INPUT_TOKEN_LIMIT = int(os.getenv("CHAT_INPUT_TOKEN_LIMIT", "3000"))
 CHAT_DAILY_TOKEN_LIMIT = int(os.getenv("CHAT_DAILY_TOKEN_LIMIT", "100000"))
 LLM_MAX_OUTPUT_TOKENS = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "1200"))
 JWT_USER_ID_CLAIMS = [
@@ -43,8 +43,8 @@ TOKEN_USAGE_DB = os.getenv("TOKEN_USAGE_DB", "./data/token_usage.sqlite3")
 CHAT_RATE_LIMIT_REQUESTS = int(os.getenv("CHAT_RATE_LIMIT_REQUESTS", "20"))
 CHAT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("CHAT_RATE_LIMIT_WINDOW_SECONDS", "60"))
 CHAT_TRUST_PROXY = os.getenv("CHAT_TRUST_PROXY", "false").lower() in {"1", "true", "yes", "on"}
-CHAT_SERVER_HISTORY_MESSAGES = int(os.getenv("CHAT_SERVER_HISTORY_MESSAGES", "24"))
-CHAT_VISIBLE_EXCHANGES = int(os.getenv("CHAT_VISIBLE_EXCHANGES", "12"))
+CHAT_SERVER_HISTORY_MESSAGES = int(os.getenv("CHAT_SERVER_HISTORY_MESSAGES", "8"))
+CHAT_VISIBLE_EXCHANGES = int(os.getenv("CHAT_VISIBLE_EXCHANGES", "4"))
 FILE_TICKET_TTL_SECONDS = int(os.getenv("FILE_TICKET_TTL_SECONDS", "900"))
 
 if CHAT_QUERY_MAX_LENGTH < 1:
@@ -288,9 +288,19 @@ def _frontend_history(body: ChatIn) -> List[Dict[str, str]]:
             "role": "user" if message.get("who") == "you" else "assistant",
             "content": str(message.get("text", "")),
         }
-        for message in history[-24:]
+        for message in history[-CHAT_SERVER_HISTORY_MESSAGES:]
         if isinstance(message, dict) and str(message.get("text", "")).strip()
     ]
+
+
+_history_citation_marker_re = re.compile(r"\[\d+\]")
+_history_sources_re = re.compile(r"(?is)\bSources:\s*(?:\n|.)*")
+
+
+def _sanitize_history_context(text: str) -> str:
+    cleaned = _history_sources_re.sub("", str(text or ""))
+    cleaned = _history_citation_marker_re.sub("", cleaned)
+    return re.sub(r"[ \t]{2,}", " ", cleaned).strip()
 
 
 def _build_query_with_context(
@@ -305,7 +315,7 @@ def _build_query_with_context(
 
     active_topic = next(
         (
-            str(message.get("content", "")).strip()
+            _sanitize_history_context(str(message.get("content", "")))
             for message in reversed(recent)
             if message.get("role") == "user"
             and str(message.get("content", "")).strip()
@@ -314,9 +324,9 @@ def _build_query_with_context(
     )
     history_text = "\n".join(
         f"{'User' if message.get('role') == 'user' else 'Assistant'}: "
-        f"{str(message.get('content', '')).strip()}"
+        f"{_sanitize_history_context(str(message.get('content', '')))}"
         for message in recent
-        if str(message.get("content", "")).strip()
+        if _sanitize_history_context(str(message.get("content", "")))
     )
     topic_text = (
         f"Active topic from the previous user turn: {active_topic[:300]}\n\n"
@@ -324,7 +334,7 @@ def _build_query_with_context(
         else ""
     )
     summary_text = (
-        f"Private summary of earlier conversation:\n{summary}\n\n"
+        f"Private summary of earlier conversation:\n{_sanitize_history_context(summary)}\n\n"
         if summary.strip()
         else ""
     )

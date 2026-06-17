@@ -116,11 +116,16 @@ async function run() {
   assert.strictEqual(locked.validCommitMessage('x'.repeat(161)), false);
   assert.match(source, /\/api\/server\/git-status/);
   assert.match(source, /push origin/);
+  assert.match(source, /Dashboard API route not found/);
+  assert.match(source, /req\.path\.startsWith\('\/api'\)/);
   assert.match(dashboardHtml, /checkRemoteBranch/);
   assert.match(dashboardHtml, /syncPromptToEc2/);
+  assert.match(dashboardHtml, /readDashboardJsonResponse/);
+  assert.match(dashboardHtml, /content-type/);
+  assert.match(dashboardHtml, /returned non-JSON response/);
   assert.match(dashboardHtml, /Commit and push prompt\.txt to the active EC2 branch/);
 
-  console.log('Dashboard security configuration: 13 checks passed');
+  console.log('Dashboard security configuration: 18 checks passed');
 }
 
 run().catch((error) => {

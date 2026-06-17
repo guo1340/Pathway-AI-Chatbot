@@ -7,16 +7,75 @@ header('X-Robots-Tag: noindex, nofollow', true);
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0', true);
 header('Pragma: no-cache', true);
 
-// Ensure plugin is active
-if (!function_exists('pathway_rag_mint_current_user_token')) {
-    status_header(500);
-    echo '<h2 style="padding:40px;font-family:system-ui;">Server misconfigured: RAG Auth plugin not active.</h2>';
-    exit;
+function pathway_ask_ai_base64url($value)
+{
+    return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+}
+
+function pathway_ask_ai_get_jwt_secret()
+{
+    if (defined('PATHWAY_RAG_JWT_SECRET')) {
+        return (string) PATHWAY_RAG_JWT_SECRET;
+    }
+
+    $env_secret = getenv('PATHWAY_RAG_JWT_SECRET');
+    if (is_string($env_secret) && $env_secret !== '') {
+        return $env_secret;
+    }
+
+    foreach (['pathway_rag_jwt_secret', 'rag_chatbot_jwt_secret'] as $option_name) {
+        $option_secret = get_option($option_name);
+        if (is_string($option_secret) && $option_secret !== '') {
+            return $option_secret;
+        }
+    }
+
+    return '';
+}
+
+function pathway_ask_ai_mint_current_user_token($ttl_seconds = 600)
+{
+    $secret = pathway_ask_ai_get_jwt_secret();
+    if ($secret === '') {
+        return new WP_Error(
+            'missing_secret',
+            'JWT secret is not configured for Ask AI.',
+            ['status' => 500]
+        );
+    }
+
+    $user = wp_get_current_user();
+    $now = time();
+    $exp = $now + (int) $ttl_seconds;
+    $header = pathway_ask_ai_base64url(wp_json_encode([
+        'alg' => 'HS256',
+        'typ' => 'JWT',
+    ]));
+    $payload = pathway_ask_ai_base64url(wp_json_encode([
+        'sub' => (string) $user->ID,
+        'user_id' => (int) $user->ID,
+        'id' => (int) $user->ID,
+        'iat' => $now,
+        'exp' => $exp,
+        'cap' => ['contributor'],
+    ]));
+    $signature = pathway_ask_ai_base64url(hash_hmac(
+        'sha256',
+        $header . '.' . $payload,
+        $secret,
+        true
+    ));
+
+    return [
+        'token' => $header . '.' . $payload . '.' . $signature,
+        'exp' => $exp,
+    ];
 }
 
 $current_user = wp_get_current_user();
 $user_roles = (array) $current_user->roles;
-$is_contributor = in_array('contributor', $user_roles, true);
+$ask_ai_allowed_roles = ['administrator', 'contributor', 'contributor_liiv', 'contributor_esp'];
+$has_ask_ai_role = (bool) array_intersect($ask_ai_allowed_roles, $user_roles);
 
 // Not logged in → redirect
 if (!is_user_logged_in()) {
@@ -33,20 +92,20 @@ if (!is_user_logged_in()) {
 }
 
 
-// Must have the Contributor role.
-if (!$is_contributor) {
+// Must have one of the Ask AI roles.
+if (!$has_ask_ai_role) {
     $login_url = wp_login_url(get_permalink());
     $login_url = add_query_arg([
         'rag_notice' => '1',
-        'rag_msg' => rawurlencode('Your account does not have access to Ask AI. Please log in with a contributor account.'),
+        'rag_msg' => rawurlencode('Your account does not have access to Ask AI. Please log in with an authorized account.'),
     ], $login_url);
 
     wp_safe_redirect($login_url);
     exit;
 }
 
-// Mint token (10 minutes)
-$mint = pathway_rag_mint_current_user_token(600);
+// Mint token (10 minutes). The role gate above is the auth check.
+$mint = pathway_ask_ai_mint_current_user_token(600);
 
 if (is_wp_error($mint)) {
     $status = 500;
