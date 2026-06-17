@@ -188,7 +188,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - Durable conversation rows and cumulative summaries share the SQLite database configured by `TOKEN_USAGE_DB`.
 - Conversation ownership uses the same HMAC-derived stable user key as daily quota storage, so raw WordPress user IDs are not stored.
 - Each user has one stable linear thread. Client-provided conversation IDs remain accepted for request compatibility but do not create separate threads.
-- `CHAT_VISIBLE_EXCHANGES` defaults to 12. Overflow exchanges are summarized, and raw rows are removed only after a non-empty replacement summary is saved.
+- `CHAT_VISIBLE_EXCHANGES` defaults to 4 and `CHAT_SERVER_HISTORY_MESSAGES` defaults to 8. Overflow exchanges are summarized, and raw rows are removed only after a non-empty replacement summary is saved.
 - The private cumulative summary and recent raw messages are hidden context for future answers. Automatic and clear-triggered summarization consume daily tokens.
 - `App.tsx` also persists visible chat history in `sessionStorage`.
 
@@ -206,8 +206,9 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The composer displays the backend-provided daily `remaining_tokens` balance after successful answers and shows a dedicated quota message when the backend rejects a reservation.
 - Authentication checking and backend response waiting use separate blocking overlays.
 - Authentication checking remains a blocking full-screen state. Backend response waiting no longer covers the chat; the disabled Send button displays an accessible spinner while the existing conversation remains visible.
-- A pending AI message bubble appears immediately after send with its own spinner, is excluded from session persistence, and is replaced in place by the complete returned answer without replaying a typing animation.
+- A pending AI message bubble appears immediately after send with its own spinner, is excluded from session persistence, and is replaced in place by a progressively revealed returned answer. Messages restored from history appear instantly.
 - Backend answer spans wrapped in balanced `**` markers render as escaped React `<strong>` content; citation markers continue to render as authenticated links.
+- New answer Sources are deferred until the reveal animation completes. The frontend only renders inline citation links and the Sources list for `[n]` markers that are present in the answer text and have matching current citation metadata, so unreferenced citation metadata is suppressed.
 - Frontend answer rendering normalizes model output before tokenizing links/bold text: citation markers placed before Roman numeral, numbered, lettered, or bold outline labels are removed from the heading position; inline outline and bullet boundaries are restored as line breaks.
 - Request failures use a dismissible notification dialog; authorization failures explain the redirect and provide an immediate login action.
 - The authorization dialog's `Go to login` control is a top-level link to `https://pathway.training/wp-login.php`, so it works from the cross-origin chat iframe.
@@ -229,13 +230,14 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - `App.tsx` duplicates API helper logic instead of using `webapp/src/api.ts`.
 - Dashboard deployment details remain local configuration. EC2 document operations and prompt synchronization use the configured SSH connection; environment switching and standalone restart controls remain unavailable in the UI.
 - Dashboard git commands may fail unless Git safe-directory ownership is configured for the current user.
+- Dashboard EC2 branch check and prompt sync use JSON-safe response handling. API 404/errors return JSON from `server.js`, and the browser checks response `content-type` before parsing so wrong-origin or HTML failures show readable HTTP snippets instead of `Unexpected token '<'`.
 - Dashboard local deletion removes the local file and calls authenticated backend `/api/reload`; EC2 deletion uses SFTP and then restarts PM2 to rebuild the remote index.
 - If local deletion cannot reload the backend index, the dashboard restores the original source file.
 - Uploads accept `.txt`, `.md`, `.html`, and `.pdf`; unsupported types return HTTP 400.
 - Uploads use a temporary file and atomic replacement so oversized same-name uploads preserve the existing document.
 - `/api/upload` and `/api/reload` require both normal and dashboard JWT capabilities, and the local dashboard generates a short-lived token using the configured secret or its process-local fallback.
 - `/api/ask` is the only chatbot endpoint and requires a valid WordPress JWT containing `JWT_REQUIRED_CAP`; `/api/chat` returns HTTP 404.
-- `CHAT_INPUT_TOKEN_LIMIT` rejects an estimated question-plus-recent-history input before retrieval or LLM execution.
+- `CHAT_INPUT_TOKEN_LIMIT` defaults to 3,000 and rejects an estimated question-plus-recent-history input before retrieval or LLM execution.
 - `LLM_MAX_OUTPUT_TOKENS` caps response generation for OpenAI (`max_tokens`) and Ollama (`num_predict`).
 - `CHAT_DAILY_TOKEN_LIMIT` provides a durable daily budget per stable JWT identity.
 - `JWT_USER_ID_CLAIMS` defines the ordered JWT claims used to identify the quota owner; the first non-empty value is used.
@@ -244,9 +246,9 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - `/api/ask` reserves estimated input plus maximum output before model execution, settles estimated input plus returned-answer usage afterward, and returns `remaining_tokens`.
 - Failed requests release their reservation, and quota buckets reset by UTC date.
 - The daily balance measures estimated user-visible tokens, not exact provider billing tokens; hidden system instructions and retrieved RAG context are not currently included.
-- The webapp displays the matching estimated input budget and disables Send when the estimate exceeds its configured limit.
+- The webapp displays the matching estimated input budget. If accumulated history pushes a request over the limit, Send opens a `Clear history and continue` recovery dialog that calls backend clear/summarization before resending; a single message that is too large still shows a shorten-message notice.
 - Citation normalization preserves `#page=N` after the encoded filename, including fallback `file://` and raw-filename citations.
-- Backend citation finalization preserves retrieved source metadata when the model omits inline `[n]` markers, allowing fallback markers to be added. The frontend also renders a linked Sources list whenever citation metadata is present.
+- Backend citation finalization preserves retrieved source metadata, but hidden history and summary context strip stale `[n]` markers and `Sources:` text before prompt construction. The frontend suppresses citation metadata unless the current answer includes matching markers.
 - File tickets default to a 900-second lifetime through `FILE_TICKET_TTL_SECONDS`. File responses use `Cache-Control: private, no-store` and `Referrer-Policy: no-referrer`.
 - The rate limiter is process-local, so each worker has a separate request bucket; a shared store is still required before scaling to multiple workers.
 - The request-rate limiter remains short-window and IP-based; the daily token quota is separately keyed by JWT user identity.

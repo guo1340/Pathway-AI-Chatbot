@@ -532,6 +532,55 @@ class BackendSecurityTests(unittest.TestCase):
         )
         self.assertIn("Azusa", main.PIPE.answer_calls[-1])
 
+    def test_history_citation_markers_do_not_leak_into_next_prompt(self):
+        user = make_token(["contributor"], claims={"sub": "citation-history-user"})
+        main.PIPE.citations = [
+            {
+                "title": "Earlier Source",
+                "url": "file:///tmp/earlier.pdf#page=1",
+            }
+        ]
+        first = self.client.post(
+            "/api/ask",
+            headers=auth(user),
+            json={"query": "source"},
+        )
+        self.assertEqual(first.status_code, 200)
+        self.assertIn("[1]", first.json()["answer"])
+
+        main.PIPE.citations = []
+        second = self.client.post(
+            "/api/ask",
+            headers=auth(user),
+            json={"query": "hello"},
+        )
+        self.assertEqual(second.status_code, 200)
+        prompt = main.PIPE.answer_calls[-1]
+        self.assertNotIn("[1]", prompt)
+        self.assertNotIn("Sources:", prompt)
+
+        user_key = main._quota_user_key({"sub": "citation-history-user"})
+        with main._usage_db_connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO conversation_state (user_key, summary, summarized_exchanges, updated_at)
+                VALUES (?, ?, 0, ?)
+                ON CONFLICT(user_key)
+                DO UPDATE SET summary = excluded.summary, updated_at = excluded.updated_at
+                """,
+                (user_key, "Prior summary [2]\nSources:\n[2] Old File", time.time()),
+            )
+            connection.commit()
+        third = self.client.post(
+            "/api/ask",
+            headers=auth(user),
+            json={"query": "again"},
+        )
+        self.assertEqual(third.status_code, 200)
+        prompt = main.PIPE.answer_calls[-1]
+        self.assertNotIn("[2]", prompt)
+        self.assertNotIn("Sources:", prompt)
+
     def test_exact_visible_window_restart_and_summary_failure_safety(self):
         user = make_token(["contributor"], claims={"sub": "summary-window-user"})
         main.CHAT_VISIBLE_EXCHANGES = 12

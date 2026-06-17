@@ -24,6 +24,7 @@ const askBodies = [];
 const priority8Only = process.argv.includes("--priority8");
 const conversationSummaryOnly = process.argv.includes("--conversation-summary");
 const uiOnly = process.argv.includes("--ui");
+const priority9Only = process.argv.includes("--priority9");
 let mockHistoryMessages = [];
 let clearConversationCalls = 0;
 let clearConversationShouldFail = false;
@@ -91,7 +92,7 @@ const server = createServer((req, res) => {
 
   if (url.pathname === "/api/history" && req.method === "GET") {
     const payload = {
-      messages: conversationSummaryOnly || uiOnly ? mockHistoryMessages : [],
+      messages: conversationSummaryOnly || uiOnly || priority9Only ? mockHistoryMessages : [],
       conversation_id: "thread-test-user",
     };
     if (historyRemainingTokens !== undefined) {
@@ -227,6 +228,32 @@ const server = createServer((req, res) => {
           citations: [{
             title: "Worship in the Bible",
             url: `${APP_ORIGIN}/api/files/worship.pdf?file_token=test#page=1`,
+          }],
+          conversation_id: "test-conversation",
+          remaining_tokens: 5000,
+        }));
+        return;
+      }
+      if (query === "priority9 reveal") {
+        res.writeHead(200);
+        res.end(JSON.stringify({
+          answer: "This answer reveals progressively while the user can keep reading the chat. The sources wait until the response is complete, and the source marker stays at the end [1].",
+          citations: [{
+            title: "Priority 9 Source",
+            url: `${APP_ORIGIN}/api/files/priority9.pdf?file_token=test#page=9`,
+          }],
+          conversation_id: "test-conversation",
+          remaining_tokens: 5000,
+        }));
+        return;
+      }
+      if (query === "priority9 no marker citations") {
+        res.writeHead(200);
+        res.end(JSON.stringify({
+          answer: "Hello!",
+          citations: [{
+            title: "Unreferenced Source",
+            url: `${APP_ORIGIN}/api/files/unreferenced.pdf?file_token=test#page=1`,
           }],
           conversation_id: "test-conversation",
           remaining_tokens: 5000,
@@ -1135,6 +1162,86 @@ async function runUi(cdp) {
   record("outline formatting removes leading citation markers and restores line breaks");
 }
 
+async function runPriority9(cdp) {
+  await freshValidPage(cdp);
+  await setInputAndSend(cdp, "priority9 reveal");
+  await waitFor(
+    () => cdp.evaluate(
+      "document.querySelector('.rcb-msg.ai:last-child')?.textContent.includes('This answer reveals')"
+    ),
+    "answer reveal starts"
+  );
+  assert.equal(
+    await cdp.evaluate("Boolean(document.querySelector('.rcb-msg.ai:last-child .rcb-cite'))"),
+    false
+  );
+  await waitFor(
+    () => cdp.evaluate(
+      "document.querySelector('.rcb-msg.ai:last-child')?.textContent.includes('source marker stays at the end')"
+    ),
+    "answer reveal completes"
+  );
+  await waitForSelector(cdp, ".rcb-msg.ai:last-child .rcb-cite");
+  assert.match(
+    await cdp.evaluate("document.querySelector('.rcb-msg.ai:last-child .rcb-cite')?.textContent"),
+    /Sources:\s*\[1\] Priority 9 Source/
+  );
+  record("new answers reveal progressively and defer Sources until complete");
+
+  await freshValidPage(cdp);
+  await setInputAndSend(cdp, "priority9 no marker citations");
+  await waitFor(
+    () => cdp.evaluate(
+      "document.querySelector('.rcb-msg.ai:last-child')?.textContent.includes('Hello!')"
+    ),
+    "unreferenced citation answer"
+  );
+  assert.equal(
+    await cdp.evaluate("Boolean(document.querySelector('.rcb-msg.ai:last-child .rcb-cite'))"),
+    false
+  );
+  assert.equal(
+    await cdp.evaluate("Boolean(document.querySelector('.rcb-msg.ai:last-child .inline-citation'))"),
+    false
+  );
+  record("unreferenced citation metadata does not render Sources");
+
+  mockHistoryMessages = Array.from({ length: 4 }, (_, index) => [
+    {
+      who: "you",
+      text: `long visible question ${index + 1} ${"x".repeat(1800)}`,
+      citations: [],
+      time: "10:00",
+    },
+    {
+      who: "ai",
+      text: `long visible answer ${index + 1} ${"y".repeat(1800)}`,
+      citations: [],
+      time: "10:00",
+    },
+  ]).flat();
+  await freshValidPage(cdp);
+  const originalQuestion = "continue after clearing";
+  await setInputAndSend(cdp, originalQuestion);
+  await waitFor(
+    () => cdp.evaluate(
+      "document.querySelector('.dialog-panel')?.textContent.includes('Clear history and continue')"
+    ),
+    "over-budget recovery dialog"
+  );
+  const asksBeforeClear = askBodies.length;
+  await clickText(cdp, ".dialog-actions button", "Clear history and continue");
+  await waitFor(
+    () => askBodies.length === asksBeforeClear + 1,
+    "resent long question API call"
+  );
+  assert.equal(clearConversationCalls > 0, true);
+  assert.equal(askBodies.length, asksBeforeClear + 1);
+  assert.equal(askBodies.at(-1).query, originalQuestion);
+  assert.equal(askBodies.at(-1).history.length, 0);
+  record("over-budget recovery clears history and resends the original question");
+}
+
 async function run() {
   await new Promise((resolve) => server.listen(APP_PORT, "0.0.0.0", resolve));
   const chrome = spawn(CHROME, [
@@ -1177,6 +1284,11 @@ async function run() {
     if (uiOnly) {
       await runUi(cdp);
       console.log(`\n${results.length} UI checks passed.`);
+      return;
+    }
+    if (priority9Only) {
+      await runPriority9(cdp);
+      console.log(`\n${results.length} Priority 9 frontend checks passed.`);
       return;
     }
 
@@ -1270,16 +1382,17 @@ async function run() {
 
     await freshValidPage(cdp);
     await setInputAndSend(cdp, "citation list");
-    await waitForSelector(cdp, ".rcb-cite");
-    assert.match(
-      await cdp.evaluate("document.querySelector('.rcb-cite')?.textContent"),
-      /Sources:\s*\[1\] Reference Guide p\.2/
+    await waitFor(
+      () => cdp.evaluate(
+        "document.querySelector('.rcb-msg.ai:last-child')?.textContent.includes('Answer without an inline citation marker.')"
+      ),
+      "unmarked citation answer"
     );
-    assert.match(
-      await cdp.evaluate("document.querySelector('.rcb-cite a')?.href"),
-      /\/api\/files\/reference\.pdf\?file_token=test#page=2$/
+    assert.equal(
+      await cdp.evaluate("Boolean(document.querySelector('.rcb-msg.ai:last-child .rcb-cite'))"),
+      false
     );
-    record("citation list remains visible without inline answer markers");
+    record("citation metadata without answer markers is suppressed");
 
     for (const status of [401, 403]) {
       await freshValidPage(cdp);

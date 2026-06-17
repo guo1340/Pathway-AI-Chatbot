@@ -1357,3 +1357,48 @@ Pending:
 - [ ] Manual EC2 check: production `.env` has `JWT_REQUIRED_CAP=contributor`, PM2 is restarted, and `/api/health` returns OK.
 
 Optimal result: WordPress Contributor-role users can load Ask AI and send messages even when their role does not include `edit_posts`.
+
+## 2026-06-17 13:04:08 +08:00 - Priority 9 Response UX, Token Budgeting, And Citation Integrity Pending Run
+
+Generated focused checks for the Priority 9 work. Previously completed checks above remain recorded as historical results; the new behavior checks below are intentionally left unchecked so they can be run next without repeating the full test log.
+
+Completed:
+
+- [x] `node --check webapp/scripts/test-frontend-security.mjs` passed.
+- [x] `python -m py_compile rag-backend/main.py rag-backend/tests/test_backend_security.py` passed.
+- [x] `cd webapp && npm.cmd run build` passed.
+
+Completed in follow-up:
+
+- [x] `cd webapp && npm.cmd run test:frontend-priority9` passed all 3 focused Priority 9 browser checks: new answers reveal progressively, Sources appear only after reveal completion, unreferenced citation metadata does not render, and over-budget recovery clears/summarizes history before resending the original question.
+- [x] `cd rag-backend && ..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v` passed all 18 backend checks, including the new history/summary citation-marker leak regression.
+
+Pending manual checks:
+
+- [ ] Manual Ask AI check: send a cited answer and confirm text appears progressively, inline `[n]` citation links and the Sources block appear only when the answer has matching markers, and a plain greeting does not show a stray source link.
+- [ ] Manual Ask AI check: continue a long chat until the estimated input exceeds 3,000 tokens, click `Clear history and continue`, and confirm the visible history clears only after backend summarization succeeds and the original message is resent.
+
+Optimal result: Priority 9 changes improve live response feel, keep frontend/backend input budgeting aligned at 3,000 estimated tokens with 4 visible exchanges, and prevent old citation markers from creating misleading links or Sources entries.
+
+## 2026-06-17 17:25:24 +08:00 - Priority 9 And Dashboard JSON Handling Verification
+
+Completed:
+
+- [x] Fixed the Priority 9 frontend test harness so seeded history is loaded for the over-budget recovery case and resend assertions wait for the actual `/api/ask` call.
+- [x] Fixed the backend citation-marker leak regression test to use the existing `conversation_state` table and query lengths allowed by the test configuration.
+- [x] `cd webapp && npm.cmd run test:frontend-priority9` passed all 3 focused Priority 9 checks.
+- [x] `cd rag-backend && ..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v` passed all 18 backend checks.
+- [x] `node --check webapp/scripts/test-frontend-security.mjs` passed.
+- [x] `python -m py_compile rag-backend/main.py rag-backend/tests/test_backend_security.py` passed.
+- [x] `cd dashboard && node --check server.js` passed.
+- [x] `cd dashboard && node security.test.js` passed 18 dashboard security/configuration checks.
+- [x] `cd dashboard && npm.cmd run test:security` passed 18 dashboard security/configuration checks.
+- [x] `cd webapp && npm.cmd run build` passed.
+- [x] `php -l webapp/page-ask-ai.php` passed.
+
+Pending manual checks:
+
+- [ ] Manual dashboard check: start the dashboard, click `Check EC2 Branch`, and confirm success shows branch/commit while SSH or wrong-origin failures show a readable HTTP/JSON message instead of `Unexpected token '<'`.
+- [ ] Manual dashboard check: use `Sync Prompt to EC2` with and without commit/push and confirm failures render in the inline status/toast as readable JSON-based messages.
+
+Optimal result: the focused Priority 9 regression suite is green, backend citation history is clean, and dashboard EC2 branch/prompt failures never expose raw HTML parse errors to the operator.

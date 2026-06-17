@@ -710,6 +710,16 @@ app.post('/api/prompt', (req, res) => {
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `Dashboard API route not found: ${req.method} ${req.originalUrl}` });
+});
+
+app.use((err, req, res, next) => {
+  if (!req.path.startsWith('/api')) return next(err);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({ error: err.message || 'Dashboard API error' });
+});
+
 app.listen(PORT, () => {
   console.log(`\n  Pathway Dashboard → http://localhost:${PORT}\n`);
 });

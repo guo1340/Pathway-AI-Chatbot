@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test:frontend-security": "node scripts/test-frontend-security.mjs",
     "test:frontend-priority8": "node scripts/test-frontend-security.mjs --priority8",
+    "test:frontend-priority9": "node scripts/test-frontend-security.mjs --priority9",
     "test:conversation-summary": "node scripts/test-frontend-security.mjs --conversation-summary",
     "test:ui": "node scripts/test-frontend-security.mjs --ui"
   },
