@@ -1988,3 +1988,40 @@ Verification completed:
 Optimal result:
 
 - Help bubbles float cleanly above the token grid, and the daily balance is populated from history or the balance endpoint without requiring a new chat send.
+
+### 2026-06-17 10:04:03 +08:00 - Contributor Ask AI Access
+
+Clarified and guarded the current Ask AI access level so contributors can use the chat page.
+
+Changes:
+
+- WordPress template (`webapp/page-ask-ai.php`): introduced `$ask_ai_required_cap = 'edit_posts'` and reused it for both `current_user_can()` and iframe `requiredCap`.
+- Backend config example (`rag-backend/.env.example`): documented that `edit_posts` allows contributors and above.
+- README and project notes: added instructions for future role changes. To allow all logged-in users later, change the WordPress page capability, backend `JWT_REQUIRED_CAP`, and token issuer JWT `cap` claim to `read` together.
+- Browser test (`webapp/scripts/test-frontend-security.mjs`): added assertions that the WordPress template uses the shared contributor capability variable.
+
+Verification completed:
+
+1. `php -l webapp/page-ask-ai.php` passed.
+2. `node --check webapp/scripts/test-frontend-security.mjs` passed.
+3. `python -m py_compile rag-backend/main.py rag-backend/rag.py` passed.
+4. `cd webapp && npm.cmd run build` passed.
+5. `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 Priority 8 frontend checks.
+6. `cd webapp && npm.cmd run test:ui` passed all 10 UI checks.
+7. Direct `Select-String` checks confirmed the template contains `$ask_ai_required_cap = 'edit_posts'`, `current_user_can($ask_ai_required_cap)`, iframe `requiredCap`, and future `read` guidance.
+
+Test note:
+
+- `cd webapp && npm.cmd run test:frontend-security` was attempted and timed out on the first Chrome `Page.navigate` call before any app assertion ran; this is the same hosted-domain browser harness timeout seen in recent runs.
+
+### Steps And Instructions For Testing
+
+1. In WordPress, assign a test user the Contributor role.
+2. Log in as that Contributor and open the Ask AI page.
+3. Confirm the page embeds the chat instead of redirecting to the access-denied/login notice.
+4. Send a simple message and confirm the backend accepts the JWT.
+5. For another future role level, update these three items together: `$ask_ai_required_cap` in `webapp/page-ask-ai.php`, backend `JWT_REQUIRED_CAP`, and the JWT `cap` claim minted by the WordPress token issuer.
+
+Optimal result:
+
+- Contributors, authors, editors, and admins can access Ask AI. Subscribers remain blocked until the planned future switch to `read` is made across the page, backend, and token issuer.

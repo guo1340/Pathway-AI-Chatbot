@@ -40,10 +40,10 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 
 ### Authenticated Ask AI
 
-1. WordPress page template `webapp/page-ask-ai.php` requires a logged-in user with `edit_posts`.
+1. WordPress page template `webapp/page-ask-ai.php` requires a logged-in user with `$ask_ai_required_cap`, currently `edit_posts` for contributor-and-above access.
 2. It calls `pathway_rag_mint_current_user_token(600)` and embeds the hosted chat app in an iframe with API, token, expiry, required-capability, and WordPress access-page parameters.
 3. React validates the token shape, expiry, and configured capability for hosted-chat navigation, then uses `POST /api/ask`; the backend remains the authority for signature and authorization validation.
-4. Backend validates an HS256 JWT on `/api/ask` using `PATHWAY_RAG_JWT_SECRET` and the required capability from `JWT_REQUIRED_CAP` (default `edit_posts`).
+4. Backend validates an HS256 JWT on `/api/ask` using `PATHWAY_RAG_JWT_SECRET` and the required capability from `JWT_REQUIRED_CAP` (default `edit_posts`, matching WordPress contributors and above).
 5. Dashboard upload and reload additionally require `JWT_DASHBOARD_CAP` (default `manage_rag`), so a normal WordPress token cannot mutate the document index.
 6. `chat.pathway.training` redirects missing, expired, malformed, incompatible-capability, HTTP 401, and HTTP 403 sessions to the configured Pathway WordPress access page.
 7. HTTP 401 means the token is missing, expired, malformed, or signed with a secret the backend does not accept. HTTP 403 means signature and expiry passed but the `cap` claim lacks `JWT_REQUIRED_CAP`.
@@ -273,7 +273,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The rollback snapshot is under `/home/ubuntu/pathway-backups/20260606-063636`, and the pre-release Git rollback commit is `092f05c`.
 - A byte-identical local copy is stored under the Git-ignored `local-backups/ec2/20260606-063636` directory. All 90 files were SHA-256 verified on 2026-06-06.
 - `webapp/page-ask-ai.php` consumes `pathway_rag_mint_current_user_token()`, but the WordPress plugin that defines that function is managed outside this repository and must be verified in the deployed WordPress environment.
-- The current WordPress page and backend require `edit_posts`. Subscriber access must not be enabled until the external issuer is confirmed to mint an accepted capability for the intended subscriber accounts.
+- The current WordPress page and backend require `edit_posts`, which includes contributors, authors, editors, and administrators. To later allow subscribers or every logged-in user, change `webapp/page-ask-ai.php`'s `$ask_ai_required_cap`, backend `JWT_REQUIRED_CAP`, and the external WordPress token issuer's JWT `cap` claim to `read` together.
 - Hosted-chat redirect destinations are limited to HTTPS Pathway domains and local development hosts to avoid an open redirect.
 - The current tracked tree contains no public EC2 IP/hostname or tracked PEM/key file, but older Git commits contain the former server address. Removing it from GitHub requires a coordinated history rewrite and force-push; infrastructure access controls must not rely on the address being secret.
 
