@@ -1291,3 +1291,29 @@ Completed:
 - [x] `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 Priority 8 frontend checks.
 
 Optimal result: the `?` popovers render above the token grid instead of under or behind it, and Daily balance shows a numeric value after refresh without requiring the user to send a message.
+
+## 2026-06-17 10:04:03 +08:00 - Contributor Ask AI Access Verification
+
+Verified the repository-side contributor access configuration.
+
+Completed:
+
+- [x] `webapp/page-ask-ai.php` now defines `$ask_ai_required_cap = 'edit_posts'`.
+- [x] The WordPress page gate uses `current_user_can($ask_ai_required_cap)`.
+- [x] The hosted iframe receives the same value through `requiredCap`.
+- [x] Documentation explains that `edit_posts` allows contributors and above.
+- [x] Documentation explains that future all-logged-in access should use `read` in the WordPress page, backend `JWT_REQUIRED_CAP`, and token issuer JWT `cap` claim together.
+- [x] `php -l webapp/page-ask-ai.php` passed.
+- [x] `node --check webapp/scripts/test-frontend-security.mjs` passed.
+- [x] `python -m py_compile rag-backend/main.py rag-backend/rag.py` passed.
+- [x] `cd webapp && npm.cmd run build` passed.
+- [x] `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 Priority 8 frontend checks.
+- [x] `cd webapp && npm.cmd run test:ui` passed all 10 UI checks.
+- [x] Direct template checks confirmed `$ask_ai_required_cap = 'edit_posts'`, `current_user_can($ask_ai_required_cap)`, iframe `requiredCap`, and future `read` guidance.
+- [ ] `cd webapp && npm.cmd run test:frontend-security` timed out on the first Chrome `Page.navigate` call before app assertions ran.
+
+Manual production check:
+
+- [ ] Log in as a WordPress Contributor and confirm the Ask AI page embeds chat and can send a message.
+
+Optimal result: WordPress Contributors can access Ask AI with the same `edit_posts` capability required by the backend token validation.

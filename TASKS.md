@@ -80,10 +80,12 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Frontend: Make the info button on the top right corner of the page much bigger, right now it is not visible enough.
 - [x] Frontend: add a circled question mark button after the input tokens and max response header that opens a chat bubble like display that explains in common language what they each are, users may not know what they are.
 - [x] Backend and Frontend: right now the daily balance has "waiting for the next backend balance" when page is refreshed, find a way to track the remaining daily balance when loading the messages, either keep track of it with the user id or with the latest message. Choose the cleanest and easiest way to do it so that it will always display the correct daily balance limit.
+- [ ] needs to allow more than 2000 token per question since history may be too long, also add recomendations
+- [x] WordPress/Auth: explicitly allow contributor-and-above accounts to access Ask AI by keeping the page, iframe, backend capability, and token expectations aligned on `edit_posts`; document the future `read` change for all logged-in users.
 
 ## In Progress
 
-- Current task: Fixed the Priority 8 follow-up issues: token help bubbles now render above the token grid without clipping, and the daily balance loads from `/api/history`, then authenticated `/api/balance`, then the latest session fallback.
+- Current task: Completed the contributor-and-above Ask AI access clarification. The current capability remains `edit_posts`; future subscriber/all-logged-in access should switch the WordPress page, backend `JWT_REQUIRED_CAP`, and token issuer to `read` together.
 
 ## Done
 
@@ -129,6 +131,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Fixed the duplicated WordPress admin bar that appeared after a timed-out session re-authenticated, by redirecting the top-level window instead of the embedded chat iframe.
 - [x] Corrected the token help placement so the circled question marks are in the token grid header cells beside Input tokens and Max response, cleaned up the enlarged info button styling, and added a session fallback for the daily balance while `/api/history` remains the backend authority.
 - [x] Fixed token help bubble clipping by allowing the token grid to overflow visibly and anchoring each bubble inside the dialog; added authenticated `/api/balance` as a direct fallback when history does not include `remaining_tokens`.
+- [x] Centralized the Ask AI WordPress page capability as `$ask_ai_required_cap = 'edit_posts'`, kept the iframe `requiredCap` in sync, and documented how to change access for other roles later.
 
 ## Notes for Codex
 
@@ -193,6 +196,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-16 19:56:52 +08:00 - Completed the three new Priority 8 items (larger info button, token-usage help popover, daily-balance-on-load) and fixed the duplicated WordPress admin bar after re-auth by redirecting the top window; added backend and browser tests.
 - 2026-06-16 22:03:50 +08:00 - Redid the three Priority 8 token UI/balance fixes: moved help controls into the token grid headers, refined the larger info button style, persisted the latest known daily balance, and reran focused frontend/backend verification.
 - 2026-06-16 23:26:50 +08:00 - Fixed the token help bubble z-index/clipping issue and added authenticated `/api/balance` so the frontend can still display daily balance when `/api/history` does not provide it.
+- 2026-06-17 10:04:03 +08:00 - Clarified and guarded contributor-and-above Ask AI access with the shared `edit_posts` capability, plus instructions for future `read`/all-logged-in access.
 
 ## Steps and Instructions for Testing
 

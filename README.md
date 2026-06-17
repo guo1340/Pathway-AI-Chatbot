@@ -129,6 +129,22 @@ define('RAG_CHATBOT_DEV_SERVER', 'http://localhost:5173');
   - `rag_chatbot_sitewide_enabled` (default true)
   - `rag_chatbot_sitewide_atts` (default `{ source: 'site', title: 'Ask our AI' }`)
 
+### Ask AI role access
+
+The full-screen Ask AI page template currently uses WordPress capability `edit_posts`, which allows Contributors, Authors, Editors, and Administrators. The backend must use the same required capability:
+
+```env
+JWT_REQUIRED_CAP=edit_posts
+```
+
+For another role level, keep these three places aligned:
+
+- `webapp/page-ask-ai.php`: change `$ask_ai_required_cap`.
+- `rag-backend/.env`: change `JWT_REQUIRED_CAP`.
+- WordPress token issuer: mint the same capability in the JWT `cap` claim.
+
+To eventually allow all logged-in users, use capability `read` in all three places. Do not change dashboard upload/reload access unless intended; it still requires `JWT_DASHBOARD_CAP`.
+
 ### Use
 
 - Site‑wide floating widget appears bottom‑right on all pages by default.
