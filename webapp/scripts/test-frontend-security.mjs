@@ -1398,14 +1398,17 @@ async function run() {
       "utf8"
     );
     for (const parameter of [
+      "$ask_ai_required_cap = 'edit_posts'",
+      "current_user_can($ask_ai_required_cap)",
       "'requireAuth' => '1'",
-      "'requiredCap' => 'edit_posts'",
+      "'requiredCap' => $ask_ai_required_cap",
       "'accessUrl' => get_permalink()",
       "'token' => $token",
       "'exp' => $exp",
     ]) {
       assert.ok(template.includes(parameter), `Missing iframe parameter ${parameter}`);
     }
+    assert.ok(template.includes("To later allow subscribers/all logged-in users"));
     assert.ok(template.includes("--askai-available-height"));
     assert.ok(template.includes("getBoundingClientRect().top"));
     assert.equal(template.includes("32px"), false);
