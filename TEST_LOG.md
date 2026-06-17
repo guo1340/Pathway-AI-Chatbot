@@ -1336,3 +1336,24 @@ Pending:
 - [ ] Manual production check: log in as a WordPress user whose roles include Contributor and confirm Ask AI embeds chat instead of redirecting.
 
 Optimal result: Contributor-role users can enter the WordPress Ask AI page, higher standard WordPress roles still enter through `edit_posts`, and the backend capability requirement remains unchanged.
+
+## 2026-06-17 10:51:36 +08:00 - Contributor Role Auth Correction Verification
+
+Verification for the corrected role-based auth model after live WordPress debug output showed `Roles: subscriber, contributor` and `Can edit_posts: no`.
+
+Completed:
+
+- [x] `php -l webapp/page-ask-ai.php` passed.
+- [x] `python -m py_compile rag-backend/main.py rag-backend/rag.py` passed.
+- [x] `node --check webapp/scripts/test-frontend-security.mjs` passed.
+- [x] `cd webapp && npm.cmd run build` passed.
+- [x] `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 Priority 8 frontend checks.
+- [x] `cd webapp && npm.cmd run test:ui` passed all 10 UI checks.
+- [x] `cd rag-backend && ..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v` passed all 17 backend checks.
+
+Pending:
+
+- [ ] Manual WordPress check: external token issuer allows role `contributor` and mints JWT `cap` containing `contributor`.
+- [ ] Manual EC2 check: production `.env` has `JWT_REQUIRED_CAP=contributor`, PM2 is restarted, and `/api/health` returns OK.
+
+Optimal result: WordPress Contributor-role users can load Ask AI and send messages even when their role does not include `edit_posts`.

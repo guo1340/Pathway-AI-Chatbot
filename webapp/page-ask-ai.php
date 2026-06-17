@@ -33,8 +33,8 @@ if (!is_user_logged_in()) {
 }
 
 
-// Must be Contributor role or a standard higher role with post-editing access.
-if (!$is_contributor && !current_user_can('edit_posts')) {
+// Must have the Contributor role.
+if (!$is_contributor) {
     $login_url = wp_login_url(get_permalink());
     $login_url = add_query_arg([
         'rag_notice' => '1',
@@ -44,7 +44,6 @@ if (!$is_contributor && !current_user_can('edit_posts')) {
     wp_safe_redirect($login_url);
     exit;
 }
-
 
 // Mint token (10 minutes)
 $mint = pathway_rag_mint_current_user_token(600);
@@ -77,7 +76,7 @@ $iframe_url = add_query_arg([
     'token' => $token,
     'exp' => $exp,
     'requireAuth' => '1',
-    'requiredCap' => 'edit_posts',
+    'requiredCap' => 'contributor',
     'accessUrl' => get_permalink(),
     'source' => $source,
     'title' => $title,

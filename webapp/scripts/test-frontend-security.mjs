@@ -51,11 +51,11 @@ function pageUrl(params = {}, origin = APP_ORIGIN) {
 
 const validToken = token({
   exp: Math.floor(Date.now() / 1000) + 3600,
-  cap: ["edit_posts"],
+  cap: ["contributor"],
 });
 const expiredToken = token({
   exp: Math.floor(Date.now() / 1000) - 60,
-  cap: ["edit_posts"],
+  cap: ["contributor"],
 });
 const wrongCapToken = token({
   exp: Math.floor(Date.now() / 1000) + 3600,
@@ -417,7 +417,7 @@ async function freshValidPage(cdp) {
     token: validToken,
     exp: String(Math.floor(Date.now() / 1000) + 3600),
     requireAuth: "1",
-    requiredCap: "edit_posts",
+    requiredCap: "contributor",
     accessUrl: `${APP_ORIGIN}/access`,
   }));
   await waitForSelector(cdp, "#message");
@@ -497,7 +497,7 @@ async function runPriority8(cdp) {
     await navigate(cdp, pageUrl({
       ...params,
       requireAuth: "1",
-      requiredCap: "edit_posts",
+      requiredCap: "contributor",
       accessUrl: `${APP_ORIGIN}/access`,
     }));
     await waitFor(
@@ -728,7 +728,7 @@ async function runPriority8(cdp) {
   });
   await navigate(cdp, pageUrl({
     requireAuth: "1",
-    requiredCap: "edit_posts",
+    requiredCap: "contributor",
     accessUrl: `${APP_ORIGIN}/access`,
   }));
   await waitForSelector(cdp, ".status-overlay");
@@ -1212,7 +1212,7 @@ async function run() {
     const framedChild = pageUrl({
       token: expiredToken,
       requireAuth: "1",
-      requiredCap: "edit_posts",
+      requiredCap: "contributor",
       accessUrl: `${APP_ORIGIN}/access`,
     });
     await navigate(
@@ -1230,7 +1230,7 @@ async function run() {
       pageUrl({
         token: wrongCapToken,
         requireAuth: "1",
-        requiredCap: "edit_posts",
+        requiredCap: "contributor",
         accessUrl: `${APP_ORIGIN}/access`,
       }),
       `${APP_ORIGIN}/access`
@@ -1399,9 +1399,8 @@ async function run() {
     );
     for (const parameter of [
       "in_array('contributor', $user_roles, true)",
-      "current_user_can('edit_posts')",
       "'requireAuth' => '1'",
-      "'requiredCap' => 'edit_posts'",
+      "'requiredCap' => 'contributor'",
       "'accessUrl' => get_permalink()",
       "'token' => $token",
       "'exp' => $exp",
@@ -1409,6 +1408,8 @@ async function run() {
       assert.ok(template.includes(parameter), `Missing iframe parameter ${parameter}`);
     }
     assert.equal(template.includes("$ask_ai_required_cap"), false);
+    assert.equal(template.includes("current_user_can('edit_posts')"), false);
+    assert.equal(template.includes("current_user_can('contributor')"), false);
     assert.ok(template.includes("--askai-available-height"));
     assert.ok(template.includes("getBoundingClientRect().top"));
     assert.equal(template.includes("32px"), false);
@@ -1447,7 +1448,7 @@ async function run() {
     );
     assert.equal(localConfig.apiBase, APP_ORIGIN);
     assert.equal(localPayload.sub, "local-development");
-    assert.ok(localPayload.cap.includes("edit_posts"));
+    assert.ok(localPayload.cap.includes("contributor"));
     assert.ok(localPayload.exp > Math.floor(Date.now() / 1000) + 28000);
     record("Vite mints a short-lived loopback-only local user token");
 
