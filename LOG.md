@@ -2053,3 +2053,31 @@ Manual check still required:
 Optimal result:
 
 - Users with role `contributor` can access Ask AI. Standard higher roles still work through `edit_posts`. If a Contributor can open the page but `/api/ask` returns HTTP 401, the next thing to check is token signing/expiry, not the page role check.
+
+### 2026-06-17 10:51:36 +08:00 - Contributor Role Auth Correction
+
+Corrected the Ask AI auth model after live WordPress debugging showed the Contributor user has role `contributor` but `Can edit_posts: no`.
+
+Changes:
+
+- WordPress template (`webapp/page-ask-ai.php`): removed the temporary debug output block and removed the `current_user_can('edit_posts')` fallback.
+- WordPress template (`webapp/page-ask-ai.php`): now allows only logged-in users whose role list includes the exact role slug `contributor`.
+- WordPress template (`webapp/page-ask-ai.php`): sends iframe `requiredCap=contributor`.
+- Backend (`rag-backend/main.py`, `rag-backend/.env.example`): changed the default normal chat JWT capability from `edit_posts` to `contributor`.
+- Frontend (`webapp/src/App.tsx`, `webapp/vite.config.ts`): changed default hosted/local required capability from `edit_posts` to `contributor`.
+- Tests: changed backend and frontend auth fixtures to use JWT `cap: ["contributor"]`.
+- Docs: recorded that the external WordPress token issuer must allow role `contributor` and mint JWT `cap` containing `contributor`.
+
+Verification completed:
+
+1. `php -l webapp/page-ask-ai.php` passed.
+2. `python -m py_compile rag-backend/main.py rag-backend/rag.py` passed.
+3. `node --check webapp/scripts/test-frontend-security.mjs` passed.
+4. `cd webapp && npm.cmd run build` passed and refreshed built assets.
+5. `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 checks.
+6. `cd webapp && npm.cmd run test:ui` passed all 10 checks.
+7. `cd rag-backend && ..\.uv-security-env\Scripts\python.exe -m unittest discover -s tests -p "test_backend_security.py" -v` passed all 17 backend checks.
+
+Optimal result:
+
+- WordPress users whose roles include `contributor` pass the page check even when they do not have `edit_posts`. The WordPress token issuer mints `cap: ["contributor"]`, the frontend accepts it, and the backend accepts `/api/ask` with `JWT_REQUIRED_CAP=contributor`.

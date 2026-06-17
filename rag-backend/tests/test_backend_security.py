@@ -26,7 +26,7 @@ DOCS_DIR.mkdir()
 os.environ.update(
     {
         "PATHWAY_RAG_JWT_SECRET": "security-test-secret",
-        "JWT_REQUIRED_CAP": "edit_posts",
+        "JWT_REQUIRED_CAP": "contributor",
         "JWT_DASHBOARD_CAP": "manage_rag",
         "DOCS_DIR": str(DOCS_DIR),
         "CHAT_QUERY_MAX_LENGTH": "12",
@@ -145,8 +145,8 @@ class BackendSecurityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = TestClient(main.app)
-        cls.normal_token = make_token(["edit_posts"])
-        cls.dashboard_token = make_token(["edit_posts", "manage_rag"])
+        cls.normal_token = make_token(["contributor"])
+        cls.dashboard_token = make_token(["contributor", "manage_rag"])
 
     def setUp(self):
         main.CHAT_REQUESTS.clear()
@@ -297,7 +297,7 @@ class BackendSecurityTests(unittest.TestCase):
 
         with main._usage_db_connection() as connection:
             connection.execute("DELETE FROM conversation_messages")
-        other_user = make_token(["edit_posts"], claims={"user_id": 42})
+        other_user = make_token(["contributor"], claims={"user_id": 42})
         response = self.client.post(
             "/api/ask",
             headers=auth(other_user),
@@ -306,7 +306,7 @@ class BackendSecurityTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["remaining_tokens"], 15)
 
-        missing_identity = make_token(["edit_posts"], claims={})
+        missing_identity = make_token(["contributor"], claims={})
         before = len(main.PIPE.answer_calls)
         response = self.client.post(
             "/api/ask",
@@ -338,7 +338,7 @@ class BackendSecurityTests(unittest.TestCase):
         self.assertEqual(balance.status_code, 200)
         self.assertEqual(balance.json()["remaining_tokens"], expected_remaining)
 
-        fresh_user = make_token(["edit_posts"], claims={"user_id": 4242})
+        fresh_user = make_token(["contributor"], claims={"user_id": 4242})
         fresh_history = self.client.get("/api/history", headers=auth(fresh_user))
         self.assertEqual(fresh_history.status_code, 200)
         self.assertEqual(fresh_history.json()["messages"], [])
@@ -483,8 +483,8 @@ class BackendSecurityTests(unittest.TestCase):
         self.assertEqual(len(main.PIPE.answer_calls), before + 1)
 
     def test_durable_conversation_summary_history_and_clear_are_user_isolated(self):
-        user_a = make_token(["edit_posts"], claims={"sub": "topic-user-a"})
-        user_b = make_token(["edit_posts"], claims={"sub": "topic-user-b"})
+        user_a = make_token(["contributor"], claims={"sub": "topic-user-a"})
+        user_b = make_token(["contributor"], claims={"sub": "topic-user-b"})
         main.CHAT_VISIBLE_EXCHANGES = 2
 
         for query in ("Azusa", "its history", "latest"):
@@ -533,7 +533,7 @@ class BackendSecurityTests(unittest.TestCase):
         self.assertIn("Azusa", main.PIPE.answer_calls[-1])
 
     def test_exact_visible_window_restart_and_summary_failure_safety(self):
-        user = make_token(["edit_posts"], claims={"sub": "summary-window-user"})
+        user = make_token(["contributor"], claims={"sub": "summary-window-user"})
         main.CHAT_VISIBLE_EXCHANGES = 12
         main.CHAT_DAILY_TOKEN_LIMIT = 100000
         main.LLM_MAX_OUTPUT_TOKENS = 5
@@ -603,7 +603,7 @@ class BackendSecurityTests(unittest.TestCase):
         )
 
         failing_user = make_token(
-            ["edit_posts"], claims={"sub": "summary-failure-user"}
+            ["contributor"], claims={"sub": "summary-failure-user"}
         )
         main.CHAT_VISIBLE_EXCHANGES = 1
         self.assertEqual(
@@ -652,7 +652,7 @@ class BackendSecurityTests(unittest.TestCase):
         )
 
     def test_clear_noop_quota_and_failure_preserve_history(self):
-        empty_user = make_token(["edit_posts"], claims={"sub": "empty-clear-user"})
+        empty_user = make_token(["contributor"], claims={"sub": "empty-clear-user"})
         before_calls = main.PIPE.summary_calls
         empty_clear = self.client.post(
             "/api/conversation/clear",
@@ -662,7 +662,7 @@ class BackendSecurityTests(unittest.TestCase):
         self.assertFalse(empty_clear.json()["summarized"])
         self.assertEqual(main.PIPE.summary_calls, before_calls)
 
-        user = make_token(["edit_posts"], claims={"sub": "clear-quota-user"})
+        user = make_token(["contributor"], claims={"sub": "clear-quota-user"})
         main.CHAT_DAILY_TOKEN_LIMIT = 100
         main.LLM_MAX_OUTPUT_TOKENS = 5
         sent = self.client.post(
@@ -684,7 +684,7 @@ class BackendSecurityTests(unittest.TestCase):
         )
 
         blocked_user = make_token(
-            ["edit_posts"], claims={"sub": "blocked-clear-user"}
+            ["contributor"], claims={"sub": "blocked-clear-user"}
         )
         main.CHAT_DAILY_TOKEN_LIMIT = 20
         sent = self.client.post(
@@ -709,7 +709,7 @@ class BackendSecurityTests(unittest.TestCase):
         )
 
         failing_user = make_token(
-            ["edit_posts"], claims={"sub": "failed-clear-user"}
+            ["contributor"], claims={"sub": "failed-clear-user"}
         )
         main.CHAT_DAILY_TOKEN_LIMIT = 100
         self.assertEqual(
@@ -736,7 +736,7 @@ class BackendSecurityTests(unittest.TestCase):
         )
 
     def test_concurrent_same_user_requests_preserve_summary_order(self):
-        user = make_token(["edit_posts"], claims={"sub": "concurrent-summary-user"})
+        user = make_token(["contributor"], claims={"sub": "concurrent-summary-user"})
         main.CHAT_VISIBLE_EXCHANGES = 1
         main.CHAT_DAILY_TOKEN_LIMIT = 100000
         main.LLM_MAX_OUTPUT_TOKENS = 5
