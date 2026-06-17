@@ -131,19 +131,13 @@ define('RAG_CHATBOT_DEV_SERVER', 'http://localhost:5173');
 
 ### Ask AI role access
 
-The full-screen Ask AI page template currently uses WordPress capability `edit_posts`, which allows Contributors, Authors, Editors, and Administrators. The backend must use the same required capability:
+The full-screen Ask AI page template allows users with the WordPress `contributor` role. It also allows standard higher roles that have `edit_posts`, such as Author, Editor, and Administrator. The backend token capability remains:
 
 ```env
 JWT_REQUIRED_CAP=edit_posts
 ```
 
-For another role level, keep these three places aligned:
-
-- `webapp/page-ask-ai.php`: change `$ask_ai_required_cap`.
-- `rag-backend/.env`: change `JWT_REQUIRED_CAP`.
-- WordPress token issuer: mint the same capability in the JWT `cap` claim.
-
-To eventually allow all logged-in users, use capability `read` in all three places. Do not change dashboard upload/reload access unless intended; it still requires `JWT_DASHBOARD_CAP`.
+For another role later, add that role slug to `webapp/page-ask-ai.php` and keep the WordPress token issuer plus backend `JWT_REQUIRED_CAP` aligned with the capability the backend should require.
 
 ### Use
 
