@@ -1317,3 +1317,22 @@ Manual production check:
 - [ ] Log in as a WordPress Contributor and confirm the Ask AI page embeds chat and can send a message.
 
 Optimal result: WordPress Contributors can access Ask AI with the same `edit_posts` capability required by the backend token validation.
+
+## 2026-06-17 10:26:29 +08:00 - Contributor Access Simplification Verification
+
+Verification for the simplified WordPress Contributor-role access check. Previously completed checks above remain recorded as historical results.
+
+Completed:
+
+- [x] `php -l webapp/page-ask-ai.php` passed.
+- [x] `node --check webapp/scripts/test-frontend-security.mjs` passed.
+- [x] Direct template checks confirmed the page uses `in_array('contributor', $user_roles, true)`, `current_user_can('edit_posts')`, and iframe `'requiredCap' => 'edit_posts'`.
+- [x] `cd webapp && npm.cmd run build` passed.
+- [x] `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 Priority 8 frontend checks.
+- [x] `cd webapp && npm.cmd run test:ui` passed all 10 UI checks.
+
+Pending:
+
+- [ ] Manual production check: log in as a WordPress user whose roles include Contributor and confirm Ask AI embeds chat instead of redirecting.
+
+Optimal result: Contributor-role users can enter the WordPress Ask AI page, higher standard WordPress roles still enter through `edit_posts`, and the backend capability requirement remains unchanged.

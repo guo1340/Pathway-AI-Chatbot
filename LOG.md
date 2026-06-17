@@ -2025,3 +2025,31 @@ Test note:
 Optimal result:
 
 - Contributors, authors, editors, and admins can access Ask AI. Subscribers remain blocked until the planned future switch to `read` is made across the page, backend, and token issuer.
+
+### 2026-06-17 10:26:29 +08:00 - Contributor Access Simplification
+
+Simplified the previous contributor-access update after review showed it was heavier than needed for the current requirement.
+
+Changes:
+
+- WordPress template (`webapp/page-ask-ai.php`): removed the extra `$ask_ai_required_cap` variable and now checks the user's WordPress roles directly for `contributor`.
+- WordPress template (`webapp/page-ask-ai.php`): keeps `current_user_can('edit_posts')` as the fallback for standard higher roles such as Author, Editor, and Administrator.
+- WordPress template (`webapp/page-ask-ai.php`): keeps iframe `requiredCap` as the literal `edit_posts`, matching backend JWT validation.
+- Docs/tests: updated the project notes, README, env example, task log, and frontend security test assertions to describe the simpler Contributor-role access model.
+
+Verification completed:
+
+1. `php -l webapp/page-ask-ai.php` passed.
+2. `node --check webapp/scripts/test-frontend-security.mjs` passed.
+3. Direct template checks confirmed `in_array('contributor', $user_roles, true)`, `current_user_can('edit_posts')`, and iframe `'requiredCap' => 'edit_posts'`.
+4. `cd webapp && npm.cmd run build` passed.
+5. `cd webapp && npm.cmd run test:frontend-priority8` passed all 10 Priority 8 browser checks.
+6. `cd webapp && npm.cmd run test:ui` passed all 10 UI browser checks.
+
+Manual check still required:
+
+1. In WordPress, log in as a user whose roles include Contributor and confirm the Ask AI page embeds chat instead of redirecting.
+
+Optimal result:
+
+- Users with role `contributor` can access Ask AI. Standard higher roles still work through `edit_posts`. If a Contributor can open the page but `/api/ask` returns HTTP 401, the next thing to check is token signing/expiry, not the page role check.
