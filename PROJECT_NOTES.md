@@ -40,7 +40,7 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 
 ### Authenticated Ask AI
 
-1. WordPress page template `webapp/page-ask-ai.php` requires a logged-in user with `$ask_ai_required_cap`, currently `edit_posts` for contributor-and-above access.
+1. WordPress page template `webapp/page-ask-ai.php` requires a logged-in user with the `contributor` role, or a standard higher role with `edit_posts`.
 2. It calls `pathway_rag_mint_current_user_token(600)` and embeds the hosted chat app in an iframe with API, token, expiry, required-capability, and WordPress access-page parameters.
 3. React validates the token shape, expiry, and configured capability for hosted-chat navigation, then uses `POST /api/ask`; the backend remains the authority for signature and authorization validation.
 4. Backend validates an HS256 JWT on `/api/ask` using `PATHWAY_RAG_JWT_SECRET` and the required capability from `JWT_REQUIRED_CAP` (default `edit_posts`, matching WordPress contributors and above).
@@ -255,7 +255,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - Rotating `PATHWAY_RAG_JWT_SECRET` changes the HMAC-derived conversation owner key and requires a history-key migration first.
 - Admin history lookup is intentionally not exposed yet. A future dashboard endpoint can use the existing user-keyed tables after authorization and audit requirements are defined.
 - The repository does not include the WordPress token issuer, so the deployed token must be checked for one configured stable identity claim before release.
-- A user who passes `page-ask-ai.php`'s `current_user_can('edit_posts')` check and then receives HTTP 401 from `/api/ask` is not being rejected by the backend role check. Compare hashes of the issuer and backend signing secrets without printing either secret, then check token expiry.
+- A user who passes `page-ask-ai.php`'s Contributor/`edit_posts` check and then receives HTTP 401 from `/api/ask` is not being rejected by the page role check. Compare hashes of the issuer and backend signing secrets without printing either secret, then check token expiry.
 - The owner confirmed on 2026-06-13 that live WordPress subscriber/token verification is complete; no further repository change is pending for that release check.
 - The webapp currently uses Vite 6.4.3. A later 2026-06-13 re-audit reports zero vulnerabilities, so the previously suggested security-driven Vite 8 migration is no longer required. Treat a future Vite major upgrade as normal planned maintenance.
 - Production currently reports five pending Ubuntu ESM Apps updates: `node-lodash`, `node-lodash-packages`, `python3-pip`, `python3-pip-whl`, and `python3-wheel`. The server is not attached to Ubuntu Pro, so target versions, simulation, and installation remain pending.
@@ -273,7 +273,7 @@ The old exact-string live/local toggle definitions remain for future deployment 
 - The rollback snapshot is under `/home/ubuntu/pathway-backups/20260606-063636`, and the pre-release Git rollback commit is `092f05c`.
 - A byte-identical local copy is stored under the Git-ignored `local-backups/ec2/20260606-063636` directory. All 90 files were SHA-256 verified on 2026-06-06.
 - `webapp/page-ask-ai.php` consumes `pathway_rag_mint_current_user_token()`, but the WordPress plugin that defines that function is managed outside this repository and must be verified in the deployed WordPress environment.
-- The current WordPress page and backend require `edit_posts`, which includes contributors, authors, editors, and administrators. To later allow subscribers or every logged-in user, change `webapp/page-ask-ai.php`'s `$ask_ai_required_cap`, backend `JWT_REQUIRED_CAP`, and the external WordPress token issuer's JWT `cap` claim to `read` together.
+- The current WordPress page explicitly allows the `contributor` role and standard higher roles with `edit_posts`; the backend still requires JWT capability `edit_posts`. To add another role later, add that role slug to `webapp/page-ask-ai.php` and keep the external WordPress token issuer plus backend `JWT_REQUIRED_CAP` aligned with the capability the backend should require.
 - Hosted-chat redirect destinations are limited to HTTPS Pathway domains and local development hosts to avoid an open redirect.
 - The current tracked tree contains no public EC2 IP/hostname or tracked PEM/key file, but older Git commits contain the former server address. Removing it from GitHub requires a coordinated history rewrite and force-push; infrastructure access controls must not rely on the address being secret.
 
@@ -324,7 +324,7 @@ When changing WordPress/plugin behavior:
 - Build the webapp so `plugin/dist/assets/main.js` and `styles.css` are refreshed.
 - Confirm `RAG_CHATBOT_API_BASE` and optional `RAG_CHATBOT_DEV_SERVER` behavior.
 - For authenticated Ask AI, confirm the token minting function exists in the active WordPress environment.
-- Confirm the deployed token's capability claim for both contributor and intended subscriber accounts before broadening the page-template role check.
+- Confirm the deployed token's capability claim for Contributor accounts before broadening the page-template role check.
 
 ## Preferred Change Style
 

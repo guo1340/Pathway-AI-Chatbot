@@ -14,12 +14,9 @@ if (!function_exists('pathway_rag_mint_current_user_token')) {
     exit;
 }
 
-wp_get_current_user();
-
-// Contributor access uses WordPress's built-in edit_posts capability.
-// To later allow subscribers/all logged-in users, change this to 'read' and
-// make the backend JWT_REQUIRED_CAP plus token issuer mint the same capability.
-$ask_ai_required_cap = 'edit_posts';
+$current_user = wp_get_current_user();
+$user_roles = (array) $current_user->roles;
+$is_contributor = in_array('contributor', $user_roles, true);
 
 // Not logged in → redirect
 if (!is_user_logged_in()) {
@@ -36,8 +33,8 @@ if (!is_user_logged_in()) {
 }
 
 
-// Must be contributor+
-if (!current_user_can($ask_ai_required_cap)) {
+// Must be Contributor role or a standard higher role with post-editing access.
+if (!$is_contributor && !current_user_can('edit_posts')) {
     $login_url = wp_login_url(get_permalink());
     $login_url = add_query_arg([
         'rag_notice' => '1',
@@ -80,7 +77,7 @@ $iframe_url = add_query_arg([
     'token' => $token,
     'exp' => $exp,
     'requireAuth' => '1',
-    'requiredCap' => $ask_ai_required_cap,
+    'requiredCap' => 'edit_posts',
     'accessUrl' => get_permalink(),
     'source' => $source,
     'title' => $title,
