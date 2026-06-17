@@ -50,7 +50,7 @@ export default defineConfig({
             return
           }
 
-          const requiredCap = envValue('JWT_REQUIRED_CAP') || 'edit_posts'
+          const requiredCap = envValue('JWT_REQUIRED_CAP') || 'contributor'
           const encode = (value: object) =>
             Buffer.from(JSON.stringify(value)).toString('base64url')
           const header = encode({ alg: 'HS256', typ: 'JWT' })

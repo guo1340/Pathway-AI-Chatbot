@@ -81,11 +81,11 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Frontend: add a circled question mark button after the input tokens and max response header that opens a chat bubble like display that explains in common language what they each are, users may not know what they are.
 - [x] Backend and Frontend: right now the daily balance has "waiting for the next backend balance" when page is refreshed, find a way to track the remaining daily balance when loading the messages, either keep track of it with the user id or with the latest message. Choose the cleanest and easiest way to do it so that it will always display the correct daily balance limit.
 - [ ] needs to allow more than 2000 token per question since history may be too long, also add recomendations
-- [x] WordPress/Auth: explicitly allow Contributor-role accounts to access Ask AI with a direct role check while keeping backend JWT validation on `edit_posts`.
+- [x] WordPress/Auth: explicitly allow users with WordPress role slug `contributor` to access Ask AI without requiring the `edit_posts` capability.
 
 ## In Progress
 
-- Current task: Simplified the Ask AI WordPress access check to the actual current requirement: users with role `contributor` can enter, and higher standard roles still pass through `edit_posts`. Backend JWT validation remains `edit_posts`.
+- Current task: Corrected Ask AI access to use the WordPress role slug `contributor` as the shared page/frontend/backend auth signal. The live Contributor role has `edit_posts: no`, so `edit_posts` is no longer used for normal chat access.
 
 ## Done
 
@@ -131,7 +131,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - [x] Fixed the duplicated WordPress admin bar that appeared after a timed-out session re-authenticated, by redirecting the top-level window instead of the embedded chat iframe.
 - [x] Corrected the token help placement so the circled question marks are in the token grid header cells beside Input tokens and Max response, cleaned up the enlarged info button styling, and added a session fallback for the daily balance while `/api/history` remains the backend authority.
 - [x] Fixed token help bubble clipping by allowing the token grid to overflow visibly and anchoring each bubble inside the dialog; added authenticated `/api/balance` as a direct fallback when history does not include `remaining_tokens`.
-- [x] Reverted the overcomplicated Ask AI capability variable and replaced it with a direct Contributor role check plus the existing `edit_posts` fallback for higher roles.
+- [x] Replaced the Ask AI `edit_posts` requirement with the exact WordPress role slug `contributor` across the page, frontend required capability, backend default capability, and tests.
 
 ## Notes for Codex
 
@@ -198,6 +198,7 @@ Improve the chatbot's backend architecture and security before expanding fronten
 - 2026-06-16 23:26:50 +08:00 - Fixed the token help bubble z-index/clipping issue and added authenticated `/api/balance` so the frontend can still display daily balance when `/api/history` does not provide it.
 - 2026-06-17 10:04:03 +08:00 - Clarified and guarded contributor-and-above Ask AI access with the shared `edit_posts` capability, plus instructions for future `read`/all-logged-in access.
 - 2026-06-17 10:26:29 +08:00 - Simplified the Ask AI access fix by removing the extra capability variable and checking the WordPress `contributor` role directly, with `edit_posts` retained for higher roles and backend JWT validation.
+- 2026-06-17 10:51:36 +08:00 - Corrected Ask AI auth after live debugging showed Contributor has `edit_posts: no`; normal chat access now uses role/cap string `contributor` instead of `edit_posts`.
 
 ## Steps and Instructions for Testing
 

@@ -272,7 +272,7 @@ export default function App({
   const requiredCap =
     qs.get('requiredCap') ||
     cfg.requiredCap ||
-    'edit_posts'
+    'contributor'
   const tokenPayload = readJwtPayload(authToken || undefined)
   const tokenExpiry = Number(tokenPayload?.exp || expFromUrl || 0)
   const tokenCaps = Array.isArray(tokenPayload?.cap) ? tokenPayload.cap : []
