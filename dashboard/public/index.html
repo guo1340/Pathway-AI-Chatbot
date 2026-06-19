@@ -153,6 +153,24 @@
     }
     .prompt-sync-input:disabled { opacity: 0.5; }
     .prompt-sync-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .token-limit-grid {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
+      margin-top: 14px;
+    }
+    .token-limit-field {
+      display: grid; gap: 7px; padding: 12px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 9px;
+    }
+    .token-limit-field label {
+      font-size: 0.76rem; color: var(--muted); line-height: 1.35;
+    }
+    .token-limit-field input {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--surface); color: var(--text); font: inherit;
+    }
+    .token-limit-field input:focus { border-color: var(--accent); outline: none; }
+    .token-limit-status { font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
+    .token-limit-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
 
     /* ── Log output ── */
     .log {
@@ -186,6 +204,7 @@
 
     @media (max-width: 680px) {
       .service-grid { grid-template-columns: 1fr; }
+      .token-limit-grid { grid-template-columns: 1fr; }
       .service-row { align-items: flex-start; flex-direction: column; }
       .service-actions { width: 100%; }
       .service-actions button { flex: 1; justify-content: center; }
@@ -261,6 +280,40 @@
   </div>
 
   <!-- ── Documents ── -->
+  <div class="card">
+    <div class="document-head">
+      <div class="card-title">Token Usage Limits</div>
+      <div class="target-toggle" aria-label="Token limit environment">
+        <button type="button" id="localTokenLimitBtn" class="active" onclick="setTokenLimitTarget('local')">Local</button>
+        <button type="button" id="ec2TokenLimitBtn" onclick="setTokenLimitTarget('ec2')">EC2</button>
+      </div>
+    </div>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:12px">
+      Adjust backend limits stored in <code>rag-backend/.env</code>. Local changes need a backend restart; EC2 changes restart PM2 automatically.
+    </p>
+    <div class="token-limit-grid">
+      <div class="token-limit-field">
+        <label for="dailyTokenLimit">Daily tokens per user</label>
+        <input id="dailyTokenLimit" type="number" min="1" step="1000" inputmode="numeric" />
+      </div>
+      <div class="token-limit-field">
+        <label for="requestTokenLimit">Per-request input tokens</label>
+        <input id="requestTokenLimit" type="number" min="1" step="100" inputmode="numeric" />
+      </div>
+      <div class="token-limit-field">
+        <label for="responseTokenLimit">Per-response max tokens</label>
+        <input id="responseTokenLimit" type="number" min="1" step="100" inputmode="numeric" />
+      </div>
+    </div>
+    <div class="token-limit-actions">
+      <span class="token-limit-status" id="tokenLimitStatus">Loading token limits...</span>
+      <div style="display:flex;gap:10px">
+        <button class="btn-ghost" onclick="loadTokenLimits()">Reset</button>
+        <button class="btn-primary" id="saveTokenLimitsBtn" onclick="saveTokenLimits()">Save Limits</button>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <div class="document-head">
       <div class="card-title" id="documentTitle">Local Bot Documents - rag-backend/docs</div>
@@ -438,6 +491,76 @@ function updateServiceStatus(service, state) {
 
 let documentTarget = 'local';
 let loadedDocuments = [];
+let tokenLimitTarget = 'local';
+
+function setTokenLimitTarget(target) {
+  tokenLimitTarget = target;
+  const isEc2 = target === 'ec2';
+  document.getElementById('localTokenLimitBtn').classList.toggle('active', !isEc2);
+  document.getElementById('ec2TokenLimitBtn').classList.toggle('active', isEc2);
+  loadTokenLimits();
+}
+
+function tokenLimitPayload() {
+  return {
+    CHAT_DAILY_TOKEN_LIMIT: document.getElementById('dailyTokenLimit').value,
+    CHAT_INPUT_TOKEN_LIMIT: document.getElementById('requestTokenLimit').value,
+    LLM_MAX_OUTPUT_TOKENS: document.getElementById('responseTokenLimit').value,
+  };
+}
+
+function fillTokenLimitInputs(limits) {
+  const byName = Object.fromEntries((limits || []).map(limit => [limit.name, limit.value]));
+  document.getElementById('dailyTokenLimit').value = byName.CHAT_DAILY_TOKEN_LIMIT || '';
+  document.getElementById('requestTokenLimit').value = byName.CHAT_INPUT_TOKEN_LIMIT || '';
+  document.getElementById('responseTokenLimit').value = byName.LLM_MAX_OUTPUT_TOKENS || '';
+}
+
+async function loadTokenLimits() {
+  const status = document.getElementById('tokenLimitStatus');
+  status.textContent = 'Loading token limits...';
+  status.style.color = 'var(--muted)';
+  try {
+    const r = await fetch(`/api/token-limits?target=${tokenLimitTarget}`);
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    fillTokenLimitInputs(d.limits);
+    status.textContent = `Loaded ${d.target === 'ec2' ? 'EC2' : 'local'} limits from ${d.envPath}`;
+  } catch (e) {
+    status.textContent = 'Failed to load token limits: ' + e.message;
+    status.style.color = 'var(--danger)';
+  }
+}
+
+async function saveTokenLimits() {
+  const btn = document.getElementById('saveTokenLimitsBtn');
+  const status = document.getElementById('tokenLimitStatus');
+  setLoading(btn, true, ' Saving...');
+  status.textContent = '';
+  try {
+    const r = await fetch(`/api/token-limits?target=${tokenLimitTarget}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ limits: tokenLimitPayload() }),
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    fillTokenLimitInputs(d.limits);
+    status.textContent = d.message || (
+      d.target === 'ec2'
+        ? 'Saved to EC2 and restarted backend'
+        : 'Saved to rag-backend/.env - restart backend to apply'
+    );
+    status.style.color = 'var(--success)';
+    toast(d.target === 'ec2' ? 'EC2 token limits saved' : 'Token limits saved');
+  } catch (e) {
+    status.textContent = 'Save failed: ' + e.message;
+    status.style.color = 'var(--danger)';
+    toast('Token limit save failed: ' + e.message, 'err');
+  } finally {
+    setLoading(btn, false);
+  }
+}
 
 function setDocumentTarget(target) {
   documentTarget = target;
@@ -744,6 +867,7 @@ startHealthPolling();
 startLogPolling();
 loadDocs();
 loadPrompt();
+loadTokenLimits();
 </script>
 </body>
 </html>

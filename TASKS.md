@@ -165,6 +165,7 @@ Observed in the dashboard: clicking "Check EC2 Branch" shows `Branch check faile
 - [x] Replaced the Ask AI `edit_posts` requirement with the exact WordPress role slug `contributor` across the page, frontend required capability, backend default capability, and tests.
 - [x] Completed Priority 9 response reveal, token-budget recovery, shorter visible history, and citation-integrity hardening; generated focused pending checks for the next test run.
 - [x] Hardened dashboard EC2 branch check and prompt sync so API failures and non-JSON responses produce readable JSON-based errors instead of `Unexpected token '<'`.
+- [x] Added dashboard controls for local and EC2 backend daily, per-request input, and per-response token limits.
 
 ## Notes for Codex
 
@@ -177,6 +178,7 @@ Observed in the dashboard: clicking "Check EC2 Branch" shows `Branch check faile
 ## Work Log
 
 - Full timestamped history: [`LOG.md`](LOG.md#work-log)
+- 2026-06-19 12:02:36 +08:00 - Added dashboard token-limit controls for local and EC2 backend `.env` and passed dashboard security checks.
 - 2026-06-17 17:25:24 +08:00 - Ran the Priority 9 frontend/backend tests, fixed their regressions, hardened dashboard branch/prompt JSON error handling, and passed the dashboard security checks.
 - 2026-06-17 13:04:08 +08:00 - Implemented Priority 9 response reveal, over-budget recovery, 3,000-token input defaults, 4-exchange visible history, and citation-marker hardening; generated focused pending tests.
 - 2026-06-05 17:27:47 +08:00 - Completed content-aware document chunking.

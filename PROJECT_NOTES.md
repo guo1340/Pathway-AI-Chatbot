@@ -60,6 +60,7 @@ This project is a Retrieval-Augmented Generation chatbot for Pathway Ministry / 
 - Dashboard local uploads are proxied to authenticated `POST /api/upload`, and local deletions call authenticated `POST /api/reload`.
 - Dashboard document controls can target Local or EC2 explicitly. EC2 listing/upload/deletion uses SSH/SFTP and restarts `rag-backend` through PM2 so the production index reloads.
 - Dashboard prompt controls can check the active Git branch on EC2, sync local `rag-backend/prompt.txt` to that active checkout, and optionally commit plus push the prompt change to the same active branch. The browser does not provide a branch name.
+- Dashboard token controls can read and update Local or EC2 `rag-backend/.env` values for `CHAT_DAILY_TOKEN_LIMIT`, `CHAT_INPUT_TOKEN_LIMIT`, and `LLM_MAX_OUTPUT_TOKENS`. Local saves require a backend restart; EC2 saves run over SSH and restart PM2 automatically.
 - Dashboard-launched backend and frontend processes have individual Stop controls and separate bounded output consoles. The dashboard stops only child processes it launched.
 - The document card filters the currently loaded Local or EC2 list by filename without making an additional backend or SSH request.
 - When the backend `.env` has no JWT secret, the dashboard creates an in-memory local secret and passes it only to the backend process it launches.
@@ -146,6 +147,7 @@ Dashboard:
 - `GET /api/local-health`, `GET /api/local-logs`: local backend/frontend status and backend logs.
 - `GET /api/docs`, `POST /api/docs/upload`, `DELETE /api/docs/:filename`: local document operations using backend authentication for indexing.
 - `GET /api/prompt`, `POST /api/prompt`: local prompt editing.
+- `GET /api/token-limits`, `POST /api/token-limits`: Local/EC2 backend `.env` editing for daily, per-request input, and per-response token limits.
 - `GET /api/server/git-status`: reads the active EC2 branch, short commit, and `rag-backend/prompt.txt` Git status through SSH.
 - `POST /api/server/sync-prompt`: uploads local `rag-backend/prompt.txt` to EC2, restarts PM2, and can optionally commit/push only to the EC2 checkout's active branch.
 - `POST /api/toggle`, `POST /api/server/restart`: return HTTP 423 while remote deployment is locked.
