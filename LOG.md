@@ -2149,3 +2149,36 @@ Verification completed:
 Optimal result:
 
 - Dashboard branch and prompt-sync operations either succeed normally or fail with clear JSON-based messages. The operator should not see a raw HTML parse error.
+
+### 2026-06-19 12:02:36 +08:00 - Dashboard Token Limit Controls
+
+Added local and EC2 dashboard controls for the three backend token usage limits.
+
+Changes:
+
+- Dashboard backend (`dashboard/server.js`): added `GET /api/token-limits` and `POST /api/token-limits` for Local and EC2 `rag-backend/.env` values.
+- Dashboard backend (`dashboard/server.js`): added bounded numeric validation for `CHAT_DAILY_TOKEN_LIMIT`, `CHAT_INPUT_TOKEN_LIMIT`, and `LLM_MAX_OUTPUT_TOKENS`.
+- Dashboard backend (`dashboard/server.js`): EC2 saves back up the remote `.env`, update only the three token keys through SSH, and restart PM2 with `--update-env`.
+- Dashboard frontend (`dashboard/public/index.html`): added a `Token Usage Limits` card with a Local/EC2 target toggle and numeric inputs for daily user tokens, per-request input tokens, and per-response max tokens.
+- Dashboard frontend (`dashboard/public/index.html`): local saves update `rag-backend/.env` and tell the operator to restart the backend; EC2 saves restart PM2 automatically.
+- Dashboard tests (`dashboard/security.test.js`): added coverage for reading/writing token limits and for the new dashboard controls.
+
+Verification completed:
+
+1. `cd dashboard && node --check server.js` passed.
+2. `cd dashboard && npm.cmd run test:security` passed 32 dashboard security/configuration checks.
+
+### Steps And Instructions For Testing
+
+1. Start the dashboard with `cd dashboard && npm start`.
+2. Open `http://localhost:3131`.
+3. In `Token Usage Limits`, confirm Local loads the three values from local `rag-backend/.env`.
+4. Change one or more Local values and click `Save Limits`.
+5. Confirm the status says the values were saved and that local `rag-backend/.env` contains the new numbers.
+6. Restart the local backend from the dashboard or by restarting its terminal process.
+7. Switch the token target to EC2 after `dashboard/.env` SSH settings are configured.
+8. Confirm EC2 loads the remote values, save a deliberate change, and confirm the dashboard reports that EC2 was saved and PM2 restarted.
+
+Optimal result:
+
+- The dashboard can adjust local or EC2 daily, per-request input, and per-response token limits without hand-editing `.env`; local changes apply after restart and EC2 changes apply after the automatic PM2 restart.

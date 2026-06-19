@@ -1402,3 +1402,20 @@ Pending manual checks:
 - [ ] Manual dashboard check: use `Sync Prompt to EC2` with and without commit/push and confirm failures render in the inline status/toast as readable JSON-based messages.
 
 Optimal result: the focused Priority 9 regression suite is green, backend citation history is clean, and dashboard EC2 branch/prompt failures never expose raw HTML parse errors to the operator.
+
+## 2026-06-19 12:02:36 +08:00 - Dashboard Token Limit Controls Verification
+
+Completed:
+
+- [x] Added dashboard API coverage for reading and writing `CHAT_DAILY_TOKEN_LIMIT`, `CHAT_INPUT_TOKEN_LIMIT`, and `LLM_MAX_OUTPUT_TOKENS` in local `rag-backend/.env`.
+- [x] Added dashboard API coverage for the EC2 token-limit route path that updates remote `.env` through SSH and restarts PM2.
+- [x] Added dashboard UI coverage for the `Token Usage Limits` card, Local/EC2 target toggle, and save handler.
+- [x] `cd dashboard && node --check server.js` passed.
+- [x] `cd dashboard && npm.cmd run test:security` passed 32 dashboard security/configuration checks.
+
+Pending manual checks:
+
+- [ ] Start the dashboard, edit the three Local token fields, save, confirm local `rag-backend/.env` updates, and restart the local backend to confirm the new values apply.
+- [ ] With valid `dashboard/.env` SSH settings, switch token limits to EC2, save a deliberate value change, and confirm EC2 `.env` updates and PM2 restarts.
+
+Optimal result: operators can adjust Local or EC2 daily, per-request input, and per-response token limits from the dashboard instead of hand-editing backend `.env`.

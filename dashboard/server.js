@@ -43,6 +43,23 @@ const LOCAL_BACKEND_URL = 'http://127.0.0.1:8000';
 const LOCAL_FRONTEND_URL = 'http://localhost:5173';
 const REMOTE_API_ENABLED = false;
 const LOCAL_JWT_SECRET = crypto.randomBytes(32).toString('hex');
+const TOKEN_LIMIT_FIELDS = [
+  {
+    name: 'CHAT_DAILY_TOKEN_LIMIT',
+    label: 'Daily user token limit',
+    fallback: 100000,
+  },
+  {
+    name: 'CHAT_INPUT_TOKEN_LIMIT',
+    label: 'Per-request input token limit',
+    fallback: 3000,
+  },
+  {
+    name: 'LLM_MAX_OUTPUT_TOKENS',
+    label: 'Per-response max token limit',
+    fallback: 1200,
+  },
+];
 
 
 // ── Toggle file definitions ───────────────────────────────────────────────────
@@ -372,6 +389,80 @@ function readEnvValue(name) {
   return line.slice(line.indexOf('=') + 1).trim().replace(/^(['"])(.*)\1$/, '$2');
 }
 
+function readBackendEnvText() {
+  return fs.existsSync(BACKEND_ENV_FILE) ? fs.readFileSync(BACKEND_ENV_FILE, 'utf8') : '';
+}
+
+function writeBackendEnvValue(name, value) {
+  fs.mkdirSync(path.dirname(BACKEND_ENV_FILE), { recursive: true });
+  const text = readBackendEnvText();
+  const lines = text ? text.split(/\r?\n/) : [];
+  const pattern = new RegExp(`^\\s*${name}\\s*=`);
+  let changed = false;
+  const nextLines = lines.map(line => {
+    if (!pattern.test(line)) return line;
+    changed = true;
+    return `${name}=${value}`;
+  });
+  if (!changed) {
+    if (nextLines.length && nextLines[nextLines.length - 1] !== '') nextLines.push('');
+    nextLines.push(`${name}=${value}`);
+  }
+  fs.writeFileSync(BACKEND_ENV_FILE, nextLines.join('\n').replace(/\n*$/, '\n'), 'utf8');
+}
+
+function parseTokenLimitsFromText(text) {
+  return TOKEN_LIMIT_FIELDS.map(field => {
+    const line = String(text || '')
+      .split(/\r?\n/)
+      .find(entry => entry.trim().startsWith(`${field.name}=`));
+    const raw = line
+      ? line.slice(line.indexOf('=') + 1).trim().replace(/^(['"])(.*)\1$/, '$2')
+      : '';
+    const parsed = Number.parseInt(raw || String(field.fallback), 10);
+    return {
+      name: field.name,
+      label: field.label,
+      value: Number.isFinite(parsed) && parsed > 0 ? parsed : field.fallback,
+      fallback: field.fallback,
+    };
+  });
+}
+
+function readTokenLimits() {
+  return parseTokenLimitsFromText(readBackendEnvText());
+}
+
+function normalizeTokenLimitValue(field, rawValue) {
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 10000000) {
+    throw new Error(`${field.label} must be a whole number from 1 to 10,000,000.`);
+  }
+  return parsed;
+}
+
+async function readRemoteTokenLimits() {
+  const remoteEnv = `${REMOTE_ROOT}/rag-backend/.env`;
+  const text = await sshExec(`cat ${shellQuote(remoteEnv)}`);
+  return parseTokenLimitsFromText(text);
+}
+
+async function writeRemoteTokenLimits(values) {
+  const commands = [
+    `cd ${shellQuote(`${REMOTE_ROOT}/rag-backend`)}`,
+    'cp .env ".env.bak.$(date +%Y%m%d-%H%M%S)"',
+  ];
+  for (const field of TOKEN_LIMIT_FIELDS) {
+    const value = values[field.name];
+    commands.push(
+      `if grep -q '^${field.name}=' .env; then sed -i 's|^${field.name}=.*|${field.name}=${value}|' .env; else printf '\\n%s=%s\\n' '${field.name}' '${value}' >> .env; fi`
+    );
+  }
+  commands.push('pm2 restart rag-backend --update-env');
+  await sshExec(commands.join(' && '));
+  return readRemoteTokenLimits();
+}
+
 function localBackendToken() {
   const secret = readEnvValue('PATHWAY_RAG_JWT_SECRET') || LOCAL_JWT_SECRET;
   const requiredCap = readEnvValue('JWT_REQUIRED_CAP') || 'edit_posts';
@@ -574,6 +665,68 @@ app.post('/api/local/stop/:service', async (req, res) => {
     res.json({ success: true, stopped });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/token-limits', async (req, res) => {
+  const target = documentTarget(req);
+  if (!target) return res.status(400).json({ error: 'Invalid token limit target' });
+  try {
+    if (target === 'ec2') {
+      return res.json({
+        target,
+        envPath: `${REMOTE_ROOT}/rag-backend/.env`,
+        limits: await readRemoteTokenLimits(),
+        restartRequired: false,
+      });
+    }
+    res.json({
+      target,
+      envPath: BACKEND_ENV_FILE,
+      limits: readTokenLimits(),
+      restartRequired: true,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/token-limits', async (req, res) => {
+  const target = documentTarget(req);
+  if (!target) return res.status(400).json({ error: 'Invalid token limit target' });
+  try {
+    const incoming = req.body?.limits || {};
+    const saved = {};
+    for (const field of TOKEN_LIMIT_FIELDS) {
+      const value = normalizeTokenLimitValue(field, incoming[field.name]);
+      saved[field.name] = value;
+    }
+    if (target === 'ec2') {
+      const limits = await writeRemoteTokenLimits(saved);
+      return res.json({
+        success: true,
+        target,
+        envPath: `${REMOTE_ROOT}/rag-backend/.env`,
+        limits,
+        saved,
+        restartRequired: false,
+        message: 'EC2 token limits saved and backend restarted.',
+      });
+    }
+    for (const [name, value] of Object.entries(saved)) {
+      writeBackendEnvValue(name, value);
+    }
+    res.json({
+      success: true,
+      target,
+      envPath: BACKEND_ENV_FILE,
+      limits: readTokenLimits(),
+      saved,
+      restartRequired: true,
+      message: 'Local token limits saved. Restart the local backend to apply them.',
+    });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
   }
 });
 
