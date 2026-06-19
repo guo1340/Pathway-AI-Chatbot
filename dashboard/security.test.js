@@ -16,7 +16,7 @@ function loadServer(envFile, environment = {}) {
 
   const instrumented = source.replace(
     /app\.listen\(PORT,[\s\S]*$/,
-    'module.exports = { SSH_HOST, SSH_USER, REMOTE_ROOT, localBackendToken, createSSHClient, remoteLocked, documentTarget, validDocumentName, validLocalService, shellQuote, remoteGitBaseCommand, validCommitMessage };'
+    'module.exports = { SSH_HOST, SSH_USER, REMOTE_ROOT, BACKEND_ENV_FILE, localBackendToken, createSSHClient, remoteLocked, documentTarget, validDocumentName, validLocalService, shellQuote, remoteGitBaseCommand, validCommitMessage, readTokenLimits, writeBackendEnvValue };'
   );
   const sandboxProcess = Object.create(process);
   sandboxProcess.env = { ...environment };
@@ -114,18 +114,50 @@ async function run() {
   assert.strictEqual(locked.validCommitMessage(''), false);
   assert.strictEqual(locked.validCommitMessage('bad\nmessage'), false);
   assert.strictEqual(locked.validCommitMessage('x'.repeat(161)), false);
+  fs.mkdirSync(path.dirname(locked.BACKEND_ENV_FILE), { recursive: true });
+  fs.writeFileSync(
+    locked.BACKEND_ENV_FILE,
+    [
+      'CHAT_DAILY_TOKEN_LIMIT=90000',
+      'CHAT_INPUT_TOKEN_LIMIT=2500',
+      'LLM_MAX_OUTPUT_TOKENS=900',
+    ].join('\n'),
+    'utf8'
+  );
+  assert.strictEqual(
+    JSON.stringify(locked.readTokenLimits().map(limit => [limit.name, limit.value])),
+    JSON.stringify([
+      ['CHAT_DAILY_TOKEN_LIMIT', 90000],
+      ['CHAT_INPUT_TOKEN_LIMIT', 2500],
+      ['LLM_MAX_OUTPUT_TOKENS', 900],
+    ])
+  );
+  locked.writeBackendEnvValue('CHAT_INPUT_TOKEN_LIMIT', 3000);
+  assert.match(fs.readFileSync(locked.BACKEND_ENV_FILE, 'utf8'), /CHAT_INPUT_TOKEN_LIMIT=3000/);
   assert.match(source, /\/api\/server\/git-status/);
+  assert.match(source, /\/api\/token-limits/);
+  assert.match(source, /readRemoteTokenLimits/);
+  assert.match(source, /writeRemoteTokenLimits/);
+  assert.match(source, /pm2 restart rag-backend --update-env/);
+  assert.match(source, /target === 'ec2'/);
   assert.match(source, /push origin/);
   assert.match(source, /Dashboard API route not found/);
   assert.match(source, /req\.path\.startsWith\('\/api'\)/);
   assert.match(dashboardHtml, /checkRemoteBranch/);
   assert.match(dashboardHtml, /syncPromptToEc2/);
+  assert.match(dashboardHtml, /Token Usage Limits/);
+  assert.match(dashboardHtml, /localTokenLimitBtn/);
+  assert.match(dashboardHtml, /ec2TokenLimitBtn/);
+  assert.match(dashboardHtml, /setTokenLimitTarget/);
+  assert.match(dashboardHtml, /dailyTokenLimit/);
+  assert.match(dashboardHtml, /saveTokenLimits/);
+  assert.match(dashboardHtml, /target=\$\{tokenLimitTarget\}/);
   assert.match(dashboardHtml, /readDashboardJsonResponse/);
   assert.match(dashboardHtml, /content-type/);
   assert.match(dashboardHtml, /returned non-JSON response/);
   assert.match(dashboardHtml, /Commit and push prompt\.txt to the active EC2 branch/);
 
-  console.log('Dashboard security configuration: 18 checks passed');
+  console.log('Dashboard security configuration: 32 checks passed');
 }
 
 run().catch((error) => {
